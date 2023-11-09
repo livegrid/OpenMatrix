@@ -30,3 +30,21 @@
 *.exe
 *.out
 *.app
+
+# Platformio
+.pioenvs
+.piolibdeps
+.clang_complete
+.gcc-flags.json
+.pio
+
+# Code specific
+
+# Apple
+*Secrets.h
+.DS_Store
+
+# VSCode
+.vscode
+mklittlefs.exe
+mklittlefs
