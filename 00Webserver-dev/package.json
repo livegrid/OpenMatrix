@@ -1,0 +1,37 @@
+{
+	"name": "src",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"lint": "prettier --plugin-search-dir . --check .",
+		"format": "prettier --plugin-search-dir . --write ."
+	},
+	"devDependencies": {
+		"@bun-community/sveltekit-adapter-bun": "^0.0.6",
+		"@fontsource/fira-mono": "^4.5.10",
+		"@neoconfetti/svelte": "^1.0.0",
+		"@sveltejs/adapter-auto": "^2.0.0",
+		"@sveltejs/adapter-static": "^2.0.1",
+		"@sveltejs/kit": "^1.5.0",
+		"@tailwindcss/typography": "^0.5.9",
+		"autoprefixer": "^10.4.7",
+		"daisyui": "^2.18.1",
+		"postcss": "^8.4.14",
+		"postcss-load-config": "^4.0.1",
+		"prettier": "^2.8.0",
+		"prettier-plugin-svelte": "^2.8.1",
+		"svelte": "^3.54.0",
+		"svelte-awesome-color-picker": "^2.4.1",
+		"svelte-preprocess": "^4.10.7",
+		"tailwindcss": "^3.1.5",
+		"vite": "^4.2.0"
+	},
+	"type": "module",
+	"dependencies": {
+		"svelte-local-storage-store": "^0.4.0",
+		"theme-change": "^2.5.0",
+		"vite-plugin-singlefile": "^0.13.5"
+	}
+}

@@ -1,0 +1,17 @@
+<script>
+	import { createEventDispatcher } from 'svelte';
+	const dispatch = createEventDispatcher();
+  export let label = 'null';
+	export let command = 'interaction';
+  export let param = 'null';
+	function sendData() {
+		dispatch('update', { command:command, param:param});
+		console.log('Button sent');
+	}
+</script>
+
+<button class="btn btn-circle btn-outline" on:click={sendData}>
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+</button>
+
+{label}

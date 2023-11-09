@@ -1,11 +1,17 @@
 # Welcome to OpenMatrix, a project by [Livegrid](livegrid.tech) ✨
 
 <p align="center">
+  <img src="https://raw.githubusercontent.com/livegrid/OpenMatrix/main/images/MQTT.webp" alt="Cover Image">
 </p>
 
 Use ESP32 to control HUB75 matrices using a simple webserver !
 
 ## ⚙️ Features
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/livegrid/OpenMatrix/main/images/Features.webp" alt="Cover Image">
+</p>
+
 [x] Uses ESP32 DMA based on [this amazing library](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA) to control the matrices leaving the processor free for other important functions.
 [x] Built fully on [ESPAsyncWebserver Library](https://github.com/me-no-dev/ESPAsyncWebServer) enabling fast and easy communication.
 [x] Connect to your local WiFi using a WiFi Manager (partly implemented, uses [Khoih-prog WiFiManager library](https://github.com/khoih-prog/ESPAsync_WiFiManager) for now).
