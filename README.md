@@ -1,10 +1,10 @@
-# Welcome to OpenMatrix, a project by [Livegrid](livegrid.tech) ✨
+# Welcome to OpenMatrix, a project by [Livegrid](https://livegrid.tech/) ✨
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/livegrid/OpenMatrix/main/images/MQTT.webp" alt="Cover Image">
 </p>
 
-Use ESP32 to control HUB75 matrices using a simple webserver !
+Use ESP32 to control RGB HUB75 matrices using a simple webserver !
 
 ## ⚙️ Features
 
