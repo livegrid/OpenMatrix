@@ -3,9 +3,14 @@
 #include <ElegantOTA.h>
 #include "ConfigManager.h"
 
-ConfigManager cfgManager;
+#define FIRMWARE_VERSION_MAJOR 0
+#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_PATCH 0
+
 WebServer server(80);
 NetWizard NW(&server);
+
+ConfigManager cfgManager;
 
 void setup(void) {
   Serial.begin(115200);
@@ -20,7 +25,7 @@ void setup(void) {
 
 )"""");
   Serial.println("----------------------------");
-  Serial.printf("Firmware Version: %s\n", "0.0.0");
+  Serial.printf("Firmware Version: %u.%u.%u\n", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
 
   // NetWizard configured to NON_BLOCKING mode
   NW.setStrategy(NetWizardStrategy::NON_BLOCKING);
