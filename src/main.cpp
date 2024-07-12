@@ -1,7 +1,7 @@
 #include <WebServer.h>
 #include <NetWizard.h>
 #include <ElegantOTA.h>
-#include "ConfigManager.h"
+#include "StateManager.h"
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 0
@@ -10,7 +10,7 @@
 WebServer server(80);
 NetWizard NW(&server);
 
-ConfigManager cfgManager;
+StateManager stateManager;
 
 void setup(void) {
   Serial.begin(115200);
