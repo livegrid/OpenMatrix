@@ -47,7 +47,7 @@ See [here](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA)!
 
 ## ✌️ Other
 
-Licensed under the MIT license  
+Licensed under the AGPL-3.0 license  
 
 This project is hugely inspired from [WLED](https://github.com/Aircoookie/WLED), one the best open source projects I have ever used.
 
