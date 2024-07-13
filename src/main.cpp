@@ -2,15 +2,18 @@
 #include <NetWizard.h>
 #include <ElegantOTA.h>
 #include "StateManager.h"
+#include "UI.h"
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 0
 #define FIRMWARE_VERSION_PATCH 0
 
+StateManager stateManager;
+
 WebServer server(80);
 NetWizard NW(&server);
+UI ui(&server, &stateManager);
 
-StateManager stateManager;
 
 void setup(void) {
   Serial.begin(115200);
@@ -26,6 +29,13 @@ void setup(void) {
 )"""");
   Serial.println("----------------------------");
   Serial.printf("Firmware Version: %u.%u.%u\n", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+  Serial.println();
+
+  // Start LittleFS
+  LittleFS.begin();
+
+  // Restore State
+  stateManager.restore();
 
   // NetWizard configured to NON_BLOCKING mode
   NW.setStrategy(NetWizardStrategy::NON_BLOCKING);
@@ -98,6 +108,9 @@ void setup(void) {
     Serial.printf("[NW] Portal state changed to: %s\n", state_str.c_str());
   });
 
+  // Start OpenMatrix UI
+  ui.begin();
+
   // Start ElegantOTA
   Serial.println("[*] Attaching ElegantOTA");
   ElegantOTA.begin(&server);
@@ -108,13 +121,10 @@ void setup(void) {
   
   // Check if configured
   if (NW.isConfigured()) {
-    Serial.println("LiveGrid is configured!");
+    Serial.println("OpenMatrix is configured!");
   } else {
-    Serial.println("LiveGrid is not configured yet! Please connect to LiveGrid AP and setup your device.");
+    Serial.println("OpenMatrix is not configured yet! Please connect to LiveGrid AP and setup your device.");
   }
-
-  // Start WebServer
-  server.begin();
 }
 
 void loop(void) {
