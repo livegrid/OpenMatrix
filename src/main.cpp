@@ -118,6 +118,8 @@ void setup(void) {
   // Start NetWizard with "LiveGrid" AP
   Serial.println("[*] Starting NetWizard");
   NW.autoConnect("LiveGrid", "");
+
+  server.begin();
   
   // Check if configured
   if (NW.isConfigured()) {
