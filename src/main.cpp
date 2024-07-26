@@ -19,6 +19,46 @@ UI ui(&server, &stateManager);
 Matrix matrix;
 EffectManager effectManager(&matrix);
 
+TaskHandle_t updateMatrixTaskHandle;
+TaskHandle_t serverTaskHandle;
+
+void updateMatrix() {
+  effectManager.updateCurrentEffect();
+  matrix.update();
+}
+
+
+void serverTask(void *parameter) {
+  for (;;) {
+    server.handleClient();
+    ElegantOTA.loop();
+    NW.loop();
+    vTaskDelay(1); // Small delay to prevent watchdog timer issues
+  }
+}
+
+void updateMatrixTask(void *parameter) {
+  const TickType_t xFrequency = pdMS_TO_TICKS(30); // 2000 ms interval (2 seconds)
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
+  for (;;) {
+    static unsigned long lastLogTime = 0;
+    static unsigned long lastFrameTime = 0;
+    unsigned long currentTime = millis();
+    
+    // Calculate and print framerate every 5 seconds
+    if (currentTime - lastLogTime >= 5000) {
+      float framerate = 1000.0 / (currentTime - lastFrameTime);
+      log_e("Framerate: %.2f FPS", framerate);
+      lastLogTime = currentTime;
+    }
+    
+    lastFrameTime = currentTime;
+    effectManager.updateCurrentEffect();
+    matrix.update();
+    vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next interval
+  }
+}
+
 void setup(void) {
   Serial.begin(115200);
   Serial.println("");
@@ -131,25 +171,31 @@ void setup(void) {
   } else {
     Serial.println("OpenMatrix is not configured yet! Please connect to LiveGrid AP and setup your device.");
   }
+
+  xTaskCreatePinnedToCore(
+    updateMatrixTask,          // Task function
+    "Update Matrix",           // Name of the task
+    8192,                      // Stack size in words
+    NULL,                      // Task input parameter
+    1,                         // Priority of the task
+    NULL,                      // Task handle
+    1                          // Core where the task should run (1)
+  );
+
+  xTaskCreatePinnedToCore(
+    serverTask,                // Task function
+    "Server Task",             // Name of the task
+    8192,                      // Stack size in words
+    NULL,                      // Task input parameter
+    1,                         // Priority of the task
+    &serverTaskHandle,         // Task handle
+    0                          // Core where the task should run (0)
+  );
 }
 
 void loop(void) {
   // Handle WebServer
-  server.handleClient();
-
-  static unsigned long lastTime = 0;  
-  static uint16_t x = 0;
-  static uint16_t y = 0;  
-  unsigned long currentTime = millis();
-
-  if (millis() - lastTime >= 40) {
-    effectManager.updateCurrentEffect();
-    matrix.update();
-    lastTime = currentTime;
-  }
-
-  ElegantOTA.loop();
-  NW.loop();
+  vTaskDelete(NULL); // Delete the task running the loop function
 
   // static unsigned long lastFpsTime = 0;
   // static int frameCount = 0;
