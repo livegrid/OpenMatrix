@@ -3,9 +3,11 @@
 #include <ElegantOTA.h>
 #include "StateManager.h"
 #include "UI.h"
+#include "Matrix.h"
+#include "Effects/EffectManager.h"
 
 #define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_MINOR 1
 #define FIRMWARE_VERSION_PATCH 0
 
 StateManager stateManager;
@@ -14,6 +16,8 @@ WebServer server(80);
 NetWizard NW(&server);
 UI ui(&server, &stateManager);
 
+Matrix matrix;
+EffectManager effectManager(&matrix);
 
 void setup(void) {
   Serial.begin(115200);
@@ -133,6 +137,28 @@ void loop(void) {
   // Handle WebServer
   server.handleClient();
 
+  static unsigned long lastTime = 0;  
+  static uint16_t x = 0;
+  static uint16_t y = 0;  
+  unsigned long currentTime = millis();
+
+  if (millis() - lastTime >= 40) {
+    effectManager.updateCurrentEffect();
+    matrix.update();
+    lastTime = currentTime;
+  }
+
   ElegantOTA.loop();
   NW.loop();
+
+  // static unsigned long lastFpsTime = 0;
+  // static int frameCount = 0;
+  // frameCount++;
+
+  // if (currentTime - lastFpsTime >= 5000) {
+  //   float fps = frameCount / 5.0f;
+  //   Serial.printf("FPS: %.2f\n", fps);
+  //   frameCount = 0;
+  //   lastFpsTime = currentTime;
+  // }
 }

@@ -48,8 +48,8 @@ typedef enum {
 } eDmxProtocol;
 
 typedef enum {
-    RGB = 0,
-    WHITE
+    DMX_MODE_RGB = 0,
+    DMX_MODE_WHITE
 } eDmxMode;
 
 struct State {
@@ -120,7 +120,7 @@ struct State {
             bool multicast = true;
             bool start_universe = true;
             uint16_t start_address = 1;
-            eDmxMode mode = RGB;
+            eDmxMode mode = DMX_MODE_RGB;
             uint16_t timeout = 5000;
         } edmx;
     } settings;
