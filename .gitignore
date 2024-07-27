@@ -50,6 +50,7 @@ mklittlefs.exe
 mklittlefs
 
 # Svelte + node
+dist
 node_modules
 /build
 /.svelte-kit

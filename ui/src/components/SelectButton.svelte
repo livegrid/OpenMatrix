@@ -1,0 +1,15 @@
+<script>
+    export let selected;
+</script>
+
+{#if selected}
+    <button disabled class="absolute bottom-3 right-3 py-1 px-1.5 flex flex-row items-center text-xs gap-x-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-500 text-emerald-600">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        Selected
+    </button>
+{:else}
+    <button class="absolute bottom-3 right-3 py-1 px-1.5 flex flex-row items-center text-xs gap-x-1 rounded-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 hover:bg-gray-100 hover:border-gray-400 dark:border-zinc-700 text-gray-500 dark:text-zinc-500 hover:text-gray-500 dark:hover:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:border-zinc-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Select
+    </button>
+{/if}
