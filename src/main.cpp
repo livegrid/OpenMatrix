@@ -14,7 +14,7 @@ StateManager stateManager;
 
 WebServer server(80);
 NetWizard NW(&server);
-UI ui(&server, &stateManager);
+UI Interface(&server, &stateManager);
 
 Matrix matrix;
 EffectManager effectManager(&matrix);
@@ -153,7 +153,44 @@ void setup(void) {
   });
 
   // Start OpenMatrix UI
-  ui.begin();
+  Interface.begin();
+
+  Interface.onPower([&](PowerState state) {
+    stateManager.getState()->power = state;
+    // Save state
+    stateManager.save();
+
+    // TODO: Change matrix power state below this line
+    if (state == PowerState::ON) {
+      // Turn on matrix
+    } else {
+      // Turn off matrix
+    }
+  });
+
+  Interface.onBrightness([&](uint16_t value) {
+    stateManager.getState()->brightness = value;
+    // Save state
+    stateManager.save();
+    
+    // TODO: Adjust matrix brightness below this line
+  });
+
+  Interface.onMode([&](OpenMatrixMode mode) {
+    stateManager.getState()->mode = mode;
+    // Save state
+    stateManager.save();
+
+    // TODO: Change matrix mode below this line
+  });
+
+  Interface.onEffect([&](Effects effect) {
+    stateManager.getState()->effects.selected = effect;
+    // Save state
+    stateManager.save();
+
+    // TODO: Change matrix effect below this line
+  });
 
   // Start ElegantOTA
   Serial.println("[*] Attaching ElegantOTA");
@@ -163,6 +200,7 @@ void setup(void) {
   Serial.println("[*] Starting NetWizard");
   NW.autoConnect("LiveGrid", "");
 
+  // Start WebServer
   server.begin();
   
   // Check if configured
@@ -172,6 +210,7 @@ void setup(void) {
     Serial.println("OpenMatrix is not configured yet! Please connect to LiveGrid AP and setup your device.");
   }
 
+  // Start matrix task
   xTaskCreatePinnedToCore(
     updateMatrixTask,          // Task function
     "Update Matrix",           // Name of the task
@@ -182,6 +221,7 @@ void setup(void) {
     1                          // Core where the task should run (1)
   );
 
+  // Start server task
   xTaskCreatePinnedToCore(
     serverTask,                // Task function
     "Server Task",             // Name of the task
@@ -194,7 +234,6 @@ void setup(void) {
 }
 
 void loop(void) {
-  // Handle WebServer
   vTaskDelete(NULL); // Delete the task running the loop function
 
   // static unsigned long lastFpsTime = 0;

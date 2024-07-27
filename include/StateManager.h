@@ -20,12 +20,6 @@ typedef enum {
     TEXT,
 } OpenMatrixMode;
 
-// Power State
-typedef enum {
-    ON,
-    OFF
-} PowerState;
-
 // Effects
 typedef enum {
     NONE = 0,
@@ -53,7 +47,7 @@ typedef enum {
 } eDmxMode;
 
 struct State {
-    PowerState power = OFF;
+    bool power = false;
     uint8_t brightness = 255;
     OpenMatrixMode mode = AQUARIUM;
 
@@ -64,6 +58,7 @@ struct State {
             struct {
                 DiffType type;
                 String value;
+                bool inverse;
             } diff;
         } temperature;
         struct {
@@ -71,6 +66,7 @@ struct State {
             struct {
                 DiffType type;
                 String value;
+                bool inverse;
             } diff;
         } humidity;
         struct {
@@ -78,6 +74,7 @@ struct State {
             struct {
                 DiffType type;
                 String value;
+                bool inverse;
             } diff;
         } co2;
     } environment;
@@ -130,7 +127,7 @@ class StateManager {
     public:
         StateManager();
         State* getState();
-        void serialize(String& buffer);
+        void serialize(String& buffer, bool settings_only = false);
         void save();
         void restore();
         ~StateManager();

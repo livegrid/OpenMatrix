@@ -7,13 +7,36 @@ State* StateManager::getState() {
     return &_state;
 }
 
-void StateManager::serialize(String& buffer) {
+void StateManager::serialize(String& buffer, bool settings_only) {
     JsonDocument json;
     
     // Convert State to JSON
     json["power"] = _state.power;
     json["brightness"] = _state.brightness;
     json["mode"] = _state.mode;
+
+    if (!settings_only) {
+        JsonObject environment = json["environment"].to<JsonObject>();
+
+        // Temperature
+        JsonObject temperature = environment["temperature"].to<JsonObject>();
+        temperature["value"] = _state.environment.temperature;
+        temperature["diff"]["type"] = _state.environment.temperature.diff.type;
+        temperature["diff"]["value"] = _state.environment.temperature.diff.value;
+        temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
+        // Humidity
+        JsonObject humidity = environment["humidity"].to<JsonObject>();
+        humidity["value"] = _state.environment.humidity;
+        humidity["diff"]["type"] = _state.environment.humidity.diff.type;
+        humidity["diff"]["value"] = _state.environment.humidity.diff.value;
+        humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
+        // CO2
+        JsonObject co2 = environment["co2"].to<JsonObject>();
+        co2["value"] = _state.environment.co2;
+        co2["diff"]["type"] = _state.environment.co2.diff.type;
+        co2["diff"]["value"] = _state.environment.co2.diff.value;
+        co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
+    }
 
     // Effects
     json["effects"]["selected"] = _state.effects.selected;
@@ -54,9 +77,9 @@ void StateManager::save() {
         return;
     }
 
-    // Serialize config to file
+    // Serialize settings only to file
     String buffer;
-    this->serialize(buffer);
+    this->serialize(buffer, true);
     
     // Write to file
     file.print(buffer);
@@ -80,7 +103,7 @@ void StateManager::restore() {
         }
 
         // Convert JSON to State
-        _state.power = json["power"].as<PowerState>();
+        _state.power = json["power"].as<bool>();
         _state.brightness = json["brightness"].as<uint8_t>();
         _state.mode = json["mode"].as<OpenMatrixMode>();
         

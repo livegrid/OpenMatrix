@@ -22,21 +22,118 @@ void UI::begin() {
     // OpenMatrix State
     _server->on("/openmatrix/state", HTTP_GET, [&]() {
         String state;
-        if (_state_manager) {
-            _state_manager->serialize(state);
-        } else {
-            state = "{}";
-        }
-        _server->send(200, "application/json", state);
+        _state_manager->serialize(state);
+        return _server->send(200, "application/json", state);
     });
+
+    // OpenMatrix Switch Modes
+    _server->on("/openmatrix/mode", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        OpenMatrixMode mode;
+
+        if (err == DeserializationError::Ok) { 
+            if (strncmp(json["mode"].as<const char*>(), "aquarium", 8) == 0) {
+                mode = OpenMatrixMode::AQUARIUM;
+            } else if (strncmp(json["mode"].as<const char*>(), "effect", 6) == 0) {
+                mode = OpenMatrixMode::EFFECT;
+            } else if (strncmp(json["mode"].as<const char*>(), "image", 5) == 0) {
+                mode = OpenMatrixMode::IMAGE;
+            } else if (strncmp(json["mode"].as<const char*>(), "text", 4) == 0) {
+                mode = OpenMatrixMode::TEXT;
+            } else {
+                mode = OpenMatrixMode::AQUARIUM;
+            }
+
+            if (_on_mode_cb) {
+                _on_mode_cb(mode);
+            }
+
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on Effect Change
+    _server->on("/openmatrix/effect", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        Effects effect;
+
+
+        if (err == DeserializationError::Ok) {
+            if (strncmp(json["effect"].as<const char*>(), "none", 4) == 0) {
+                effect = Effects::NONE;
+            } else if (strncmp(json["effect"].as<const char*>(), "simplex_noise", 13) == 0) {
+                effect = Effects::SIMPLEX_NOISE;
+            } else if (strncmp(json["effect"].as<const char*>(), "dancer", 6) == 0) {
+                effect = Effects::DANCER;
+            } else if (strncmp(json["effect"].as<const char*>(), "colorful", 8) == 0) {
+                effect = Effects::COLORFUL;
+            } else {
+                effect = Effects::NONE;
+            }
+
+            if (_on_effect_cb) {
+                _on_effect_cb(effect);
+            }
+
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on Power Change
+    _server->on("/openmatrix/power", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+
+        if (err == DeserializationError::Ok) {
+            if (_on_power_cb) {
+                _on_power_cb(json["power"].as<bool>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on Brightness Change
+    _server->on("/openmatrix/brightness", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+
+        if (err == DeserializationError::Ok) {
+            uint16_t brightness = json["brightness"].as<uint16_t>();
+            if (_on_brightness_cb) {
+                _on_brightness_cb(brightness);
+            }
+
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    
 }
 
-void UI::onModeChange(onDataCallback cb) {
-    _on_mode_change_cb = cb;
+void UI::onPower(onPowerCallback cb) {
+    _on_power_cb = cb;
 }
 
-void UI::onSettingsChange(onDataCallback cb) {
-    _on_settings_change_cb = cb;
+void UI::onBrightness(onBrightnessCallback cb) {
+    _on_brightness_cb = cb;
+}
+
+void UI::onMode(onModeChangeCallback cb) {
+    _on_mode_cb = cb;
+}
+
+void UI::onEffect(onEffectChangeCallback cb) {
+    _on_effect_cb = cb;
 }
 
 bool UI::_onAPFilter(WebServer &server) {
