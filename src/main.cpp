@@ -3,8 +3,16 @@
 #include <ElegantOTA.h>
 #include "StateManager.h"
 #include "UI.h"
+#include "GeneralSettings.h"
+
 #include "Matrix.h"
-#include "Effects/EffectManager.h"
+Matrix matrix;
+
+#ifdef SCD40_ENABLED
+#include <SCD40/scd40.h>
+SCD40 scd40;
+#endif
+
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
@@ -16,8 +24,10 @@ WebServer server(80);
 NetWizard NW(&server);
 UI Interface(&server, &stateManager);
 
-Matrix matrix;
-EffectManager effectManager(&matrix);
+#ifdef ADXL345_ENABLED
+#include "AutoRotate.h"
+AutoRotate autoRotate(&matrix);
+#endif
 
 TaskHandle_t updateMatrixTaskHandle;
 TaskHandle_t serverTaskHandle;
@@ -26,7 +36,6 @@ void updateMatrix() {
   effectManager.updateCurrentEffect();
   matrix.update();
 }
-
 
 void serverTask(void *parameter) {
   for (;;) {
@@ -38,23 +47,23 @@ void serverTask(void *parameter) {
 }
 
 void updateMatrixTask(void *parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(30); // 2000 ms interval (2 seconds)
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
+  const TickType_t xFrequency = pdMS_TO_TICKS(20);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     static unsigned long lastLogTime = 0;
     static unsigned long lastFrameTime = 0;
     unsigned long currentTime = millis();
     
     // Calculate and print framerate every 5 seconds
-    if (currentTime - lastLogTime >= 5000) {
+    if (currentTime - lastLogTime >= 10000) {
       float framerate = 1000.0 / (currentTime - lastFrameTime);
       log_e("Framerate: %.2f FPS", framerate);
       lastLogTime = currentTime;
     }
-    
     lastFrameTime = currentTime;
     effectManager.updateCurrentEffect();
     matrix.update();
+
     vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next interval
   }
 }
@@ -78,6 +87,12 @@ void setup(void) {
   // Start LittleFS
   LittleFS.begin();
 
+  #ifdef SCD40_ENABLED
+  scd40.init();
+  #endif
+  #if ADXL345_ENABLED
+  autoRotate.init();
+  #endif
   // Restore State
   stateManager.restore();
 
@@ -227,7 +242,7 @@ void setup(void) {
     "Server Task",             // Name of the task
     8192,                      // Stack size in words
     NULL,                      // Task input parameter
-    1,                         // Priority of the task
+    1,                         // Pri ority of the task
     &serverTaskHandle,         // Task handle
     0                          // Core where the task should run (0)
   );
@@ -235,15 +250,4 @@ void setup(void) {
 
 void loop(void) {
   vTaskDelete(NULL); // Delete the task running the loop function
-
-  // static unsigned long lastFpsTime = 0;
-  // static int frameCount = 0;
-  // frameCount++;
-
-  // if (currentTime - lastFpsTime >= 5000) {
-  //   float fps = frameCount / 5.0f;
-  //   Serial.printf("FPS: %.2f\n", fps);
-  //   frameCount = 0;
-  //   lastFpsTime = currentTime;
-  // }
 }

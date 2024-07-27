@@ -26,7 +26,7 @@ class Matrix {
  #if USE_CRGB_ARRAY
   CRGB leds[PANEL_RES_X * PANEL_RES_Y];
  #endif
- 
+
   Matrix() {
     HUB75_I2S_CFG mxconfig(
         PANEL_RES_X,  // module width
@@ -211,9 +211,6 @@ class Matrix {
 #endif
 
   void update() {
-    #if USE_CRGB_ARRAY
-      fillDMAFromCRGBArray();
-    #endif
     #ifdef DOUBLE_BUFFER
       matrix->flipDMABuffer();
       // matrix->clearScreen();

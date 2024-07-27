@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <scd4x.h>
 #include <Wire.h>
+#include "SCD40/Scd40_Settings.h" 
 
 class SCD40 {
  private:
@@ -11,7 +12,8 @@ class SCD40 {
   uint16_t error;
   char errorMessage[256];
   SCD4X scd4x;
-  bool sensorAvailable = true;  // Track if the sensor is operational
+  bool sensorAvailable = false;  // Track if the sensor is operational
+  bool firstReadingReceived = false;  // Flag to indicate if the first reading has been received
 
   String uint16ToHex(uint16_t value) {
     String hexString = "";
@@ -41,26 +43,27 @@ class SCD40 {
     
     if(scd4x.isConnected()) {
       log_i("SCD40 connected");
+      sensorAvailable = true;  // Update sensor availability status
 
-    // Check if auto-calibration is enabled
-    if (scd4x.getCalibrationMode()) {
-      // Disable auto-calibration
-      scd4x.setCalibrationMode(false);
+      // Check if auto-calibration is enabled
+      if (scd4x.getCalibrationMode()) {
+        // Disable auto-calibration
+        scd4x.setCalibrationMode(false);
 
-      // Save the settings to EEPROM
-      scd4x.saveSettings();
-    }
-
-    scd4x.startPeriodicMeasurement();
-
-    while (true) {
-      if (scd4x.isDataReady()) {
-        if (scd4x.readMeasurement(co2, temperature, humidity) == 0) {
-          Serial.printf("CO2: %u ppm, Temperature: %.1f °C, Humidity: %.1f %%RH\n", co2, temperature, humidity);
-          vTaskDelay(pdMS_TO_TICKS(4750));  // New data available after approximately 5 seconds
-        }
-        sensorAvailable = true;
+        // Save the settings to EEPROM
+        scd4x.saveSettings();
       }
+
+      scd4x.startPeriodicMeasurement();
+
+      while (true) {
+        if (scd4x.isDataReady()) {
+          if (scd4x.readMeasurement(co2, temperature, humidity) == 0) {
+            firstReadingReceived = true;  // Set the first reading flag
+            vTaskDelay(pdMS_TO_TICKS(4750));  // New data available after approximately 5 seconds
+          }
+          sensorAvailable = true;
+        }
         vTaskDelay(pdMS_TO_TICKS(250));  // Check every 250ms
       }
     }
@@ -72,6 +75,9 @@ class SCD40 {
  public:
   void init() {
     xTaskCreate(measurementTaskFunction, "MeasurementTask", 2048, this, 1, NULL);
+  }
+  bool isFirstReadingReceived() {
+    return firstReadingReceived;
   }
   bool isConnected() {
     return sensorAvailable;

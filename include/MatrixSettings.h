@@ -38,7 +38,10 @@
 #define PANEL_RES_Y 64     // Number of pixels tall of each INDIVIDUAL panel module.
 #define PANEL_CHAIN 1      // Total number of panels chained one to another
 
-// #define DOUBLE_BUFFER 1
+#define VIRTUAL_RES_X 64
+#define VIRTUAL_RES_Y 64
+
+#define DOUBLE_BUFFER 1
 #define USE_CRGB_ARRAY 1
 
 #define PHYSICS_SCALE 100

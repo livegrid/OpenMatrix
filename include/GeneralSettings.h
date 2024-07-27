@@ -2,5 +2,7 @@
 #define SETTINGS_H
 
 #define AQUARIUM_ENABLED 1
+#define SCD40_ENABLED 1
+#define ADXL345_ENABLED 1
 
 #endif
