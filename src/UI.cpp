@@ -106,7 +106,7 @@ void UI::begin() {
         DeserializationError err = deserializeJson(json, _server->arg("plain"));
 
         if (err == DeserializationError::Ok) {
-            uint16_t brightness = json["brightness"].as<uint16_t>();
+            uint8_t brightness = json["brightness"].as<uint8_t>();
             if (_on_brightness_cb) {
                 _on_brightness_cb(brightness);
             }
