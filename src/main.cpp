@@ -155,20 +155,20 @@ void setup(void) {
   // Start OpenMatrix UI
   Interface.begin();
 
-  Interface.onPower([&](PowerState state) {
+  Interface.onPower([&](bool state) {
     stateManager.getState()->power = state;
     // Save state
     stateManager.save();
 
     // TODO: Change matrix power state below this line
-    if (state == PowerState::ON) {
+    if (state == true) {
       // Turn on matrix
     } else {
       // Turn off matrix
     }
   });
 
-  Interface.onBrightness([&](uint16_t value) {
+  Interface.onBrightness([&](uint8_t value) {
     stateManager.getState()->brightness = value;
     // Save state
     stateManager.save();

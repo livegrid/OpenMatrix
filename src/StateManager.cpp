@@ -20,19 +20,19 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 
         // Temperature
         JsonObject temperature = environment["temperature"].to<JsonObject>();
-        temperature["value"] = _state.environment.temperature;
+        temperature["value"] = _state.environment.temperature.value;
         temperature["diff"]["type"] = _state.environment.temperature.diff.type;
         temperature["diff"]["value"] = _state.environment.temperature.diff.value;
         temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
         // Humidity
         JsonObject humidity = environment["humidity"].to<JsonObject>();
-        humidity["value"] = _state.environment.humidity;
+        humidity["value"] = _state.environment.humidity.value;
         humidity["diff"]["type"] = _state.environment.humidity.diff.type;
         humidity["diff"]["value"] = _state.environment.humidity.diff.value;
         humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
         // CO2
         JsonObject co2 = environment["co2"].to<JsonObject>();
-        co2["value"] = _state.environment.co2;
+        co2["value"] = _state.environment.co2.value;
         co2["diff"]["type"] = _state.environment.co2.diff.type;
         co2["diff"]["value"] = _state.environment.co2.diff.value;
         co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
