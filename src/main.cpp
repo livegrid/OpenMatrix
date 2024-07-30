@@ -4,9 +4,11 @@
 #include "StateManager.h"
 #include "UI.h"
 #include "GeneralSettings.h"
+#include "Effects/EffectManager.h"
 
 #include "Matrix.h"
 Matrix matrix;
+EffectManager effectManager(&matrix);
 
 #ifdef SCD40_ENABLED
 #include <SCD40/scd40.h>
