@@ -96,10 +96,7 @@ void updateMatrixTask(void *parameter) {
     if (currentTime - lastLogTime >= 10000) {
       float framerate = 1000.0 / (currentTime - lastFrameTime);
       log_e("Framerate: %.2f FPS", framerate);
-       patternAdvance();
-
-       // just auto-change the palette
-      //  patterns.setPattern(++currentEffect);
+      patternAdvance();
       lastLogTime = currentTime;
     }
     lastFrameTime = currentTime;
