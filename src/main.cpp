@@ -32,10 +32,20 @@ AutoRotate autoRotate(&matrix);
 TaskHandle_t updateMatrixTaskHandle;
 TaskHandle_t serverTaskHandle;
 
-void updateMatrix() {
-  effectManager.updateCurrentEffect();
-  matrix.update();
-}
+
+// Aurora related
+#include "Aurora/EffectsManager.h"
+EffectsManager effects(VIRTUAL_RES_X, VIRTUAL_RES_Y);
+
+#include "Aurora/Drawable.h"
+#include "Aurora/Playlist.h"
+#include "Aurora/Geometry.h"
+
+#include "Aurora/Patterns.h"
+Patterns patterns;
+
+// #include "Effects/EffectManager.h"
+// EffectManager effectManager(&matrix);
 
 void serverTask(void *parameter) {
   for (;;) {
@@ -46,9 +56,38 @@ void serverTask(void *parameter) {
   }
 }
 
+void patternAdvance(){
+    // Go to next pattern in the list (se Patterns.h)
+    patterns.stop();
+
+    patterns.moveRandom(1);
+    // patterns.move(1);
+    patterns.start();  
+
+    // Select a random palette as well
+    effects.RandomPalette();
+    Serial.print("Changing pattern to:  ");
+    Serial.println(patterns.getCurrentPatternName());
+    
+}
+uint8_t currentEffect = 0;
 void updateMatrixTask(void *parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(20);
+  const TickType_t xFrequency = pdMS_TO_TICKS(30);
   TickType_t xLastWakeTime = xTaskGetTickCount();
+
+   // setup the effects generator
+  effects.Setup();
+
+  delay(500);
+  Serial.println("Effects being loaded: ");
+  patterns.listPatterns();
+  
+  patterns.setPattern(currentEffect); //   // simple noise
+  patterns.start();     
+
+  Serial.print("Starting with pattern: ");
+  Serial.println(patterns.getCurrentPatternName());
+
   for (;;) {
     static unsigned long lastLogTime = 0;
     static unsigned long lastFrameTime = 0;
@@ -58,10 +97,15 @@ void updateMatrixTask(void *parameter) {
     if (currentTime - lastLogTime >= 10000) {
       float framerate = 1000.0 / (currentTime - lastFrameTime);
       log_e("Framerate: %.2f FPS", framerate);
+       patternAdvance();
+
+       // just auto-change the palette
+      //  patterns.setPattern(++currentEffect);
       lastLogTime = currentTime;
     }
     lastFrameTime = currentTime;
-    effectManager.updateCurrentEffect();
+    // effectManager.updateCurrentEffect();
+    patterns.drawFrame();
     matrix.update();
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next interval
@@ -86,13 +130,6 @@ void setup(void) {
 
   // Start LittleFS
   LittleFS.begin();
-
-  #ifdef SCD40_ENABLED
-  scd40.init();
-  #endif
-  #if ADXL345_ENABLED
-  autoRotate.init();
-  #endif
   // Restore State
   stateManager.restore();
 
@@ -169,7 +206,6 @@ void setup(void) {
 
   // Start OpenMatrix UI
   Interface.begin();
-
   Interface.onPower([&](bool state) {
     stateManager.getState()->power = state;
     // Save state
@@ -181,6 +217,7 @@ void setup(void) {
     } else {
       // Turn off matrix
     }
+    Serial.printf("Power state changed to: %s\n", state ? "ON" : "OFF");
   });
 
   Interface.onBrightness([&](uint8_t value) {
@@ -189,6 +226,7 @@ void setup(void) {
     stateManager.save();
     
     // TODO: Adjust matrix brightness below this line
+    Serial.printf("Brightness changed to: %d\n", value);
   });
 
   Interface.onMode([&](OpenMatrixMode mode) {
@@ -197,6 +235,7 @@ void setup(void) {
     stateManager.save();
 
     // TODO: Change matrix mode below this line
+    Serial.printf("Mode changed to: %d\n", static_cast<int>(mode));
   });
 
   Interface.onEffect([&](Effects effect) {
@@ -205,6 +244,7 @@ void setup(void) {
     stateManager.save();
 
     // TODO: Change matrix effect below this line
+    Serial.printf("Effect changed to: %d\n", static_cast<int>(effect));
   });
 
   // Start ElegantOTA
@@ -229,7 +269,7 @@ void setup(void) {
   xTaskCreatePinnedToCore(
     updateMatrixTask,          // Task function
     "Update Matrix",           // Name of the task
-    8192,                      // Stack size in words
+    4096,                      // Stack size in words
     NULL,                      // Task input parameter
     1,                         // Priority of the task
     NULL,                      // Task handle
@@ -240,14 +280,20 @@ void setup(void) {
   xTaskCreatePinnedToCore(
     serverTask,                // Task function
     "Server Task",             // Name of the task
-    8192,                      // Stack size in words
+    4096,                      // Stack size in words
     NULL,                      // Task input parameter
     1,                         // Pri ority of the task
     &serverTaskHandle,         // Task handle
     0                          // Core where the task should run (0)
   );
+  #ifdef SCD40_ENABLED
+  scd40.init();
+  #endif
+  #if ADXL345_ENABLED
+  autoRotate.init();
+  #endif
 }
 
 void loop(void) {
   vTaskDelete(NULL); // Delete the task running the loop function
-}
+} 

@@ -41,8 +41,8 @@
 #define VIRTUAL_RES_X 64
 #define VIRTUAL_RES_Y 64
 
-#define DOUBLE_BUFFER 1
-#define USE_CRGB_ARRAY 1
+// #define DOUBLE_BUFFER 1
+// #define USE_CRGB_ARRAY 1
 
 #define PHYSICS_SCALE 100
 

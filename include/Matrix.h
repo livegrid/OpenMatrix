@@ -23,10 +23,6 @@ class Matrix {
   uint8_t matrixRotation = 0;
 
  public:
- #if USE_CRGB_ARRAY
-  CRGB leds[PANEL_RES_X * PANEL_RES_Y];
- #endif
-
   Matrix() {
     HUB75_I2S_CFG mxconfig(
         PANEL_RES_X,  // module width
@@ -100,18 +96,6 @@ class Matrix {
   void drawTriangle(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3, uint8_t r, uint8_t g, uint8_t b) {
     // matrix->fillTriangle(x1, y1, x2, y2, x3, y3, r, g, b);
     // matrix->fillTriangle(x1, y1, x2, y2, x3, y3, matrix->color565(r, g, b));
-  }
-
-  void fillNoise() {
-    unsigned long currentTime = millis();
-    fill_raw_noise8(
-      (uint8_t*)leds,  // Cast CRGB array to uint8_t*
-      PANEL_RES_X * PANEL_RES_Y,  // Total number of color components (R, G, B for each LED)
-      1,    // octaves
-      0,    // x
-      32,   // scalex
-      currentTime / 20  // time
-    );
   }
 
   void setFont(int val) {
@@ -197,18 +181,6 @@ class Matrix {
   void fillScreen(uint8_t r, uint8_t g, uint8_t b) {
     matrix->fillScreen(matrix->color565(r, g, b));
   }
-
-#if USE_CRGB_ARRAY
-  void fillDMAFromCRGBArray() {
-    for (int y = 0; y < PANEL_RES_Y; y++) {
-      for (int x = 0; x < PANEL_RES_X; x++) {
-        int index = y * PANEL_RES_X + x;
-        const CRGB &color = leds[index];
-        matrix->drawPixelRGB888(x, y, color.r, color.g, color.b);
-      }
-    }
-  }
-#endif
 
   void update() {
     #ifdef DOUBLE_BUFFER
