@@ -1,5 +1,4 @@
-#ifndef SCD40_SETTINGS_H
-#define SCD40_SETTINGS_H
+#pragma once
 
 //TEMP SETTINGS
 
@@ -7,5 +6,3 @@
 #define CO2_OK 600
 #define CO2_BAD 1000
 #define CO2_REALBAD 2000
-
-#endif // SCD40_SETTINGS_H

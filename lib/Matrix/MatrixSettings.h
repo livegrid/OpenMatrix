@@ -1,6 +1,8 @@
 #ifndef MATRIXSETTINGS_H
 #define MATRIXSETTINGS_H
 
+#include <Arduino.h>
+
 //NEW PCB
 // #define RL1 18
 // #define GL1 17
@@ -48,6 +50,6 @@
 
 #define OFFSET 1
 
-uint8_t matrixBrightness = 250;
+extern uint8_t matrixBrightness;
 
 #endif
