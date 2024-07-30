@@ -4,32 +4,31 @@
 #include "StateManager.h"
 #include "UI.h"
 #include "GeneralSettings.h"
-#include "Effects/EffectManager.h"
+#include "EffectManager.h"
+
+#define FIRMWARE_VERSION_MAJOR 0
+#define FIRMWARE_VERSION_MINOR 1
+#define FIRMWARE_VERSION_PATCH 0
 
 #include "Matrix.h"
 Matrix matrix;
 EffectManager effectManager(&matrix);
 
 #ifdef SCD40_ENABLED
-#include <SCD40/scd40.h>
-SCD40 scd40;
+  #include <SCD40.h>
+  SCD40 scd40;
 #endif
 
-
-#define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 0
+#ifdef ADXL345_ENABLED
+  #include "AutoRotate.h"
+  AutoRotate autoRotate(&matrix);
+#endif
 
 StateManager stateManager;
 
 WebServer server(80);
 NetWizard NW(&server);
 UI Interface(&server, &stateManager);
-
-#ifdef ADXL345_ENABLED
-#include "AutoRotate.h"
-AutoRotate autoRotate(&matrix);
-#endif
 
 TaskHandle_t updateMatrixTaskHandle;
 TaskHandle_t serverTaskHandle;
@@ -90,7 +89,7 @@ void setup(void) {
   LittleFS.begin();
 
   #ifdef SCD40_ENABLED
-  scd40.init();
+  // scd40.init();
   #endif
   #if ADXL345_ENABLED
   autoRotate.init();
@@ -228,15 +227,15 @@ void setup(void) {
   }
 
   // Start matrix task
-  xTaskCreatePinnedToCore(
-    updateMatrixTask,          // Task function
-    "Update Matrix",           // Name of the task
-    8192,                      // Stack size in words
-    NULL,                      // Task input parameter
-    1,                         // Priority of the task
-    NULL,                      // Task handle
-    1                          // Core where the task should run (1)
-  );
+  // xTaskCreatePinnedToCore(
+  //   updateMatrixTask,          // Task function
+  //   "Update Matrix",           // Name of the task
+  //   8192,                      // Stack size in words
+  //   NULL,                      // Task input parameter
+  //   1,                         // Priority of the task
+  //   NULL,                      // Task handle
+  //   1                          // Core where the task should run (1)
+  // );
 
   // Start server task
   xTaskCreatePinnedToCore(
@@ -246,7 +245,7 @@ void setup(void) {
     NULL,                      // Task input parameter
     1,                         // Pri ority of the task
     &serverTaskHandle,         // Task handle
-    0                          // Core where the task should run (0)
+    1                          // Core where the task should run (0)
   );
 }
 

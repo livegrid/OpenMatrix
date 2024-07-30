@@ -1,7 +1,6 @@
-#ifndef EFFECT_H
-#define EFFECT_H
+#pragma once
 
-#include "../Matrix.h"
+#include "Matrix.h"
 
 class Effect {
 public:
@@ -14,5 +13,3 @@ public:
 protected:
     Matrix* m_matrix;
 };
-
-#endif // EFFECT_H
