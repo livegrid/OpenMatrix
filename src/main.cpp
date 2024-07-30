@@ -4,7 +4,6 @@
 #include "StateManager.h"
 #include "UI.h"
 #include "GeneralSettings.h"
-#include "EffectManager.h"
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
@@ -12,7 +11,6 @@
 
 #include "Matrix.h"
 Matrix matrix;
-EffectManager effectManager(&matrix);
 
 #ifdef SCD40_ENABLED
   #include <SCD40.h>
