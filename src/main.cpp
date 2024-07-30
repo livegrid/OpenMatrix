@@ -58,7 +58,7 @@ void updateMatrixTask(void *parameter) {
     // Calculate and print framerate every 5 seconds
     if (currentTime - lastLogTime >= 10000) {
       float framerate = 1000.0 / (currentTime - lastFrameTime);
-      log_e("Framerate: %.2f FPS", framerate);
+      log_i("Framerate: %.2f FPS", framerate);
       lastLogTime = currentTime;
     }
     lastFrameTime = currentTime;
@@ -227,15 +227,15 @@ void setup(void) {
   }
 
   // Start matrix task
-  // xTaskCreatePinnedToCore(
-  //   updateMatrixTask,          // Task function
-  //   "Update Matrix",           // Name of the task
-  //   8192,                      // Stack size in words
-  //   NULL,                      // Task input parameter
-  //   1,                         // Priority of the task
-  //   NULL,                      // Task handle
-  //   1                          // Core where the task should run (1)
-  // );
+  xTaskCreatePinnedToCore(
+    updateMatrixTask,          // Task function
+    "Update Matrix",           // Name of the task
+    8192,                      // Stack size in words
+    NULL,                      // Task input parameter
+    1,                         // Priority of the task
+    NULL,                      // Task handle
+    1                          // Core where the task should run (1)
+  );
 
   // Start server task
   xTaskCreatePinnedToCore(
