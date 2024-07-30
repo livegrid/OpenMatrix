@@ -1,7 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { theme } from '@/store';
+  import { theme, state, togglePower, updateBrightness } from '@/store';
   import Toggle from "./Toggle.svelte";
+
+  let brightnessTimeout = null;
 
   const toggleTheme = () => {
     if ($theme === 'dark') {
@@ -15,6 +17,17 @@
       // Set localstorage
       localStorage.setItem('theme', 'dark');
     }
+  }
+
+  const updateBrightnessHandler = ({ target }) => {
+    if (brightnessTimeout) {
+      clearTimeout(brightnessTimeout);
+    }
+
+    brightnessTimeout = setTimeout(() => {
+      updateBrightness(parseInt(target.value));
+      brightnessTimeout = null;
+    }, 200);
   }
 
   onMount(() => {
@@ -55,12 +68,24 @@
         Power
       </span>
     </div>
-    <Toggle />
+    {#if typeof $state?.power !== 'boolean'}
+      <div role="status" class="animate-pulse">
+        <div class="h-4 bg-gray-300 rounded dark:bg-zinc-700 w-16 mt-2"></div>
+      </div>
+    {:else}
+      <Toggle checked={$state.power} on:change={togglePower} />
+    {/if}
   </li>
   <li class="flex items-center space-x-3">
     <div class="text-gray-600 dark:text-zinc-400">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
     </div>
-    <input id="steps-range" type="range" min="0" max="5" value="2.5" step="0.5" class="w-full h-2 bg-gray-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+    {#if typeof $state?.brightness !== 'number'}
+      <div role="status" class="w-full animate-pulse">
+        <div class="h-4 bg-gray-300 rounded dark:bg-zinc-700 w-full"></div>
+      </div>
+    {:else}
+      <input id="steps-range" type="range" min="0" max="255" value={$state?.brightness || 0} on:change={updateBrightnessHandler} step="1" class="w-full h-2 bg-gray-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+    {/if}
   </li>
 </ul>

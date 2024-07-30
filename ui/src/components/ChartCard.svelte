@@ -1,138 +1,27 @@
 <script>
-  export let title, value, symbol, icon, trend, trendInverse = false;
-  import { theme } from '@/store';
+  // @ts-nocheck
   import Icon from "./Icon.svelte";
   import { Line } from 'svelte-chartjs'
+  import { theme } from '@/store';
 
-  $: trendColor = trendInverse ? 'text-red-500' : 'text-emerald-600';
+  export let title, value, symbol, icon;
 
-  function getRandomInt(min, max) {
-  const minCeiled = Math.ceil(min);
-  const maxFloored = Math.floor(max);
-  return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
-}
-  const randomValue = () => {
-    // Return random value between min 20 and max 46
-    return getRandomInt(20, 46);
+  function generateLast24Hours() {
+    let result = [];
+    const now = new Date();
+
+    for (let i = 0; i < 24; i++) {
+      const date = new Date(now);
+      date.setHours(date.getHours() - i);
+      date.setMinutes(0, 0, 0); // Set minutes, seconds, and milliseconds to 00:00:00.000
+      result.push(date);
+    }
+    result.reverse();
+    return result;
   }
 
-  const getDate = (hours) => {
-    // Add hours to current time starting from 00:00
-    const date = new Date();
-    date.setHours(hours);
-    date.setMinutes(0);
-    date.setSeconds(0);
-    date.setMilliseconds(0);
-    return date
-  };
-
-  let result = [
-    {
-      x: getDate(0),
-      y: 24
-    },
-    {
-      x: getDate(1),
-      y: 24
-    },
-    {
-      x: getDate(2),
-      y: 25
-    },
-    {
-      x: getDate(3),
-      y: 25
-    },
-    {
-      x: getDate(4),
-      y: 26
-    },
-    {
-      x: getDate(5),
-      y: 26
-    },
-    {
-      x: getDate(6),
-      y: 26
-    },
-    {
-      x: getDate(7),
-      y: 28
-    },
-    {
-      x: getDate(8),
-      y: 29
-    },
-    {
-      x: getDate(9),
-      y: 30
-    },
-    {
-      x: getDate(10),
-      y: 31
-    },
-    {
-      x: getDate(11),
-      y: 32
-    },
-    {
-      x: getDate(12),
-      y: 34
-    },
-    {
-      x: getDate(13),
-      y: 35
-    },
-    {
-      x: getDate(14),
-      y: 38
-    },
-    {
-      x: getDate(15),
-      y: 36
-    },
-    {
-      x: getDate(16),
-      y: 34
-    },
-    {
-      x: getDate(17),
-      y: 30
-    },
-    {
-      x: getDate(18),
-      y: 28
-    },
-    {
-      x: getDate(19),
-      y: 28
-    },
-    {
-      x: getDate(20),
-      y: 27
-    },
-    {
-      x: getDate(21),
-      y: 25
-    },
-    {
-      x: getDate(22),
-      y: 25
-    },
-    {
-      x: getDate(23),
-      y: 24
-    },
-    {
-      x: getDate(24),
-      y: 24
-    },
-  ];
-
-  console.log(result)
-
-  export const data = {
-    labels: result.map(d => d.x),
+  $: data = {
+    labels: generateLast24Hours(),
     datasets: [
       {
         label: '',
@@ -151,30 +40,32 @@
         pointHoverBackgroundColor: 'rgb(7,150,105)',
         // pointHoverBorderColor: 'rgba(220, 220, 220,1)',
         // pointHoverBorderWidth: 2,
-        pointRadius: 3,
+        pointRadius: 0,
         pointHitRadius: 10,
-        data: result.map(d => d.y),
+        data: Array.isArray(value) ? value : [],
       }
     ],
   };
 
   $: options = {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label(tooltipItems) {
+            return `${tooltipItems.formattedValue} ${symbol}`;
+          }
+        }
+      }
     },
     scales: {
       x: {
         type: 'timeseries',
-        // time: {
-        //   unit: 'hour',
-        //   displayFormats: {
-        //     hour: 'HH:mm'
-        //   }
-        // },
         grid: {
           color: $theme === 'dark' ? 'rgb(24, 24, 27)' : 'rgb(229, 231, 235)'
         }
@@ -195,7 +86,22 @@
     </div>
     <p class="truncate font-medium text-gray-500">{ title }</p>
   </dt>
-  <dd class="flex items-baseline mt-4 h-[260px]">
-    <Line {data} options={options} />
-  </dd>
+  {#if value === null || value === undefined || !Array.isArray(value) || value.length === 0}
+    <dd class="flex flex-col gap-4 items-center justify-center mt-4 h-[260px]">
+      <div role="status">
+          <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-emerald-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+              <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+          </svg>
+          <span class="sr-only">Fetching...</span>
+      </div>
+        <h1 class="text-zinc-300 text-xs uppercase">
+          Fetching
+        </h1>
+    </dd>
+  {:else}
+    <dd class="flex items-baseline mt-4 h-[260px]">
+      <Line {data} options={options} />
+    </dd>
+  {/if}
 </div>
