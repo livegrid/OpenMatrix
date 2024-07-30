@@ -55,6 +55,29 @@ void serverTask(void *parameter) {
   }
 }
 
+void demoTask(void *parameter) {
+  for (;;) {
+    // Update temperature, humidity and CO2
+    State* state = stateManager.getState();
+    state->environment.temperature.value = random(0, 100);
+    state->environment.temperature.diff.type = DiffType::DISABLE;
+    state->environment.humidity.value = random(0, 100);
+    state->environment.humidity.diff.type = DiffType::DISABLE;
+    state->environment.co2.value = random(0, 5000);
+    state->environment.co2.diff.type = DiffType::DISABLE;
+
+    // Randomize History
+    for (int i = 0; i < 24; i++) {
+      state->environment.temperature.history_24h[i] = random(0, 100);
+      state->environment.humidity.history_24h[i] = random(0, 100);
+      state->environment.co2.history_24h[i] = random(0, 5000);
+    }
+
+    // Delay for 1 second
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
 void patternAdvance(){
     // Go to next pattern in the list (se Patterns.h)
     patterns.stop();
@@ -282,6 +305,18 @@ void setup(void) {
     &serverTaskHandle,         // Task handle
     1                          // Core where the task should run (0)
   );
+
+  // Demo task
+  xTaskCreatePinnedToCore(
+    demoTask,                  // Task function
+    "DemoTask",                // Name of the task
+    1024,                      // Stack size in words
+    NULL,                      // Task input parameter
+    1,                         // Priority of the task
+    NULL,                      // Task handle
+    1                          // Core where the task should run (1)
+  );
+
   #ifdef SCD40_ENABLED
   scd40.init();
   #endif
