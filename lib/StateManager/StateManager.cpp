@@ -24,18 +24,30 @@ void StateManager::serialize(String& buffer, bool settings_only) {
         temperature["diff"]["type"] = _state.environment.temperature.diff.type;
         temperature["diff"]["value"] = _state.environment.temperature.diff.value;
         temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
+        JsonArray temperature_history = temperature.createNestedArray("history_24h");
+        for (int i = 0; i < 24; i++) {
+            temperature_history.add(_state.environment.temperature.history_24h[i]);
+        }
         // Humidity
         JsonObject humidity = environment["humidity"].to<JsonObject>();
         humidity["value"] = _state.environment.humidity.value;
         humidity["diff"]["type"] = _state.environment.humidity.diff.type;
         humidity["diff"]["value"] = _state.environment.humidity.diff.value;
         humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
+        JsonArray humidity_history = humidity.createNestedArray("history_24h");
+        for (int i = 0; i < 24; i++) {
+            humidity_history.add(_state.environment.humidity.history_24h[i]);
+        }
         // CO2
         JsonObject co2 = environment["co2"].to<JsonObject>();
         co2["value"] = _state.environment.co2.value;
         co2["diff"]["type"] = _state.environment.co2.diff.type;
         co2["diff"]["value"] = _state.environment.co2.diff.value;
         co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
+        JsonArray co2_history = co2.createNestedArray("history_24h");
+        for (int i = 0; i < 24; i++) {
+            co2_history.add(_state.environment.co2.history_24h[i]);
+        }
     }
 
     // Effects

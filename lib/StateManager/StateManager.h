@@ -60,6 +60,7 @@ struct State {
                 String value;
                 bool inverse;
             } diff;
+            float history_24h[24];
         } temperature;
         struct {
             float value;
@@ -68,6 +69,7 @@ struct State {
                 String value;
                 bool inverse;
             } diff;
+            float history_24h[24];
         } humidity;
         struct {
             float value;
@@ -76,6 +78,7 @@ struct State {
                 String value;
                 bool inverse;
             } diff;
+            float history_24h[24];
         } co2;
     } environment;
 
