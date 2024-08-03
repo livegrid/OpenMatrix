@@ -55,36 +55,6 @@ void UI::begin() {
         }
     });
 
-    // on Effect Change
-    _server->on("/openmatrix/effect", HTTP_POST, [&]() {
-        JsonDocument json;
-        DeserializationError err = deserializeJson(json, _server->arg("plain"));
-        Effects effect;
-
-
-        if (err == DeserializationError::Ok) {
-            if (strncmp(json["effect"].as<const char*>(), "none", 4) == 0) {
-                effect = Effects::NONE;
-            } else if (strncmp(json["effect"].as<const char*>(), "simplex_noise", 13) == 0) {
-                effect = Effects::SIMPLEX_NOISE;
-            } else if (strncmp(json["effect"].as<const char*>(), "dancer", 6) == 0) {
-                effect = Effects::DANCER;
-            } else if (strncmp(json["effect"].as<const char*>(), "colorful", 8) == 0) {
-                effect = Effects::COLORFUL;
-            } else {
-                effect = Effects::NONE;
-            }
-
-            if (_on_effect_cb) {
-                _on_effect_cb(effect);
-            }
-
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
-        } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
-        }
-    });
-
     // on Power Change
     _server->on("/openmatrix/power", HTTP_POST, [&]() {
         JsonDocument json;
@@ -117,7 +87,19 @@ void UI::begin() {
         }
     });
 
-    
+    // on effect selection
+    _server->on("/openmatrix/effect", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            if (_on_effect_cb) {
+                _on_effect_cb(json["effect"].as<Effects>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
 }
 
 void UI::onPower(onPowerCallback cb) {
