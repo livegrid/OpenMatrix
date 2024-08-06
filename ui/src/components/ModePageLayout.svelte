@@ -20,7 +20,7 @@
 </script>
 
 <div>
-    <div class="flex flex-wrap items-center gap-6 sm:flex-nowrap sm:justify-between">
+    <div class="flex flex-wrap items-center gap-6 sm:flex-nowrap justify-between">
         <h1 class="text-base text-lg font-semibold leading-7 text-gray-900 dark:text-zinc-300">
             {name}
         </h1>
