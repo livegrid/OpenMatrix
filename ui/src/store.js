@@ -2,26 +2,19 @@ import { get, writable } from 'svelte/store';
 
 import { fetchWithTimeout } from './helpers';
 
+const API_URL = `.`;
+
 // Status
 export const connected = writable(false);
 export const theme = writable('dark');
 
 // State
-export const state = writable({
-    environment: {
-    },
-    effects: {
-        selected: 2,
-    },
-    images: {
-        selected: 0,
-    },
-});
+export const state = writable({});
 
 // Start state interval
 setInterval(async () => {
     try {
-        const response = await fetchWithTimeout('./openmatrix/state', {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/state`, {
             method: 'GET',
             timeout: 2000
         });
@@ -40,7 +33,7 @@ setInterval(async () => {
 export const togglePower = async ({ detail }) => {
     try {
 
-        const response = await fetchWithTimeout('./openmatrix/power', {
+        const response = await fetchWithTimeout(`${API_URL}./openmatrix/power`, {
             method: 'POST',
             timeout: 2000,
             body: JSON.stringify({
@@ -50,6 +43,7 @@ export const togglePower = async ({ detail }) => {
         if (response.status === 200) {
             state.set({
                 ...get(state),
+                // @ts-ignore
                 power: detail
             })
         }
@@ -60,7 +54,7 @@ export const togglePower = async ({ detail }) => {
 
 export const updateBrightness = async (value) => {
     try {
-        const response = await fetchWithTimeout('./openmatrix/brightness', {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/brightness`, {
             method: 'POST',
             timeout: 2000,
             body: JSON.stringify({
@@ -72,6 +66,52 @@ export const updateBrightness = async (value) => {
                 ...get(state),
                 // @ts-ignore
                 brightness: value
+            })
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+export const selectMode = async (modeId) => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/mode`, {
+            method: 'POST',
+            timeout: 2000,
+            body: JSON.stringify({
+                mode: modeId
+            })
+        });
+        if (response.status === 200) {
+            state.set({
+                ...get(state),
+                // @ts-ignore
+                mode: modeId
+            })
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+export const selectEffect = async (effect) => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/effect`, {
+            method: 'POST',
+            timeout: 2000,
+            body: JSON.stringify({
+                effect
+            })
+        });
+        if (response.status === 200) {
+            state.set({
+                ...get(state),
+                // @ts-ignore
+                effects: {
+                    // @ts-ignore
+                    ...get(state)?.effects,
+                    selected: effect
+                }
             })
         }
     } catch (err) {

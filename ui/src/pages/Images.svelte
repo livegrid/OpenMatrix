@@ -4,16 +4,13 @@
 
   const images = [
     {
-      name: 'Ken Perlin',
-      subtitle: 'Simplex Noise',
+      name: 'Simplex Noise',
     },
     {
-      name: 'James Fox',
-      subtitle: 'Dancer',
+      name: 'Dancer',
     },
     {
-      name: 'James Fox',
-      subtitle: 'Colorful',
+      name: 'Colorful',
     }
   ];
 </script>
@@ -27,7 +24,7 @@
   <!-- <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-zinc-300">Last 7 days</h3> -->
   <dl class="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
     {#each images as image}
-      <ImageCard title={image.name} subtitle={image.subtitle} />
+      <ImageCard name={image.name} selected={false} />
     {/each}
   </dl>
 </div>

@@ -32,7 +32,7 @@ const state = {
         }
     },
     effects: {
-        selected: 0
+        selected: 1
     }
 };
 
@@ -77,6 +77,7 @@ export default [
     {
         url: '/openmatrix/mode',
         method: 'post',
+        timeout: 1000,
         response: ({ body }) => {
             state.mode = body.mode;
             return {

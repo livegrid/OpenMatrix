@@ -6,51 +6,89 @@
   import Flocking from "@/components/effects/Flocking.svelte";
   import GameOfLife from "@/components/effects/GameOfLife.svelte";
   import LSystem from "@/components/effects/LSystem.svelte";
+  import StatSkeleton from "@/components/StatSkeleton.svelte";
+  import Spinner from "@/components/Spinner.svelte";
+  import { onDestroy, onMount } from "svelte";
+  import { state, selectMode, selectEffect } from "@/store";
+  import { get } from 'svelte/store';
 
-  import { state } from "@/store";
+  let last_effect = null;
+  let loading_effect_id = null;
+  let mode = {
+    new: null,
+    loading: false
+  };
 
   const effects = [
     {
       id: 1,
-      subtitle: 'Simplex Noise',
+      name: 'Simplex Noise',
       image: SimplexNoise
     },
     {
       id: 2,
-      subtitle: 'Cellular Noise',
+      name: 'Cellular Noise',
       image: CellularNoise
     },
     {
       id: 3,
-      subtitle: 'Flocking',
+      name: 'Flocking',
       image: Flocking
     },
     {
       id: 4,
-      subtitle: 'Game of Life',
+      name: 'Game of Life',
       image: GameOfLife
     },
     {
       id: 5,
-      subtitle: 'L-System',
+      name: 'L-System',
       image: LSystem
     }
   ];
+
+  const unsubscribe = state.subscribe((value) => {
+    if (last_effect !== value?.effects?.selected) {
+      last_effect = value?.effects?.selected;
+      loading_effect_id = null;
+    }
+
+    if (value?.mode === mode.new) {
+      mode.new = value?.mode;
+      mode.loading = false;
+    }
+  });
+
+  onMount(() => {
+    last_effect = get(state)?.effects?.selected;
+  });
+
+  onDestroy(() => {
+    unsubscribe();
+  });
 </script>
 <!-- Your content -->
 <div>
   <div class="flex flex-wrap items-center gap-6 sm:flex-nowrap sm:justify-between">
     <h1 class="text-base text-lg font-semibold leading-7 text-gray-900 dark:text-zinc-300">Effects</h1>
-    {#if $state.mode === 1}
-      <button disabled class="flex flex-row items-center uppercase gap-x-3 text-emerald-600 dark:text-emerald-700">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-        Playing
-      </button>
+    {#if Object.keys($state).length === 0}
+      <StatSkeleton />
     {:else}
-      <button class="flex flex-row items-center uppercase gap-x-3 text-gray-400 hover:text-gray-500 transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-        Play
-      </button>
+      {#if mode.loading}
+        <Spinner size="m" />
+      {:else}
+        {#if $state.mode === 1}
+          <button disabled class="flex flex-row items-center uppercase gap-x-3 text-emerald-600 dark:text-emerald-700">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            Playing
+          </button>
+        {:else}
+          <button on:click={() => { mode.loading = true; mode.new = 1; selectMode(1); }} class="flex flex-row items-center uppercase gap-x-3 text-gray-400 hover:text-gray-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            Play
+          </button>
+        {/if}
+      {/if}
     {/if}
   </div>
 </div>
@@ -59,7 +97,22 @@
   <!-- <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-zinc-300">Last 7 days</h3> -->
   <dl class="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
     {#each effects as effect}
-      <EffectCard image={effect.image} subtitle={effect.subtitle} selected={effect.id === $state.effects.selected}/>
+      {#if Object.keys($state).length === 0}
+        <div role="status" class="animate-pulse">
+          <div class="bg-gray-300/50 rounded dark:bg-zinc-700/50 w-full h-[120px]"></div>
+        </div>
+      {:else}
+        <EffectCard
+          on:click={() => {
+            loading_effect_id = effect.id;
+            selectEffect(effect.id);
+          }}
+          name={effect.name}
+          image={effect.image}
+          loading={effect.id === loading_effect_id}
+          selected={effect.id === $state?.effects?.selected}
+        />
+      {/if}
     {/each}
   </dl>
 </div>
