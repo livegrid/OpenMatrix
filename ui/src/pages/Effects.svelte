@@ -1,23 +1,19 @@
 
 <script>
+  // @ts-nocheck
+  import ModePageLayout from "@/components/ModePageLayout.svelte";
   import EffectCard from "@/components/EffectCard.svelte";
   import CellularNoise from "@/components/effects/CellularNoise.svelte";
   import SimplexNoise from "@/components/effects/SimplexNoise.svelte";
   import Flocking from "@/components/effects/Flocking.svelte";
   import GameOfLife from "@/components/effects/GameOfLife.svelte";
   import LSystem from "@/components/effects/LSystem.svelte";
-  import StatSkeleton from "@/components/StatSkeleton.svelte";
-  import Spinner from "@/components/Spinner.svelte";
   import { onDestroy, onMount } from "svelte";
   import { state, selectMode, selectEffect } from "@/store";
   import { get } from 'svelte/store';
 
   let last_effect = null;
   let loading_effect_id = null;
-  let mode = {
-    new: null,
-    loading: false
-  };
 
   const effects = [
     {
@@ -52,11 +48,6 @@
       last_effect = value?.effects?.selected;
       loading_effect_id = null;
     }
-
-    if (value?.mode === mode.new) {
-      mode.new = value?.mode;
-      mode.loading = false;
-    }
   });
 
   onMount(() => {
@@ -67,33 +58,8 @@
     unsubscribe();
   });
 </script>
-<!-- Your content -->
-<div>
-  <div class="flex flex-wrap items-center gap-6 sm:flex-nowrap sm:justify-between">
-    <h1 class="text-base text-lg font-semibold leading-7 text-gray-900 dark:text-zinc-300">Effects</h1>
-    {#if Object.keys($state).length === 0}
-      <StatSkeleton />
-    {:else}
-      {#if mode.loading}
-        <Spinner size="m" />
-      {:else}
-        {#if $state.mode === 1}
-          <button disabled class="flex flex-row items-center uppercase gap-x-3 text-emerald-600 dark:text-emerald-700">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            Playing
-          </button>
-        {:else}
-          <button on:click={() => { mode.loading = true; mode.new = 1; selectMode(1); }} class="flex flex-row items-center uppercase gap-x-3 text-gray-400 hover:text-gray-500 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            Play
-          </button>
-        {/if}
-      {/if}
-    {/if}
-  </div>
-</div>
 
-<div class="mt-8">
+<ModePageLayout name={'Effects'} id={1}>
   <!-- <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-zinc-300">Last 7 days</h3> -->
   <dl class="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
     {#each effects as effect}
@@ -115,4 +81,4 @@
       {/if}
     {/each}
   </dl>
-</div>
+</ModePageLayout>
