@@ -11,8 +11,7 @@ export const theme = writable('dark');
 // State
 export const state = writable({});
 
-// Start state interval
-setInterval(async () => {
+const fetchState = async () => {
     try {
         const response = await fetchWithTimeout(`${API_URL}/openmatrix/state`, {
             method: 'GET',
@@ -28,7 +27,13 @@ setInterval(async () => {
     } catch (err) {
         console.error(err);
     }
-}, 2000);
+}
+
+setTimeout(() => {
+    fetchState();
+    setInterval(fetchState, 2000);
+}, 1000);
+
 
 export const togglePower = async ({ detail }) => {
     try {
