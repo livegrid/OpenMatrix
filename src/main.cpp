@@ -303,7 +303,7 @@ void setup(void) {
     NULL,                      // Task input parameter
     1,                         // Pri ority of the task
     &serverTaskHandle,         // Task handle
-    0                          // Core where the task should run (0)
+    1                          // Core where the task should run (1)
   );
 
   #ifndef SCD40_ENABLED

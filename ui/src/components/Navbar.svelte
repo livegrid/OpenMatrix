@@ -3,12 +3,13 @@
   import Logo from '@/components/Logo.svelte';
   import NavItem from '@/components/NavItem.svelte';
   import NavBottomSettings from '@/components/NavBottomSettings.svelte';
+  import { state } from '@/store';
 
   export let currentTab;
   const dispatch = createEventDispatcher();
 
   // opening, open, closing, closed
-  let state = 'closed';
+  let navbarState = 'closed';
 
   const loadTab = () => {
     const tab =location.hash.substring(1);
@@ -26,17 +27,17 @@
 
   const openNavbar = () => {
     console.log('openNavbar');
-    state = 'opening';
+    navbarState = 'opening';
     setTimeout(() => {
-      state = 'open';
+      navbarState = 'open';
     }, 300);
   }
 
   const closeNavbar = () => {
     console.log('closeNavbar');
-    state = 'closing';
+    navbarState = 'closing';
     setTimeout(() => {
-      state = 'closed';
+      navbarState = 'closed';
     }, 300);
   }
 
@@ -87,10 +88,10 @@
   afterUpdate(() => { loadTab(); });
 </script>
 
-<!-- Off-canvas menu for mobile, show/hide based on off-canvas menu state. -->
+<!-- Off-canvas menu for mobile, show/hide based on off-canvas menu navbarState. -->
 <div class="relative z-50 lg:hidden" role="dialog" aria-modal="true">
   <!--
-    Off-canvas menu backdrop, show/hide based on off-canvas menu state.
+    Off-canvas menu backdrop, show/hide based on off-canvas menu navbarState.
 
     Entering: "transition-opacity ease-linear duration-300"
       From: "opacity-0"
@@ -99,12 +100,12 @@
       From: "opacity-100"
       To: "opacity-0"
   -->
-  {#if state !== 'closed'}
-    <div class={`fixed inset-0 bg-gray-900/80 dark:bg-gray-900/40 transition-opacity ease-linear duration-300 ${ state === 'open' ? 'opacity-100' : 'opacity-0'}`}></div>
+  {#if navbarState !== 'closed'}
 
     <div class="fixed inset-0 flex">
-      <!--
-        Off-canvas menu, show/hide based on off-canvas menu state.
+      <div on:click={closeNavbar} class={`fixed inset-0 bg-gray-900/80 dark:bg-zinc-900/40 transition-opacity ease-linear duration-300 ${ navbarState === 'open' ? 'opacity-100' : 'opacity-0'}`} />
+    <!--
+        Off-canvas menu, show/hide based on off-canvas menu navbarState.
 
         Entering: "transition ease-in-out duration-300 transform"
           From: "-translate-x-full"
@@ -113,9 +114,9 @@
           From: "translate-x-0"
           To: "-translate-x-full"
       -->
-      <div class={`relative mr-16 flex w-full max-w-xs flex-1 transition ease-in-out duration-300 transform ${ state === 'open' ? 'translate-x-0' : '-translate-x-full' }`}>
+      <div class={`relative mr-16 flex w-full max-w-xs flex-1 transition ease-in-out duration-300 transform ${ navbarState === 'open' ? 'translate-x-0' : '-translate-x-full' }`}>
         <!--
-          Close button, show/hide based on off-canvas menu state.
+          Close button, show/hide based on off-canvas menu navbarState.
 
           Entering: "ease-in-out duration-300"
             From: "opacity-0"
@@ -124,8 +125,8 @@
             From: "opacity-100"
             To: "opacity-0"
         -->
-        {#if state != 'closed'}
-          <div class={`absolute left-full top-0 flex w-16 justify-center pt-5 ease-in-out duration-300 ${ state === 'open' ? 'opacity-100' : 'opacity-0' }`}>
+        {#if navbarState != 'closed'}
+          <div class={`absolute left-full top-0 flex w-16 justify-center pt-5 ease-in-out duration-300 ${ navbarState === 'open' ? 'opacity-100' : 'opacity-0' }`}>
             <button on:click={closeNavbar} class="-m-2.5 p-2.5">
               <span class="sr-only">Close sidebar</span>
               <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
@@ -146,7 +147,7 @@
                 <ul class="-mx-2 space-y-1">
                   {#each navMenu as item (item.id)}
                     <li>
-                      <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} active={currentTab === item.id} disabled={item.disabled} title={item.title} icon={item.icon} />
+                      <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} active={currentTab === item.id} disabled={Object.keys($state).length === 0 || item.disabled} title={item.title} icon={item.icon} />
                     </li>
                   {/each}
                 </ul>
@@ -175,7 +176,7 @@
           <ul class="-mx-2 space-y-1">
             {#each navMenu as item (item.id)}
               <li>
-                <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} id={item.id} active={currentTab === item.id} disabled={item.disabled} title={item.title} icon={item.icon} />
+                <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} id={item.id} active={currentTab === item.id} disabled={Object.keys($state).length === 0 || item.disabled} title={item.title} icon={item.icon} />
               </li>
             {/each}
           </ul>

@@ -24,8 +24,10 @@ typedef enum {
 typedef enum {
     NONE = 0,
     SIMPLEX_NOISE,
-    DANCER,
-    COLORFUL,
+    CELLULAR_NOISE,
+    FLOCKING,
+    GAMEOFLIFE,
+    LSYSTEM,
 } Effects;
 
 // Text
