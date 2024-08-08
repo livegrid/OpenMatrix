@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <scd4x.h>
 #include <Wire.h>
-#include "SCD40Settings.h"
+#include "StateManager.h"
 
 class SCD40 {
  private:
@@ -18,6 +18,12 @@ class SCD40 {
   String getSerialNumber(uint16_t serial0, uint16_t serial1, uint16_t serial2);
   static void measurementTaskFunction(void* parameter);
   void runMeasurementTask();
+  void updateRunningAverage(State* state);
+  void shiftHistoryAndResetAverage(State* state);
+  static const int READINGS_PER_HOUR = 720; // 5 seconds * 720 = 1 hour
+  int readingCount = 0;
+  float tempSum = 0, humiditySum = 0, co2Sum = 0;
+
 
  public:
   void init();

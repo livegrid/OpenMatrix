@@ -36,7 +36,7 @@
       {#if value == null || value == undefined}
         <StatSkeleton />
       {:else}
-        {value} {symbol}
+        {Number.isInteger(value) ? value : value.toFixed(1)} {symbol}
       {/if}
     </p>
     {#if (diff !== null && diff !== undefined) && diff?.type !== 0}

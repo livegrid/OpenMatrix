@@ -1,4 +1,5 @@
 #include "SCD40.h"
+#include "SCD40Settings.h"
 
 String SCD40::uint16ToHex(uint16_t value) {
   String hexString = "";
@@ -22,6 +23,31 @@ void SCD40::measurementTaskFunction(void* parameter) {
   instance->runMeasurementTask();
 }
 
+void SCD40::updateRunningAverage(State* state) {
+  float tempAvg = tempSum / readingCount;
+  float humidityAvg = humiditySum / readingCount;
+  float co2Avg = co2Sum / readingCount;
+  
+  // Update the last element with current running average
+  state->environment.temperature.history_24h[23] = tempAvg;
+  state->environment.humidity.history_24h[23] = round(humidityAvg);
+  state->environment.co2.history_24h[23] = round(co2Avg);
+}
+
+void SCD40::shiftHistoryAndResetAverage(State* state) {
+  
+  // Shift history values
+  for (int i = 0; i < 23; i++) {
+    state->environment.temperature.history_24h[i] = state->environment.temperature.history_24h[i+1];
+    state->environment.humidity.history_24h[i] = state->environment.humidity.history_24h[i+1];
+    state->environment.co2.history_24h[i] = state->environment.co2.history_24h[i+1];
+  }
+  
+  // Reset sums and count for the new hour
+  tempSum = humiditySum = co2Sum = 0;
+  readingCount = 0;
+}
+
 void SCD40::runMeasurementTask() {
   Wire.begin();
   scd4x.begin(Wire);
@@ -41,20 +67,48 @@ void SCD40::runMeasurementTask() {
 
     scd4x.startPeriodicMeasurement();
 
-    while (true) {
+
+    const TickType_t xFrequency = pdMS_TO_TICKS(5000);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    // char tempBuffer[4];
+    extern StateManager stateManager; 
+
+    for (;;) {
       if (scd4x.isDataReady()) {
         if (scd4x.readMeasurement(co2, temperature, humidity) == 0) {
+          State* state = stateManager.getState();
+          state->environment.temperature.value = temperature;
+          state->environment.temperature.diff.type = DiffType::DISABLE;
+          state->environment.humidity.value = round(humidity);
+          state->environment.humidity.diff.type = DiffType::DISABLE;
+          state->environment.co2.value = co2;
+          state->environment.co2.diff.type = DiffType::DISABLE;
+
+          // Accumulate readings
+          tempSum += temperature;
+          humiditySum += round(humidity);
+          co2Sum += co2;
+          readingCount++;
+
+          // Update running average
+          updateRunningAverage(state);
+
+          // Check if we have collected an hour's worth of readings
+          if (readingCount >= READINGS_PER_HOUR) {
+            shiftHistoryAndResetAverage(state);
+          }
+
           firstReadingReceived = true;  // Set the first reading flag
-          vTaskDelay(pdMS_TO_TICKS(4750));  // New data available after approximately 5 seconds
         }
         sensorAvailable = true;
       }
-      vTaskDelay(pdMS_TO_TICKS(250));  // Check every 250ms
+      vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
   }
   else {
     log_i("SCD40 not connected");
     sensorAvailable = false;
+    vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
   }
 }
 

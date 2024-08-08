@@ -303,11 +303,12 @@ void setup(void) {
     NULL,                      // Task input parameter
     1,                         // Pri ority of the task
     &serverTaskHandle,         // Task handle
-    1                          // Core where the task should run (0)
+    0                          // Core where the task should run (0)
   );
 
-  // Demo task
-  xTaskCreatePinnedToCore(
+  #ifndef SCD40_ENABLED
+    // Demo task
+    xTaskCreatePinnedToCore(
     demoTask,                  // Task function
     "DemoTask",                // Name of the task
     1024,                      // Stack size in words
@@ -316,6 +317,7 @@ void setup(void) {
     NULL,                      // Task handle
     1                          // Core where the task should run (1)
   );
+  #endif
 
   #ifdef SCD40_ENABLED
   scd40.init();
