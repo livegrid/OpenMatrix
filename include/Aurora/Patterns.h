@@ -212,6 +212,8 @@ class Patterns : public Playlist {
 
       currentItem = shuffledItems[currentIndex];
 
+      Serial.print("Changing pattern to:  ");
+      Serial.println(currentItem->name);
       if (currentItem)
         currentItem->start();
 

@@ -4,6 +4,7 @@
 #include "StateManager.h"
 #include "UI.h"
 #include "GeneralSettings.h"
+#include "TaskManager.h"
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
@@ -13,7 +14,7 @@
 Matrix matrix;
 
 #ifdef SCD40_ENABLED
-  #include <SCD40.h>
+  #include "SCD40.h"
   SCD40 scd40;
 #endif
 
@@ -22,15 +23,20 @@ Matrix matrix;
   AutoRotate autoRotate(&matrix);
 #endif
 
+#ifdef TOUCH_ENABLED
+  #include "TouchMenu.h"
+  TouchMenu touchMenu(&matrix);
+#endif
+
 StateManager stateManager;
 
 WebServer server(80);
 NetWizard NW(&server);
 UI Interface(&server, &stateManager);
 
-TaskHandle_t updateMatrixTaskHandle;
+TaskHandle_t effectsTaskHandle;
 TaskHandle_t serverTaskHandle;
-
+TaskHandle_t touchTaskHandle;
 
 // Aurora related
 #include "Aurora/EffectsManager.h"
@@ -43,9 +49,6 @@ EffectsManager effects(VIRTUAL_RES_X, VIRTUAL_RES_Y);
 #include "Aurora/Patterns.h"
 Patterns patterns;
 
-// #include "Effects/EffectManager.h"
-// EffectManager effectManager(&matrix);
-
 void serverTask(void *parameter) {
   for (;;) {
     server.handleClient();
@@ -55,6 +58,7 @@ void serverTask(void *parameter) {
   }
 }
 
+#ifndef SCD40_ENABLED
 void demoTask(void *parameter) {
   for (;;) {
     // Update temperature, humidity and CO2
@@ -74,26 +78,12 @@ void demoTask(void *parameter) {
     }
 
     // Delay for 1 second
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
+#endif
 
-void patternAdvance(){
-    // Go to next pattern in the list (se Patterns.h)
-    patterns.stop();
-
-    patterns.moveRandom(1);
-    // patterns.move(1);
-    patterns.start();  
-
-    // Select a random palette as well
-    effects.RandomPalette();
-    Serial.print("Changing pattern to:  ");
-    Serial.println(patterns.getCurrentPatternName());
-    
-}
-uint8_t currentEffect = 0;
-void updateMatrixTask(void *parameter) {
+void effectsTask(void *parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(30);
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -104,14 +94,13 @@ void updateMatrixTask(void *parameter) {
   Serial.println("Effects being loaded: ");
   patterns.listPatterns();
   
-  patterns.setPattern(currentEffect); //   // simple noise
+  patterns.setPattern(0); //   // simple noise
   patterns.start();     
 
   Serial.print("Starting with pattern: ");
   Serial.println(patterns.getCurrentPatternName());
-
   for (;;) {
-    static unsigned long lastLogTime = 0;
+  static unsigned long lastLogTime = 0;
     static unsigned long lastFrameTime = 0;
     unsigned long currentTime = millis();
     
@@ -119,7 +108,7 @@ void updateMatrixTask(void *parameter) {
     if (currentTime - lastLogTime >= 10000) {
       float framerate = 1000.0 / (currentTime - lastFrameTime);
       log_e("Framerate: %.2f FPS", framerate);
-      patternAdvance();
+      patterns.moveRandom(1);
       lastLogTime = currentTime;
     }
     lastFrameTime = currentTime;
@@ -128,8 +117,19 @@ void updateMatrixTask(void *parameter) {
     matrix.update();
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next interval
+}
+}
+
+#ifdef TOUCH_ENABLED
+void touchTask(void *parameter) {
+  const TickType_t xFrequency = pdMS_TO_TICKS(30);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (;;) {
+    touchMenu.update();
+    vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next interval
   }
 }
+#endif
 
 void setup(void) {
   Serial.begin(115200);
@@ -284,47 +284,39 @@ void setup(void) {
     Serial.println("OpenMatrix is not configured yet! Please connect to LiveGrid AP and setup your device.");
   }
 
+  touchMenu.setupInterrupts();
+
   // Start matrix task
-  xTaskCreatePinnedToCore(
-    updateMatrixTask,          // Task function
-    "Update Matrix",           // Name of the task
-    4096,                      // Stack size in words
-    NULL,                      // Task input parameter
-    1,                         // Priority of the task
-    NULL,                      // Task handle
-    1                          // Core where the task should run (1)
-  );
+  TaskManager::getInstance().createTask("EffectsTask", effectsTask, 4096, 1, 1);
 
   // Start server task
-  xTaskCreatePinnedToCore(
-    serverTask,                // Task function
-    "Server Task",             // Name of the task
-    4096,                      // Stack size in words
-    NULL,                      // Task input parameter
-    1,                         // Pri ority of the task
-    &serverTaskHandle,         // Task handle
-    1                          // Core where the task should run (1)
-  );
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 1);
 
-  #ifndef SCD40_ENABLED
-    // Demo task
-    xTaskCreatePinnedToCore(
-    demoTask,                  // Task function
-    "DemoTask",                // Name of the task
-    1024,                      // Stack size in words
-    NULL,                      // Task input parameter
-    1,                         // Priority of the task
-    NULL,                      // Task handle
-    1                          // Core where the task should run (1)
-  );
+  // Start touch task
+  #ifdef TOUCH_ENABLED
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 1);
+
+  // xTaskCreatePinnedToCore(
+  //   touchTask,                 // Task function
+  //   "Touch Task",              // Name of the task
+  //   1024,                      // Stack size in words
+  //   NULL,                      // Task input parameter
+  //   1,                         // Priority of the task
+  //   &touchTaskHandle,          // Task handle
+  //   1                          // Core where the task should run (1)
+  // );
   #endif
 
   #ifdef SCD40_ENABLED
   scd40.init();
+  #else
+  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
   #endif
+
   #if ADXL345_ENABLED
   autoRotate.init();
   #endif
+
 }
 
 void loop(void) {

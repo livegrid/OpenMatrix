@@ -18,9 +18,6 @@ class Matrix {
   uint8_t matrixRotation = 0;
 
  public:
-#if USE_CRGB_ARRAY
-  CRGB leds[PANEL_RES_X * PANEL_RES_Y];
-#endif
 
   Matrix();
   void setBrightness(uint8_t newBrightness);
@@ -54,10 +51,6 @@ class Matrix {
   void setRotation(uint8_t newRotation);
   void rotate90();
   void fillScreen(uint8_t r, uint8_t g, uint8_t b);
-
-#if USE_CRGB_ARRAY
-  void fillDMAFromCRGBArray();
-#endif
 
   void update();
   void clearScreen();
