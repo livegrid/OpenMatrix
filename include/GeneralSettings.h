@@ -4,5 +4,11 @@
 #define AQUARIUM_ENABLED 1
 #define SCD40_ENABLED 1
 #define ADXL345_ENABLED 1
+#define TOUCH_ENABLED 15
+
+#define WIFI_ENABLED 1
+
+#define START_WIFI_AT_BOOT 1
+#define OTA_ENABLED 1
 
 #endif

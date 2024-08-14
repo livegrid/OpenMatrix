@@ -15,6 +15,20 @@ Matrix::Matrix() {
   matrix->setBrightness8(matrixBrightness);  // 0-255
   matrix->setRotation(2);
   matrix->clearScreen();
+
+  background = new GFX_Layer(VIRTUAL_RES_X, VIRTUAL_RES_Y, 
+    [this](int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+        matrix->drawPixelRGB888(x, y, r, g, b);
+    });
+
+  foreground = new GFX_Layer(VIRTUAL_RES_X, VIRTUAL_RES_Y, 
+    [this](int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+        matrix->drawPixelRGB888(x, y, r, g, b);
+    });
+
+  gfx_compositor = new GFX_LayerCompositor([this](int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+        matrix->drawPixelRGB888(x, y, r, g, b);
+    });
 }
 
 void Matrix::setBrightness(uint8_t newBrightness) {

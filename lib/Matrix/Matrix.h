@@ -9,6 +9,7 @@
 #include "MatrixSettings.h"
 #include "Vector.h"
 #include "Sprites.h"
+#include "GFX_Layer.hpp"
 
 class Matrix {
  private:
@@ -18,11 +19,13 @@ class Matrix {
   uint8_t matrixRotation = 0;
 
  public:
-#if USE_CRGB_ARRAY
-  CRGB leds[PANEL_RES_X * PANEL_RES_Y];
-#endif
-
+ 
   Matrix();
+
+  GFX_Layer* background = nullptr;
+  GFX_Layer* foreground = nullptr;
+  GFX_LayerCompositor* gfx_compositor = nullptr;
+  
   void setBrightness(uint8_t newBrightness);
   uint8_t getBrightness() const;
   uint8_t getXResolution();
@@ -54,10 +57,6 @@ class Matrix {
   void setRotation(uint8_t newRotation);
   void rotate90();
   void fillScreen(uint8_t r, uint8_t g, uint8_t b);
-
-#if USE_CRGB_ARRAY
-  void fillDMAFromCRGBArray();
-#endif
 
   void update();
   void clearScreen();
