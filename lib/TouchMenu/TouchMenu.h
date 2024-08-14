@@ -3,10 +3,12 @@
 
 #include <Arduino.h>
 #include <Matrix.h>
+#include <TaskManager.h>
 
 class TouchMenu {
  private:
   Matrix* matrix;
+  TaskManager* taskManager;
   long touchThreshold;
   bool menuOpen = false;
   bool sensorDataVisible = false;
@@ -49,7 +51,7 @@ class TouchMenu {
   void executeMenuItem(const std::string& selectedOption) {
     if (selectedOption == "Go Back") {
       menuOpen = false;
-      // taskManager.resumeTask("EffectsTask");
+      taskManager->startTask("EffectsTask");
     } else if (selectedOption == "Show SensorData" || selectedOption == "Hide SensorData") {
       sensorDataVisible = !sensorDataVisible;
     } else if (selectedOption == "Start WiFi") {
@@ -69,8 +71,12 @@ class TouchMenu {
   }
 
   void handleDoubleTap(uint8_t pin) {
-    menuOpen = true;
-    // taskManager.pauseTask("EffectsTask");
+    if(!menuOpen) {
+      menuOpen = true;
+      if(taskManager->isTaskRunning("EffectsTask")) {
+        taskManager->suspendTask("EffectsTask");
+      }
+    }
     log_i(" --- T%d Double Tap", pin - 10);
   }
 
@@ -157,11 +163,12 @@ class TouchMenu {
         optionSelected = false;
       }
     }
+    matrix->update();
   }
 
 
  public:
-  TouchMenu(Matrix* matrix, long touchThreshold = 10000) : matrix(matrix), touchThreshold(touchThreshold) {
+  TouchMenu(Matrix* matrix, TaskManager* taskManager, long touchThreshold = 10000) : matrix(matrix), taskManager(taskManager), touchThreshold(touchThreshold) {
     instance = this;
   }
 
@@ -194,13 +201,15 @@ class TouchMenu {
           } else {
             handleSingleTap(pin);
           }
+          if(menuOpen) {
+            displayMenu();
+          }
           lastTapTime[i] = now;
         } else {
           log_i(" --- T%d Released", i + 1);
         }
       }
     }
-    displayMenu();
   }
 
   bool isMenuOpen() {

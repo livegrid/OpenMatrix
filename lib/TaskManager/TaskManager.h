@@ -61,6 +61,10 @@ public:
         return TaskState::SUSPENDED;  // Return SUSPENDED if task not found
     }
 
+    bool isTaskRunning(const std::string& taskName) {
+        return tasks.find(taskName) != tasks.end() && tasks[taskName].state == TaskState::RUNNING;
+    }
+
 private:
     TaskManager() {}  // Private constructor for singleton
     
