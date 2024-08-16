@@ -12,9 +12,7 @@ void WebServerManager::begin() {
 
 void WebServerManager::handleClient() {
     server.handleClient();
-#ifdef OTA_ENABLED
     ElegantOTA.loop();
-#endif
     nw.loop();
 }
 
@@ -92,10 +90,8 @@ void WebServerManager::setupInterface() {
 }
 
 void WebServerManager::startServer() {
-#ifdef OTA_ENABLED
     Serial.println("[*] Attaching ElegantOTA");
     ElegantOTA.begin(&server);
-#endif
 
     server.begin();
 

@@ -1,157 +1,274 @@
 #include "StateManager.h"
 
-StateManager::StateManager() {
+StateManager::StateManager() : _saveTaskHandle(NULL) {
 }
 
 State* StateManager::getState() {
-    return &_state;
+  return &_state;
 }
 
 void StateManager::serialize(String& buffer, bool settings_only) {
-    JsonDocument json;
-    
-    // Convert State to JSON
-    json["power"] = _state.power;
-    json["brightness"] = _state.brightness;
-    json["mode"] = _state.mode;
+  JsonDocument json;
 
-    if (!settings_only) {
-        JsonObject environment = json["environment"].to<JsonObject>();
+  // Convert State to JSON
+  json["power"] = _state.power;
+  json["brightness"] = _state.brightness;
+  json["mode"] = _state.mode;
 
-        // Temperature
-        JsonObject temperature = environment["temperature"].to<JsonObject>();
-        temperature["value"] = _state.environment.temperature.value;
-        temperature["diff"]["type"] = _state.environment.temperature.diff.type;
-        temperature["diff"]["value"] = _state.environment.temperature.diff.value;
-        temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
-        JsonArray temperature_history = temperature.createNestedArray("history_24h");
-        for (int i = 0; i < 24; i++) {
-            temperature_history.add(_state.environment.temperature.history_24h[i]);
-        }
-        // Humidity
-        JsonObject humidity = environment["humidity"].to<JsonObject>();
-        humidity["value"] = _state.environment.humidity.value;
-        humidity["diff"]["type"] = _state.environment.humidity.diff.type;
-        humidity["diff"]["value"] = _state.environment.humidity.diff.value;
-        humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
-        JsonArray humidity_history = humidity.createNestedArray("history_24h");
-        for (int i = 0; i < 24; i++) {
-            humidity_history.add(_state.environment.humidity.history_24h[i]);
-        }
-        // CO2
-        JsonObject co2 = environment["co2"].to<JsonObject>();
-        co2["value"] = _state.environment.co2.value;
-        co2["diff"]["type"] = _state.environment.co2.diff.type;
-        co2["diff"]["value"] = _state.environment.co2.diff.value;
-        co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
-        JsonArray co2_history = co2.createNestedArray("history_24h");
-        for (int i = 0; i < 24; i++) {
-            co2_history.add(_state.environment.co2.history_24h[i]);
-        }
+  if (!settings_only) {
+    JsonObject environment = json["environment"].to<JsonObject>();
+
+    // Temperature
+    JsonObject temperature = environment["temperature"].to<JsonObject>();
+    temperature["value"] = _state.environment.temperature.value;
+    temperature["diff"]["type"] = _state.environment.temperature.diff.type;
+    temperature["diff"]["value"] = _state.environment.temperature.diff.value;
+    temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
+    JsonArray temperature_history = temperature.createNestedArray("history_24h");
+    for (int i = 0; i < 24; i++) {
+      temperature_history.add(_state.environment.temperature.history_24h[i]);
     }
+    // Humidity
+    JsonObject humidity = environment["humidity"].to<JsonObject>();
+    humidity["value"] = _state.environment.humidity.value;
+    humidity["diff"]["type"] = _state.environment.humidity.diff.type;
+    humidity["diff"]["value"] = _state.environment.humidity.diff.value;
+    humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
+    JsonArray humidity_history = humidity.createNestedArray("history_24h");
+    for (int i = 0; i < 24; i++) {
+      humidity_history.add(_state.environment.humidity.history_24h[i]);
+    }
+    // CO2
+    JsonObject co2 = environment["co2"].to<JsonObject>();
+    co2["value"] = _state.environment.co2.value;
+    co2["diff"]["type"] = _state.environment.co2.diff.type;
+    co2["diff"]["value"] = _state.environment.co2.diff.value;
+    co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
+    JsonArray co2_history = co2.createNestedArray("history_24h");
+    for (int i = 0; i < 24; i++) {
+      co2_history.add(_state.environment.co2.history_24h[i]);
+    }
+  }
 
-    // Effects
-    json["effects"]["selected"] = _state.effects.selected;
-    
-    // Image
-    json["image"]["selected"] = _state.image.selected;
+  // Effects
+  json["effects"]["selected"] = _state.effects.selected;
 
-    // Settings
-    JsonObject settings = json["settings"].to<JsonObject>();
-    // MQTT
-    settings["mqtt"]["host"] = _state.settings.mqtt.host;
-    settings["mqtt"]["port"] = _state.settings.mqtt.port;
-    settings["mqtt"]["client_id"] = _state.settings.mqtt.client_id;
-    settings["mqtt"]["username"] = _state.settings.mqtt.username;
-    settings["mqtt"]["password"] = _state.settings.mqtt.password;
-    settings["mqtt"]["co2_topic"] = _state.settings.mqtt.co2_topic;
-    settings["mqtt"]["matrix_text_topic"] = _state.settings.mqtt.matrix_text_topic;
-    settings["mqtt"]["show_text"] = _state.settings.mqtt.show_text;
-    // Home Assistant
-    settings["home_assistant"]["show_text"] = _state.settings.home_assistant.show_text;
-    // eDMX
-    settings["edmx"]["protocol"] = _state.settings.edmx.protocol;
-    settings["edmx"]["multicast"] = _state.settings.edmx.multicast;
-    settings["edmx"]["start_universe"] = _state.settings.edmx.start_universe;
-    settings["edmx"]["start_address"] = _state.settings.edmx.start_address;
-    settings["edmx"]["mode"] = _state.settings.edmx.mode;
-    settings["edmx"]["timeout"] = _state.settings.edmx.timeout;
+  // Image
+  json["image"]["selected"] = _state.image.selected;
 
-    serializeJson(json, buffer);
-    // Clear JSON
-    json.clear();
+  // Settings
+  JsonObject settings = json["settings"].to<JsonObject>();
+  // MQTT
+  settings["mqtt"]["host"] = _state.settings.mqtt.host;
+  settings["mqtt"]["port"] = _state.settings.mqtt.port;
+  settings["mqtt"]["client_id"] = _state.settings.mqtt.client_id;
+  settings["mqtt"]["username"] = _state.settings.mqtt.username;
+  settings["mqtt"]["password"] = _state.settings.mqtt.password;
+  settings["mqtt"]["co2_topic"] = _state.settings.mqtt.co2_topic;
+  settings["mqtt"]["matrix_text_topic"] = _state.settings.mqtt.matrix_text_topic;
+  settings["mqtt"]["show_text"] = _state.settings.mqtt.show_text;
+  // Home Assistant
+  settings["home_assistant"]["show_text"] = _state.settings.home_assistant.show_text;
+  // eDMX
+  settings["edmx"]["protocol"] = _state.settings.edmx.protocol;
+  settings["edmx"]["multicast"] = _state.settings.edmx.multicast;
+  settings["edmx"]["start_universe"] = _state.settings.edmx.start_universe;
+  settings["edmx"]["start_address"] = _state.settings.edmx.start_address;
+  settings["edmx"]["mode"] = _state.settings.edmx.mode;
+  settings["edmx"]["timeout"] = _state.settings.edmx.timeout;
+
+  serializeJson(json, buffer);
+  // Clear JSON
+  json.clear();
 }
 
 void StateManager::save() {
-    File file = LittleFS.open("/state.json", "w");
-    if (!file) {
-        Serial.println("[!] Failed to open state.json for writing");
-        return;
-    }
+  File file = LittleFS.open("/state.json", "w");
+  if (!file) {
+    Serial.println("[!] Failed to open state.json for writing");
+    return;
+  }
 
-    // Serialize settings only to file
-    String buffer;
-    this->serialize(buffer, true);
-    
-    // Write to file
-    file.print(buffer);
+  // Serialize settings only to file
+  String buffer;
+  this->serialize(buffer, true);
 
-    // Close file
-    file.close();
+  // Write to file
+  file.print(buffer);
+
+  // Close file
+  file.close();
 }
 
 void StateManager::restore() {
-    // Restore state from FS
-    File file = LittleFS.open("/state.json", "r");
-    if (file) {
-        JsonDocument json;
+  // Restore state from FS
+  File file = LittleFS.open("/state.json", "r");
+  if (!file) {
+    Serial.println("[!] state.json not found. Creating default state.");
+    file.close();
+    setDefaultState();
+    save();
+    return;
+  }
+  
+  JsonDocument json;
 
-        // Parse JSON
-        DeserializationError error = deserializeJson(json, file);
-        if (error) {
-            Serial.println("[!] Failed to parse state.json");
-            file.close();
-            return;
-        }
+  // Parse JSON
+  DeserializationError error = deserializeJson(json, file);
+  if (error) {
+    Serial.println("[!] Failed to parse state.json");
+    file.close();
+    setDefaultState();
+    save();
+    return;
+  }
 
-        // Convert JSON to State
-        _state.power = json["power"].as<bool>();
-        _state.brightness = json["brightness"].as<uint8_t>();
-        _state.mode = json["mode"].as<OpenMatrixMode>();
-        
-        // Effects
-        _state.effects.selected = json["effects"]["selected"].as<Effects>();
+  // Convert JSON to State
+  _state.power = json["power"].as<bool>();
+  _state.brightness = json["brightness"].as<uint8_t>();
+  _state.mode = json["mode"].as<OpenMatrixMode>();
 
-        // Image
-        _state.image.selected = json["image"]["selected"].as<const char*>();
+  JsonObject environment = json["environment"];
+  if (environment) {
+    JsonArray temp_history = environment["temperature"]["history_24h"];
+    JsonArray humidity_history = environment["humidity"]["history_24h"];
+    JsonArray co2_history = environment["co2"]["history_24h"];
 
-        // Settings
-        JsonObject settings = json["settings"];
-        // MQTT
-        _state.settings.mqtt.host = settings["mqtt"]["host"].as<const char*>();
-        _state.settings.mqtt.port = settings["mqtt"]["port"].as<const char*>();
-        _state.settings.mqtt.client_id = settings["mqtt"]["client_id"].as<const char*>();
-        _state.settings.mqtt.username = settings["mqtt"]["username"].as<const char*>();
-        _state.settings.mqtt.password = settings["mqtt"]["password"].as<const char*>();
-        _state.settings.mqtt.co2_topic = settings["mqtt"]["co2_topic"].as<const char*>();
-        _state.settings.mqtt.matrix_text_topic = settings["mqtt"]["matrix_text_topic"].as<const char*>();
-        _state.settings.mqtt.show_text = settings["mqtt"]["show_text"].as<bool>();
-        // Home Assistant
-        _state.settings.home_assistant.show_text = settings["home_assistant"]["show_text"].as<bool>();
-        // eDMX
-        _state.settings.edmx.protocol = settings["edmx"]["protocol"].as<eDmxProtocol>();
-        _state.settings.edmx.multicast = settings["edmx"]["multicast"].as<bool>();
-        _state.settings.edmx.start_universe = settings["edmx"]["start_universe"].as<bool>();
-        _state.settings.edmx.start_address = settings["edmx"]["start_address"].as<uint16_t>();
-        _state.settings.edmx.mode = settings["edmx"]["mode"].as<eDmxMode>();
-        _state.settings.edmx.timeout = settings["edmx"]["timeout"].as<uint16_t>();
+    for (int i = 0; i < 24; i++) {
+      _state.environment.temperature.history_24h[i] = temp_history[i] | 0.0f;
+      _state.environment.humidity.history_24h[i] = humidity_history[i] | 0;
+      _state.environment.co2.history_24h[i] = co2_history[i] | 0;
+    }
+  }
 
-        // Free memory
-        json.clear();
+  // Effects
+  _state.effects.selected = json["effects"]["selected"].as<Effects>();
+
+  // Image
+  _state.image.selected = json["image"]["selected"].as<const char*>();
+
+  // Settings
+  JsonObject settings = json["settings"];
+  // MQTT
+  _state.settings.mqtt.host = settings["mqtt"]["host"].as<const char*>();
+  _state.settings.mqtt.port = settings["mqtt"]["port"].as<const char*>();
+  _state.settings.mqtt.client_id = settings["mqtt"]["client_id"].as<const char*>();
+  _state.settings.mqtt.username = settings["mqtt"]["username"].as<const char*>();
+  _state.settings.mqtt.password = settings["mqtt"]["password"].as<const char*>();
+  _state.settings.mqtt.co2_topic = settings["mqtt"]["co2_topic"].as<const char*>();
+  _state.settings.mqtt.matrix_text_topic = settings["mqtt"]["matrix_text_topic"].as<const char*>();
+  _state.settings.mqtt.show_text = settings["mqtt"]["show_text"].as<bool>();
+  // Home Assistant
+  _state.settings.home_assistant.show_text = settings["home_assistant"]["show_text"].as<bool>();
+  // eDMX
+  _state.settings.edmx.protocol = settings["edmx"]["protocol"].as<eDmxProtocol>();
+  _state.settings.edmx.multicast = settings["edmx"]["multicast"].as<bool>();
+  _state.settings.edmx.start_universe = settings["edmx"]["start_universe"].as<bool>();
+  _state.settings.edmx.start_address = settings["edmx"]["start_address"].as<uint16_t>();
+  _state.settings.edmx.mode = settings["edmx"]["mode"].as<eDmxMode>();
+  _state.settings.edmx.timeout = settings["edmx"]["timeout"].as<uint16_t>();
+
+  // Free memory
+  json.clear();
+
+  file.close();
+}
+
+void StateManager::setDefaultState() {
+    // Basic state
+    _state.power = false;
+    _state.brightness = 255;
+    _state.mode = OpenMatrixMode::AQUARIUM;
+
+    // Environment
+    _state.environment.temperature.value = 0.0f;
+    _state.environment.temperature.diff = {DiffType::DISABLE, "", false};
+    _state.environment.humidity.value = 0.0f;
+    _state.environment.humidity.diff = {DiffType::DISABLE, "", false};
+    _state.environment.co2.value = 0.0f;
+    _state.environment.co2.diff = {DiffType::DISABLE, "", false};
+
+    // Initialize history arrays with zeros
+    for (int i = 0; i < 24; i++) {
+        _state.environment.temperature.history_24h[i] = 0.0f;
+        _state.environment.humidity.history_24h[i] = 0.0f;
+        _state.environment.co2.history_24h[i] = 0.0f;
     }
 
-    file.close();
+    // Effects
+    _state.effects.selected = Effects::SIMPLEX_NOISE;
+
+    // Image
+    _state.image.selected = "";
+
+    // Text
+    _state.text.payload = "";
+    _state.text.size = TextSize::SMALL;
+
+    // Settings
+    // MQTT
+    _state.settings.mqtt.connected = false;
+    _state.settings.mqtt.host = "";
+    _state.settings.mqtt.port = "";
+    _state.settings.mqtt.client_id = "";
+    _state.settings.mqtt.username = "";
+    _state.settings.mqtt.password = "";
+    _state.settings.mqtt.co2_topic = "";
+    _state.settings.mqtt.matrix_text_topic = "";
+    _state.settings.mqtt.show_text = false;
+
+    // Home Assistant
+    _state.settings.home_assistant.connected = false;
+    _state.settings.home_assistant.show_text = false;
+
+    // eDMX
+    _state.settings.edmx.protocol = eDmxProtocol::S_ACN;
+    _state.settings.edmx.multicast = true;
+    _state.settings.edmx.start_universe = true;
+    _state.settings.edmx.start_address = 1;
+    _state.settings.edmx.mode = eDmxMode::DMX_MODE_RGB;
+    _state.settings.edmx.timeout = 5000;
+}
+
+void StateManager::startPeriodicSave() {
+  Serial.println("Starting periodic save task");
+  BaseType_t result = xTaskCreate(
+    this->saveTask,
+    "SaveTask",
+    4096,
+    this,
+    2,
+    &_saveTaskHandle
+  );
+  if (result == pdPASS) {
+    Serial.println("Periodic save task created successfully");
+  } else {
+    Serial.println("Failed to create periodic save task");
+  }
+}
+
+void StateManager::saveTask(void* parameter) {
+    StateManager* stateManager = static_cast<StateManager*>(parameter);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(SAVE_INTERVAL);
+    Serial.println("Save task started");
+    // Wait for 10 seconds before starting the periodic save task
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    for (;;) {
+        Serial.println("Entering save task loop");
+        String buffer;
+        stateManager->serialize(buffer, true);
+        Serial.println("Buffer value:");
+        Serial.println(buffer);
+        Serial.println("End of buffer");
+        Serial.flush(); // Ensure all data is sent
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
 }
 
 StateManager::~StateManager() {
+    if (_saveTaskHandle != NULL) {
+        vTaskDelete(_saveTaskHandle);
+    }
 }

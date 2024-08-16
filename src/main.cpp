@@ -3,15 +3,13 @@
 #include "TaskManager.h"
 
 #ifdef WIFI_ENABLED
-  #include <NetWizard.h>
-  #include <WebServer.h>
-  #include "UI.h"
-  #include "WebServerManager.h"
+#include <NetWizard.h>
+#include <WebServer.h>
+#include "UI.h"
+#include "WebServerManager.h"
+#include <ElegantOTA.h>
 #endif
 
-#ifdef OTA_ENABLED
-  #include <ElegantOTA.h>
-#endif
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
@@ -147,9 +145,11 @@ void setup(void) {
   Serial.println();
 
   // Start LittleFS
-  LittleFS.begin();
+  LittleFS.begin(true);
   // Restore State
-  stateManager.restore();
+  // stateManager.restore();
+  // Start periodic save task
+  stateManager.startPeriodicSave();
 
 
 #ifdef SCD40_ENABLED

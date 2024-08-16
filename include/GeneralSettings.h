@@ -9,6 +9,5 @@
 #define WIFI_ENABLED 1
 
 #define START_WIFI_AT_BOOT 1
-#define OTA_ENABLED 1
 
 #endif
