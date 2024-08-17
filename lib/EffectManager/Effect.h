@@ -22,7 +22,7 @@ public:
 
 protected:
     Matrix* m_matrix;
-    CRGB baseColor = CRGB::Blue;
+    CRGB baseColor = CRGB::White;
     float speed;
     uint16_t baseUpdateInterval = 30; // Base update interval in milliseconds
 };

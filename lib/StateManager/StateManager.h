@@ -4,6 +4,8 @@
 #include "FS.h"
 #include "LittleFS.h"
 #include "ArduinoJson.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // Diff Type
 typedef enum {
@@ -135,7 +137,13 @@ class StateManager {
         void serialize(String& buffer, bool settings_only = false);
         void save();
         void restore();
+        void startPeriodicSave();
         ~StateManager();
     private:
         State _state;
+        TaskHandle_t _saveTaskHandle;
+        static void saveTask(void* parameter);
+                
+        void setDefaultState();
+        static const uint32_t SAVE_INTERVAL = 60000; // 60 seconds in milliseconds
 };

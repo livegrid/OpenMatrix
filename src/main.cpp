@@ -3,15 +3,13 @@
 #include "TaskManager.h"
 
 #ifdef WIFI_ENABLED
-  #include <NetWizard.h>
-  #include <WebServer.h>
-  #include "UI.h"
-  #include "WebServerManager.h"
+#include <NetWizard.h>
+#include <WebServer.h>
+#include "UI.h"
+#include "WebServerManager.h"
+#include <ElegantOTA.h>
 #endif
 
-#ifdef OTA_ENABLED
-  #include <ElegantOTA.h>
-#endif
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 1
@@ -131,10 +129,10 @@ void serverTask(void *parameter) {
 #endif
 
 void setup(void) {
-  Serial.begin(115200);
-  Serial.println("");
+  // Serial.begin(115200);
+  log_i("\n");
 
-  Serial.println(R""""(
+  log_i(R""""(
  _     _            ____      _     _ 
 | |   (_)_   _____ / ___|_ __(_) __| |
 | |   | \ \ / / _ \ |  _| '__| |/ _` |
@@ -142,14 +140,15 @@ void setup(void) {
 |_____|_| \_/ \___|\____|_|  |_|\__,_|
 
 )"""");
-  Serial.println("----------------------------");
-  Serial.printf("Firmware Version: %u.%u.%u\n", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-  Serial.println();
-
+  log_i("----------------------------");
+  log_i("Firmware Version: %u.%u.%u", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+  log_i("");
   // Start LittleFS
-  LittleFS.begin();
+  LittleFS.begin(true);
   // Restore State
   stateManager.restore();
+  // Start periodic save task
+  stateManager.startPeriodicSave();
 
 
 #ifdef SCD40_ENABLED

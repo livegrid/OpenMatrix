@@ -2,6 +2,8 @@
 
 #include "Effect.h"
 
+// #include "SimplexNoiseEffect.h"
+// #include "CellularNoiseEffect.h"
 #include "NoiseEffect.h"
 #include "SnakeEffect.h"
 #include "GameofLifeEffect.h"
