@@ -129,10 +129,10 @@ void serverTask(void *parameter) {
 #endif
 
 void setup(void) {
-  Serial.begin(115200);
-  Serial.println("");
+  // Serial.begin(115200);
+  log_i("\n");
 
-  Serial.println(R""""(
+  log_i(R""""(
  _     _            ____      _     _ 
 | |   (_)_   _____ / ___|_ __(_) __| |
 | |   | \ \ / / _ \ |  _| '__| |/ _` |
@@ -140,14 +140,13 @@ void setup(void) {
 |_____|_| \_/ \___|\____|_|  |_|\__,_|
 
 )"""");
-  Serial.println("----------------------------");
-  Serial.printf("Firmware Version: %u.%u.%u\n", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-  Serial.println();
-
+  log_i("----------------------------");
+  log_i("Firmware Version: %u.%u.%u", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+  log_i("");
   // Start LittleFS
   LittleFS.begin(true);
   // Restore State
-  // stateManager.restore();
+  stateManager.restore();
   // Start periodic save task
   stateManager.startPeriodicSave();
 

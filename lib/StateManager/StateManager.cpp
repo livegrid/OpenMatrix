@@ -1,6 +1,7 @@
 #include "StateManager.h"
+#include "esp_log.h"
 
-StateManager::StateManager() : _saveTaskHandle(NULL) {
+StateManager::StateManager() {
 }
 
 State* StateManager::getState() {
@@ -83,20 +84,29 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 }
 
 void StateManager::save() {
+  log_i("[SAVE] Starting save operation...");
+
+  String buffer;
+  this->serialize(buffer, false);
+  
+  if (buffer.length() == 0) {
+    log_e("[SAVE] Failed to serialize state");
+    return;
+  }
+  log_i("[SAVE] Serialization successful. Buffer length: %d", buffer.length());
+
   File file = LittleFS.open("/state.json", "w");
+  
   if (!file) {
-    Serial.println("[!] Failed to open state.json for writing");
+    log_e("[SAVE] Failed to open file for writing. Aborting save operation.");
     return;
   }
 
-  // Serialize settings only to file
-  String buffer;
-  this->serialize(buffer, true);
+  size_t bytesWritten = file.print(buffer);
+  if (bytesWritten != buffer.length()) {
+    log_e("[SAVE] Failed to write entire buffer to file. Bytes written: %d, Buffer length: %d", bytesWritten, buffer.length());
+  }
 
-  // Write to file
-  file.print(buffer);
-
-  // Close file
   file.close();
 }
 
@@ -104,8 +114,7 @@ void StateManager::restore() {
   // Restore state from FS
   File file = LittleFS.open("/state.json", "r");
   if (!file) {
-    Serial.println("[!] state.json not found. Creating default state.");
-    file.close();
+    log_e("[!] state.json not found. Creating default state.");
     setDefaultState();
     save();
     return;
@@ -115,9 +124,10 @@ void StateManager::restore() {
 
   // Parse JSON
   DeserializationError error = deserializeJson(json, file);
+  file.close();
+
   if (error) {
-    Serial.println("[!] Failed to parse state.json");
-    file.close();
+    log_e("[!] Failed to parse state.json");
     setDefaultState();
     save();
     return;
@@ -128,24 +138,40 @@ void StateManager::restore() {
   _state.brightness = json["brightness"].as<uint8_t>();
   _state.mode = json["mode"].as<OpenMatrixMode>();
 
+  log_i("Restored power: %d", _state.power);
+  log_i("Restored brightness: %d", _state.brightness);
+  log_i("Restored mode: %d", static_cast<int>(_state.mode));
+
   JsonObject environment = json["environment"];
   if (environment) {
     JsonArray temp_history = environment["temperature"]["history_24h"];
     JsonArray humidity_history = environment["humidity"]["history_24h"];
     JsonArray co2_history = environment["co2"]["history_24h"];
 
+    log_i("Restoring environment history:");
     for (int i = 0; i < 24; i++) {
       _state.environment.temperature.history_24h[i] = temp_history[i] | 0.0f;
       _state.environment.humidity.history_24h[i] = humidity_history[i] | 0;
       _state.environment.co2.history_24h[i] = co2_history[i] | 0;
+      log_i("Hour %d - Temp: %.2f, Humidity: %d, CO2: %d", 
+        i, 
+        _state.environment.temperature.history_24h[i],
+        _state.environment.humidity.history_24h[i],
+        _state.environment.co2.history_24h[i]
+      );
     }
+  }
+  else {
+    log_e("[!] No environment data found in state.json");
   }
 
   // Effects
   _state.effects.selected = json["effects"]["selected"].as<Effects>();
+  log_i("Restored selected effect: %d", static_cast<int>(_state.effects.selected));
 
   // Image
   _state.image.selected = json["image"]["selected"].as<const char*>();
+  log_i("Restored selected image: %s", _state.image.selected);
 
   // Settings
   JsonObject settings = json["settings"];
@@ -158,8 +184,21 @@ void StateManager::restore() {
   _state.settings.mqtt.co2_topic = settings["mqtt"]["co2_topic"].as<const char*>();
   _state.settings.mqtt.matrix_text_topic = settings["mqtt"]["matrix_text_topic"].as<const char*>();
   _state.settings.mqtt.show_text = settings["mqtt"]["show_text"].as<bool>();
+
+  log_i("Restored MQTT settings:");
+  log_i("  Host: %s", _state.settings.mqtt.host);
+  log_i("  Port: %s", _state.settings.mqtt.port);
+  log_i("  Client ID: %s", _state.settings.mqtt.client_id);
+  log_i("  Username: %s", _state.settings.mqtt.username);
+  log_i("  Password: %s", _state.settings.mqtt.password);
+  log_i("  CO2 Topic: %s", _state.settings.mqtt.co2_topic);
+  log_i("  Matrix Text Topic: %s", _state.settings.mqtt.matrix_text_topic);
+  log_i("  Show Text: %d", _state.settings.mqtt.show_text);
+
   // Home Assistant
   _state.settings.home_assistant.show_text = settings["home_assistant"]["show_text"].as<bool>();
+  log_i("Restored Home Assistant show_text: %d", _state.settings.home_assistant.show_text);
+
   // eDMX
   _state.settings.edmx.protocol = settings["edmx"]["protocol"].as<eDmxProtocol>();
   _state.settings.edmx.multicast = settings["edmx"]["multicast"].as<bool>();
@@ -168,10 +207,18 @@ void StateManager::restore() {
   _state.settings.edmx.mode = settings["edmx"]["mode"].as<eDmxMode>();
   _state.settings.edmx.timeout = settings["edmx"]["timeout"].as<uint16_t>();
 
+  log_i("Restored eDMX settings:");
+  log_i("  Protocol: %d", static_cast<int>(_state.settings.edmx.protocol));
+  log_i("  Multicast: %d", _state.settings.edmx.multicast);
+  log_i("  Start Universe: %d", _state.settings.edmx.start_universe);
+  log_i("  Start Address: %d", _state.settings.edmx.start_address);
+  log_i("  Mode: %d", static_cast<int>(_state.settings.edmx.mode));
+  log_i("  Timeout: %d", _state.settings.edmx.timeout);
+
   // Free memory
   json.clear();
 
-  file.close();
+  log_i("State restoration complete");
 }
 
 void StateManager::setDefaultState() {
@@ -231,19 +278,19 @@ void StateManager::setDefaultState() {
 }
 
 void StateManager::startPeriodicSave() {
-  Serial.println("Starting periodic save task");
+  log_i("Starting periodic save task");
   BaseType_t result = xTaskCreate(
     this->saveTask,
     "SaveTask",
     4096,
     this,
-    2,
+    1,
     &_saveTaskHandle
   );
   if (result == pdPASS) {
-    Serial.println("Periodic save task created successfully");
+    log_i("Periodic save task created successfully");
   } else {
-    Serial.println("Failed to create periodic save task");
+    log_e("Failed to create periodic save task");
   }
 }
 
@@ -251,18 +298,13 @@ void StateManager::saveTask(void* parameter) {
     StateManager* stateManager = static_cast<StateManager*>(parameter);
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(SAVE_INTERVAL);
-    Serial.println("Save task started");
+    log_i("Save task started");
     // Wait for 10 seconds before starting the periodic save task
     vTaskDelay(pdMS_TO_TICKS(10000));
 
-    for (;;) {
-        Serial.println("Entering save task loop");
-        String buffer;
-        stateManager->serialize(buffer, true);
-        Serial.println("Buffer value:");
-        Serial.println(buffer);
-        Serial.println("End of buffer");
-        Serial.flush(); // Ensure all data is sent
+    for (;;) {   
+        log_i("Saving state periodically");
+        stateManager->save();  // This will now save all state data
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
