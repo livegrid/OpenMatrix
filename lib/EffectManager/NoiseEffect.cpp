@@ -10,6 +10,8 @@ void NoiseEffect::setSpeed(float s) {
     speed = s;
 }
 
+void NoiseEffect::reset() {}
+
 // void NoiseEffect::setHue(uint8_t h) {
 //     hue = h;
 // }

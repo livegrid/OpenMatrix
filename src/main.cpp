@@ -77,7 +77,7 @@ void effectsTask(void *parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(30);
   TickType_t xLastWakeTime = xTaskGetTickCount();
   uint8_t currentEffect = 0;
-  effectManager.setEffect(currentEffect);
+  effectManager.setEffect(stateManager.getState()->effects.selected-1);
 
   for (;;) {
     static unsigned long lastLogTime = 0;
@@ -86,14 +86,6 @@ void effectsTask(void *parameter) {
 
     effectManager.updateCurrentEffect();
     matrix.background->display();
-
-    // matrix.background->clear();
-    // matrix.background->fillScreen(CRGB(0, 255, 0));
-    // matrix.background->fillCircle(32, 32, 6, CRGB(0, 0, 255));
-    // matrix.foreground->clear();
-    // matrix.foreground->fillCircle(32, 32, 12, CRGB(255, 0, 0));
-    // // matrix.foreground->display();
-    // matrix.gfx_compositor->Blend(*matrix.background, *matrix.foreground, 127);
 
     // Calculate and print framerate every 5 seconds
     if (currentTime - lastLogTime >= 10000) {
@@ -147,6 +139,7 @@ void setup(void) {
   LittleFS.begin(true);
   // Restore State
   stateManager.restore();
+  matrix.setBrightness(stateManager.getState()->brightness);
   // Start periodic save task
   stateManager.startPeriodicSave();
 

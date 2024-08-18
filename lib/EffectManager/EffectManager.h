@@ -8,6 +8,7 @@
 #include "SnakeEffect.h"
 #include "GameofLifeEffect.h"
 #include "FlockEffect.h"
+#include "LsystemEffect.h"
 
 #include <vector>
 #include <string>

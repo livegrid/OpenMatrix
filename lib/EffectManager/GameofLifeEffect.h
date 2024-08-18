@@ -31,5 +31,5 @@ public:
 
     void update() override;
     const char* getName() const override;
-    void reset();
+    void reset() override;
 };

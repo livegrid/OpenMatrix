@@ -14,6 +14,10 @@ void TemplateEffect::update() {
     }
 }
 
+void TemplateEffect::reset() {
+
+}
+
 const char* TemplateEffect::getName() const {
     return "Template";
 }

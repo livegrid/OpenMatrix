@@ -7,6 +7,7 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     m_effects.push_back(new NoiseEffect(matrix));
     m_effects.push_back(new FlockEffect(matrix));
     m_effects.push_back(new GameofLifeEffect(matrix));
+    m_effects.push_back(new LsystemEffect(matrix));
     // Add other effects here as you create them
 }
 
@@ -26,6 +27,7 @@ void EffectManager::setEffect(size_t number) {
   m_matrix->background->clear();
   if (number < m_effects.size()) {
     m_currentEffect = number;
+    m_effects[m_currentEffect]->reset();
   }
 }
 
@@ -35,6 +37,7 @@ void EffectManager::nextEffect() {
     } else {
         m_currentEffect++;
     }
+    m_effects[m_currentEffect]->reset();
 }
 
 void EffectManager::prevEffect() {
@@ -43,6 +46,7 @@ void EffectManager::prevEffect() {
     } else {
         m_currentEffect--;
     }
+    m_effects[m_currentEffect]->reset();
 }
 
 void EffectManager::setEffect(const std::string& name) {
@@ -50,6 +54,7 @@ void EffectManager::setEffect(const std::string& name) {
   for (size_t i = 0; i < m_effects.size(); ++i) {
     if (name == m_effects[i]->getName()) {
         m_currentEffect = i;
+        m_effects[m_currentEffect]->reset();
         return;
     }
   }
