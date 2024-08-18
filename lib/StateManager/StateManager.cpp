@@ -300,7 +300,7 @@ void StateManager::saveTask(void* parameter) {
     const TickType_t xFrequency = pdMS_TO_TICKS(SAVE_INTERVAL);
     log_i("Save task started");
     // Wait for 10 seconds before starting the periodic save task
-    vTaskDelay(pdMS_TO_TICKS(10000));
+    vTaskDelay(pdMS_TO_TICKS(SAVE_INTERVAL));
 
     for (;;) {   
         log_i("Saving state periodically");
