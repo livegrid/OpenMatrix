@@ -57,6 +57,10 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   // Image
   json["image"]["selected"] = _state.image.selected;
 
+  // Text
+  json["text"]["payload"] = _state.text.payload;
+  json["text"]["size"] = _state.text.size;
+
   // Settings
   JsonObject settings = json["settings"].to<JsonObject>();
   // MQTT
@@ -172,6 +176,12 @@ void StateManager::restore() {
   // Image
   _state.image.selected = json["image"]["selected"].as<const char*>();
   log_i("Restored selected image: %s", _state.image.selected);
+
+  // Text
+  _state.text.payload = json["text"]["payload"].as<const char*>();
+  _state.text.size = json["text"]["size"].as<TextSize>();
+  log_i("Restored text payload: %s", _state.text.payload);
+  log_i("Restored text size: %d", static_cast<int>(_state.text.size));
 
   // Settings
   JsonObject settings = json["settings"];
