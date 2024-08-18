@@ -8,7 +8,7 @@ private:
   uint16_t x = 0;
   uint16_t y = 0;
   uint8_t scale = 3;
-  float speed = 5;
+  float speed = 0.01;
   FastNoiseLite noise;
 
 public:

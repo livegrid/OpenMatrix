@@ -1,10 +1,11 @@
 #include "EffectManager.h"
+#include "LSystemEffect.h"  // Add this line
 
 EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     // m_effects.push_back(new SimplexNoiseEffect(matrix));
     // m_effects.push_back(new CellularNoiseEffect(matrix));
-    m_effects.push_back(new SnakeEffect(matrix));
     m_effects.push_back(new NoiseEffect(matrix));
+    m_effects.push_back(new SnakeEffect(matrix));
     m_effects.push_back(new FlockEffect(matrix));
     m_effects.push_back(new GameofLifeEffect(matrix));
     m_effects.push_back(new LsystemEffect(matrix));

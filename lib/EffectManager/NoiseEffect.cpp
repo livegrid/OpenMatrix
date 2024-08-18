@@ -24,7 +24,7 @@ void NoiseEffect::update() {
             int joffset = scale * j;
             uint8_t noiseNow = inoise8(x + ioffset, y + joffset, currentTimeSpeedInt);
             CRGB col = baseColor;
-            col.nscale8(noiseNow);
+            col.nscale8(noiseNow/2);
             m_matrix->background->drawPixel(i, j, col);
         }
     }
