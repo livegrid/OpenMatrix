@@ -1,6 +1,8 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#define PANEL_UPCYCLED 1
+
 #define AQUARIUM_ENABLED 1
 #define SCD40_ENABLED 1
 #define ADXL345_ENABLED 1

@@ -37,7 +37,6 @@ class Matrix {
   void drawRectangle(int16_t x, int16_t y, int16_t width, int16_t height, uint8_t r, uint8_t g, uint8_t b);
   void drawEllipse(int16_t x, int16_t y, int16_t rad, int16_t length, float angle, uint8_t r, uint8_t g, uint8_t b);
   void drawTriangle(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3, uint8_t r, uint8_t g, uint8_t b);
-  void fillNoise();
   void setFont(int val);
   void setCursor(int x, int y);
   void setTextColor(uint8_t r, uint8_t g, uint8_t b);
