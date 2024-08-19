@@ -33,8 +33,43 @@ const state = {
     },
     effects: {
         selected: 1
+    },
+    image: {
+        selected: 1,
+    },
+    text: {
+        payload: "Hello! 12345",
+        size: 0,
     }
 };
+
+const images = [
+    {
+        id: 1,
+        name: 'Image 1',
+        size: '2.3MB',
+    },
+    {
+        id: 2,
+        name: 'Image 2',
+        size: '2.3MB',
+    },
+    {
+        id: 3,
+        name: 'Image 3',
+        size: '2.3MB',
+    },
+    {
+        id: 4,
+        name: 'Image 4',
+        size: '2.3MB',
+    },
+    {
+        id: 5,
+        name: 'Image 5',
+        size: '2.3MB',
+    },
+];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -100,6 +135,57 @@ export default [
                     message: 'OK'
                 }
             }
+        }
+    },
+    {
+        url: '/openmatrix/image',
+        method: 'get',
+        timeout: 1000,
+        response: () => {
+            return images;
+        }
+    },
+    {
+        url: '/openmatrix/image',
+        method: 'post',
+        timeout: 1000,
+        response: async ({ body }) => {
+            state.image.selected = body.id;
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            }
+        }  
+    },
+    {
+        url: '/openmatrix/image',
+        method: 'patch',
+        timeout: 1000,
+        response: async (context) => {
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            }
+        }
+    },
+    {
+        url: '/openmatrix/text',
+        method: 'post',
+        timeout: 1000,
+        response: async ({ body }) => {
+            state.text.payload = body.payload;
+            state.text.size = body.size;
+
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
         }
     }
 ];

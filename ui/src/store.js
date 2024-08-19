@@ -1,5 +1,4 @@
 import { get, writable } from 'svelte/store';
-
 import { fetchWithTimeout } from './helpers';
 
 const API_URL = `.`;
@@ -10,6 +9,8 @@ export const theme = writable('dark');
 
 // State
 export const state = writable({});
+
+export const images = writable(null);
 
 const fetchState = async () => {
     try {
@@ -29,11 +30,30 @@ const fetchState = async () => {
     }
 }
 
+export const fetchImages = async () => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+            method: 'GET',
+            timeout: 2000
+        });
+
+        if (response.status === 200 && response.headers.get('Content-Type') === 'application/json') {
+            const json = await response.json();
+            if (Array.isArray(json)) {
+                images.set(json);
+            }
+        } else {
+            images.set([]);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 setTimeout(() => {
     fetchState();
     setInterval(fetchState, 2000);
 }, 1000);
-
 
 export const togglePower = async ({ detail }) => {
     try {
@@ -116,6 +136,71 @@ export const selectEffect = async (effect) => {
                     // @ts-ignore
                     ...get(state)?.effects,
                     selected: effect
+                }
+            })
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+export const selectImage = async ({ id }) => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+            method: 'POST',
+            timeout: 2000,
+            body: JSON.stringify({
+                id
+            })
+        });
+        if (response.status === 200) {
+            state.set({
+                ...get(state),
+                // @ts-ignore
+                image: {
+                    selected: id
+                }
+            })
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+export const invokePreview = async ({ id }) => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+            method: 'PATCH',
+            timeout: 2000,
+            body: JSON.stringify({
+                id
+            })
+        });
+        if (response.status === 200) {
+            return true;
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+export const updateText = async ({ payload, size }) => {
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/openmatrix/text`, {
+            method: 'POST',
+            timeout: 2000,
+            body: JSON.stringify({
+                payload,
+                size
+            })
+        });
+        if (response.status === 200) {
+            state.set({
+                ...get(state),
+                // @ts-ignore
+                text: {
+                    payload,
+                    size
                 }
             })
         }
