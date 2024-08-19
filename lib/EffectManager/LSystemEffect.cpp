@@ -1,99 +1,127 @@
 #include "LSystemEffect.h"
+
 #include <cmath>
 
 LSystemEffect::LSystemEffect(Matrix* m) : Effect(m) {
-    reset();
+  reset();
 }
 
 void LSystemEffect::update() {
-    m_matrix->background->clear();
+  m_matrix->background->clear();
 
-    if (millis() - lastUpdateMs > 30) {  // Update every 50ms
-        lastUpdateMs = millis();
-
-        if (growthPercent < 1) {
-            growthPercent += growthRate / (currGeneration + growthPercent);
-        } else {
-            generate();
-        }
-
-        drawLSystem();
+  if (scale < 1.0f) {
+    scale += growthRate;
+    scale = std::min(scale, 1.0f);
+    fullGrowthDelay = 0;
+  } else {
+    fullGrowthDelay++;
+    if (fullGrowthDelay >= FULL_GROWTH_DELAY_MAX) {
+      reset();
     }
+  }
+
+  drawLSystem();
 }
 
 const char* LSystemEffect::getName() const {
-    return "LSystem";
+  return "LSystem";
 }
 
 void LSystemEffect::reset() {
-    word = "X";
-    maxGeneration = 7;
-    currGeneration = 0;
-    growthPercent = 1;
-    growthRate = 0.2;
-    lastUpdateMs = 0;
+  word = "X";
+  maxGeneration = 5;
+  currGeneration = 0;
+  growthPercent = 1;
+  growthRate = 0.001;
+  scale = 0.0f;
+
+  for (int i = 0; i < maxGeneration; i++) {
+    generate();
+  }
 }
 
 void LSystemEffect::generate() {
-    if (currGeneration == maxGeneration) {
-        currGeneration = 0;
-        word = "X";
-    } else {
-        std::string next = "";
-        for (char c : word) {
-            next += applyRules(c);
-        }
-        word = next;
-        currGeneration++;
+  if (currGeneration == maxGeneration) {
+    currGeneration = 0;
+    word = "X";
+  } else {
+    std::string next = "";
+    for (char c : word) {
+      next += applyRules(c);
     }
-    growthPercent = 0;
+    word = next;
+    currGeneration++;
+  }
+  growthPercent = 0;
+}
+
+std::string LSystemEffect::chooseOne(const std::vector<Rule>& ruleSet) {
+  float n = static_cast<float>(random(100)) / 100.0f;
+  float t = 0;
+  for (const auto& rule : ruleSet) {
+    t += rule.prob;
+    if (t > n) {
+      return rule.rule;
+    }
+  }
+  return "";
 }
 
 std::string LSystemEffect::applyRules(char c) {
-    switch (c) {
-        case 'X':
-            return random(100) < 50 ? "F[+X][-X]FX" : "F[-X]FX";
-        case 'F':
-            return random(100) < 85 ? "FF" : "F";
-        default:
-            return std::string(1, c);
-    }
+  switch (c) {
+    case 'X':
+      return chooseOne(xRules);
+    case 'F':
+      return chooseOne(fRules);
+    default:
+      return std::string(1, c);
+  }
 }
 
 void LSystemEffect::drawLSystem() {
-    int x = VIRTUAL_RES_X / 2;
-    int y = VIRTUAL_RES_Y - 1;
-    float angle = -M_PI / 2;  // Start growing upwards
-    std::vector<std::pair<int, int>> stack;
+  int x = VIRTUAL_RES_X / 2;
+  int y = VIRTUAL_RES_Y - 1;
+  float angle = -M_PI / 2;  // Start growing upwards
+  std::vector<std::tuple<int, int, float>> stack;
 
-    for (char c : word) {
-        switch (c) {
-            case 'F':
-                {
-                    int newX = x + round(cos(angle) * 2 * growthPercent);
-                    int newY = y + round(sin(angle) * 2 * growthPercent);
-                    m_matrix->background->drawLine(x, y, newX, newY, CRGB(0, 255, 0));
-                    x = newX;
-                    y = newY;
-                }
-                break;
-            case '+':
-                angle -= M_PI / 4 * growthPercent;
-                break;
-            case '-':
-                angle += M_PI / 4 * growthPercent;
-                break;
-            case '[':
-                stack.push_back({x, y});
-                break;
-            case ']':
-                if (!stack.empty()) {
-                    auto [savedX, savedY] = stack.back();
-                    stack.pop_back();
-                    x = savedX;
-                    y = savedY;
-                }
-                break;
+  const float subPixelScale = 4.0f;
+  float subX = x * subPixelScale;
+  float subY = y * subPixelScale;
+
+  for (char c : word) {
+    switch (c) {
+      case 'F': {
+        float newSubX = subX + cos(angle) * len * subPixelScale * scale;
+        float newSubY = subY + sin(angle) * len * subPixelScale * scale;
+        m_matrix->background->drawLine(subX / subPixelScale, subY / subPixelScale, 
+                                       newSubX / subPixelScale, newSubY / subPixelScale, 
+                                       CRGB(158, 169, 63));
+        subX = newSubX;
+        subY = newSubY;
+      } break;
+      case '+':
+        angle -= M_PI / 4 * scale;
+        break;
+      case '-':
+        angle += M_PI / 4 * scale;
+        break;
+      case '[':
+        stack.push_back({subX, subY, angle});
+        break;
+      case ']':
+        if (!stack.empty()) {
+          std::tie(subX, subY, angle) = stack.back();
+          stack.pop_back();
         }
+        break;
+      case 'A':
+        m_matrix->background->fillCircle(subX / subPixelScale, subY / subPixelScale, 
+                                         len * scale, CRGB(229, 206, 220));
+        break;
+      case 'B':
+        m_matrix->background->fillCircle(subX / subPixelScale, subY / subPixelScale, 
+                                         len * scale, CRGB(252, 161, 125));
+        break;
     }
+  }
 }
