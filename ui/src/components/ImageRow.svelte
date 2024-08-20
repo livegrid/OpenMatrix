@@ -37,7 +37,7 @@
     const select = async () => {
       select_loading = true;
       try {
-        await selectImage({ id });
+        await selectImage({ name });
       } catch (err) {
         console.log(err);
       } finally {
@@ -48,7 +48,7 @@
     const preview = async () => {
         preview_loading = true;
         try { 
-            await invokePreview({ id });
+            await invokePreview({ name });
         } catch (err) {
             console.log(err);
         } finally {

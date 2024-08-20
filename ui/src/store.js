@@ -144,13 +144,13 @@ export const selectEffect = async (effect) => {
     }
 }
 
-export const selectImage = async ({ id }) => {
+export const selectImage = async ({ name }) => {
     try {
         const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
             method: 'POST',
             timeout: 2000,
             body: JSON.stringify({
-                id
+                name
             })
         });
         if (response.status === 200) {
@@ -158,7 +158,7 @@ export const selectImage = async ({ id }) => {
                 ...get(state),
                 // @ts-ignore
                 image: {
-                    selected: id
+                    selected: name
                 }
             })
         }
@@ -167,13 +167,13 @@ export const selectImage = async ({ id }) => {
     }
 }
 
-export const invokePreview = async ({ id }) => {
+export const invokePreview = async ({ name }) => {
     try {
         const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
             method: 'PATCH',
             timeout: 2000,
             body: JSON.stringify({
-                id
+                name
             })
         });
         if (response.status === 200) {
