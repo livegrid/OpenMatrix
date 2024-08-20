@@ -5,8 +5,8 @@
 class GameofLifeEffect : public Effect {
 private:
     static constexpr int CELL_SIZE = 1;
-    static constexpr int WORLD_WIDTH = VIRTUAL_RES_X / CELL_SIZE;
-    static constexpr int WORLD_HEIGHT = VIRTUAL_RES_Y / CELL_SIZE;
+    int WORLD_WIDTH;
+    int WORLD_HEIGHT;
     float speed = 1;
 
     struct Cell {
@@ -16,7 +16,7 @@ private:
         uint8_t brightness;
     };
 
-    Cell world[WORLD_WIDTH][WORLD_HEIGHT];
+    std::vector<std::vector<Cell>> world;
     uint32_t lastUpdateTime = 0;
     uint16_t updateInterval = 100; // Update interval in milliseconds
     int generation = 0;
@@ -31,5 +31,5 @@ public:
 
     void update() override;
     const char* getName() const override;
-    void reset();
+    void reset() override;
 };

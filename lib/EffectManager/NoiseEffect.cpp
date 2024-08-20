@@ -10,6 +10,8 @@ void NoiseEffect::setSpeed(float s) {
     speed = s;
 }
 
+void NoiseEffect::reset() {}
+
 // void NoiseEffect::setHue(uint8_t h) {
 //     hue = h;
 // }
@@ -22,7 +24,7 @@ void NoiseEffect::update() {
             int joffset = scale * j;
             uint8_t noiseNow = inoise8(x + ioffset, y + joffset, currentTimeSpeedInt);
             CRGB col = baseColor;
-            col.nscale8(noiseNow);
+            col.nscale8(noiseNow/2);
             m_matrix->background->drawPixel(i, j, col);
         }
     }

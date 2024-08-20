@@ -17,5 +17,7 @@ public:
 
     void update() override;
 
+    void reset() override;
+
     const char* getName() const override;
 };

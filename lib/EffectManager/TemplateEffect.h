@@ -13,5 +13,7 @@ public:
   // Declare public methods here
   void update() override;
 
+  void reset() override;
+  
   const char* getName() const override;
 };

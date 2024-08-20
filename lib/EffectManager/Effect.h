@@ -7,6 +7,8 @@ public:
     Effect(Matrix* matrix) : m_matrix(matrix) {}
     virtual ~Effect() {}
 
+    virtual void reset() = 0;
+
     virtual void update() = 0;
     virtual const char* getName() const = 0;
 
