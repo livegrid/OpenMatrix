@@ -117,9 +117,6 @@ class TouchMenu {
   }
   
   void displayMenu() {
-    // matrix->background->setFont();
-    // matrix->resetCursor();
-    if (menuOpen) {
       log_i("Displaying menu");
       matrix->background->setFont(&Font4x5Fixed);
       matrix->background->setTextSize(1);
@@ -179,7 +176,6 @@ class TouchMenu {
         }
         optionSelected = false;
       }
-    }
   }
 
 

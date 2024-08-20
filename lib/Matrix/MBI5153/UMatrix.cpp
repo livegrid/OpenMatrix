@@ -137,7 +137,8 @@ void UMatrix::drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data,
   int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
   transform(_x, _y, _w, _h);
 
-  mbi_set_pixel(_x+2, _y, r_data, g_data, b_data);
+  // mbi_set_pixel_old(_x, _y, r_data, g_data, b_data);
+  mbi_set_pixel(_x, _y, r_data, g_data, b_data);
 }
 
 void UMatrix::transform(int16_t& x, int16_t& y, int16_t& w, int16_t& h) {
@@ -263,6 +264,8 @@ void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data,
     log_e("Pixel position out of bounds: x=%u, y=%u", x, y);
     return;
   }
+
+  x += 2;  // offset for missing pixels on the left
 
   // Calculate bitmasks
   uint16_t _colourbitsoffset =

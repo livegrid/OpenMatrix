@@ -172,11 +172,11 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   // Start server task
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 1);
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 0);
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 1);
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
 #endif
 
 #ifdef WIFI_ENABLED
