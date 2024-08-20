@@ -30,25 +30,10 @@ void UI::begin() {
     _server->on("/openmatrix/mode", HTTP_POST, [&]() {
         JsonDocument json;
         DeserializationError err = deserializeJson(json, _server->arg("plain"));
-        OpenMatrixMode mode;
-
         if (err == DeserializationError::Ok) { 
-            if (strncmp(json["mode"].as<const char*>(), "aquarium", 8) == 0) {
-                mode = OpenMatrixMode::AQUARIUM;
-            } else if (strncmp(json["mode"].as<const char*>(), "effect", 6) == 0) {
-                mode = OpenMatrixMode::EFFECT;
-            } else if (strncmp(json["mode"].as<const char*>(), "image", 5) == 0) {
-                mode = OpenMatrixMode::IMAGE;
-            } else if (strncmp(json["mode"].as<const char*>(), "text", 4) == 0) {
-                mode = OpenMatrixMode::TEXT;
-            } else {
-                mode = OpenMatrixMode::AQUARIUM;
-            }
-
             if (_on_mode_cb) {
-                _on_mode_cb(mode);
+                _on_mode_cb(json["mode"].as<OpenMatrixMode>());
             }
-
             return _server->send(200, "application/json", "{\"message\":\"OK\"}");
         } else {
             return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
