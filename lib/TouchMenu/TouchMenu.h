@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Matrix.h>
 #include <TaskManager.h>
+#include <Fonts/Font4x5Fixed.h>
 
 class TouchMenu {
  private:
@@ -20,6 +21,9 @@ class TouchMenu {
   bool touch1detected = false;
   bool touch2detected = false;
   bool touch3detected = false;
+
+  CRGB activeColor = CRGB(255, 255, 255);
+  CRGB inactiveColor = CRGB(128, 128, 128);
   
   bool confirmationRequired = false;
   std::string itemToConfirm;
@@ -113,57 +117,69 @@ class TouchMenu {
   }
   
   void displayMenu() {
-    // matrix->setFont(1);
+    // matrix->background->setFont();
     // matrix->resetCursor();
-    // if (menuOpen) {
-    //   matrix->clearScreen();
-    //   if (confirmationRequired) {
-    //     if(itemToConfirm == "Factory Reset") {
-    //       matrix->background->drawText("This will wipe everything, are you sure?", 128, 128, 128);
-    //     } else if(itemToConfirm == "Start WiFi") {
-    //       matrix->drawText("This can lead to issues, are you sure?", 128, 128, 128);
-    //     } else {
-    //       matrix->drawText("Are you sure?", 128, 128, 128);
-    //     }
-    //     matrix->newLine();
-    //     matrix->drawText(itemToConfirm, 128, 128, 128);
-    //     matrix->newLine();
-    //     matrix->drawText(">No", currentMenuItem == 0 ? 255 : 128, currentMenuItem == 0 ? 255 : 128, currentMenuItem == 0 ? 255 : 128);
-    //     matrix->newLine();
-    //     matrix->drawText(">No", currentMenuItem == 1 ? 255 : 128, currentMenuItem == 1 ? 255 : 128, currentMenuItem == 1 ? 255 : 128);
-    //     matrix->newLine();
-    //     matrix->drawText(">Yes", currentMenuItem == 2 ? 255 : 128, currentMenuItem == 2 ? 255 : 128, currentMenuItem == 2 ? 255 : 128);
-    //     matrix->newLine();
-    //     matrix->drawText(">No", currentMenuItem == 3 ? 255 : 128, currentMenuItem == 3 ? 255 : 128, currentMenuItem == 3 ? 255 : 128);
-    //     matrix->newLine();
-    //     matrix->drawText(">No", currentMenuItem == 4 ? 255 : 128, currentMenuItem == 4 ? 255 : 128, currentMenuItem == 4 ? 255 : 128);
-    //   } else {
-    //     std::vector<std::string> currentItemList = getItemList();
-    //     for (size_t i = 0; i < currentItemList.size(); i++) {
-    //       if (i == currentMenuItem) {
-    //         matrix->drawText(">" + currentItemList[i], 255, 255, 255);  // White for selected item
-    //       } else {
-    //         matrix->drawText(">" + currentItemList[i], 128, 128, 128);  // Grey for other items
-    //       }
-    //       matrix->newLine();
-    //     }
-    //   }
-    //   if (optionSelected) {
-    //     if (confirmationRequired) {
-    //       if (currentMenuItem == 2) { // Yes
-    //         log_i("Confirmed: %s", itemToConfirm.c_str());
-    //         executeMenuItem(itemToConfirm);
-    //       }
-    //       confirmationRequired = false;
-    //     } else {
-    //       std::string selectedOption = getItemList()[currentMenuItem];
-    //       log_i("Selected option: %s", selectedOption.c_str());
-    //       executeMenuItem(selectedOption);
-    //     }
-    //     optionSelected = false;
-    //   }
-    // }
-    // matrix->update();
+    if (menuOpen) {
+      log_i("Displaying menu");
+      matrix->background->setFont(&Font4x5Fixed);
+      matrix->background->setTextSize(1);
+      matrix->background->clear();
+      matrix->background->setCursor(0,5);
+      if (confirmationRequired) {
+          matrix->background->setTextColor(inactiveColor);
+        if(itemToConfirm == "Factory Reset") {
+          matrix->background->println("This will wipe everything, are you sure?");
+        } else if(itemToConfirm == "Start WiFi") {
+          matrix->background->println("This can lead to issues, are you sure?");
+        } else {
+          matrix->background->println("Are you sure?");
+        }
+        matrix->background->println();
+        matrix->background->setTextColor(inactiveColor);
+        matrix->background->println(itemToConfirm.c_str());
+        matrix->background->println();
+        matrix->background->setTextColor(currentMenuItem == 0 ? activeColor : inactiveColor);
+        matrix->background->println(">No");
+        matrix->background->setTextColor(currentMenuItem == 1 ? activeColor : inactiveColor);
+        matrix->background->println(">No");
+        matrix->background->setTextColor(currentMenuItem == 2 ? activeColor : inactiveColor);
+        matrix->background->println(">Yes");
+        matrix->background->setTextColor(currentMenuItem == 3 ? activeColor : inactiveColor);
+        matrix->background->println(">No");
+        matrix->background->setTextColor(currentMenuItem == 4 ? activeColor : inactiveColor);
+        matrix->background->println(">No");
+
+      } else {
+        std::vector<std::string> currentItemList = getItemList();
+        for (size_t i = 0; i < currentItemList.size(); i++) {
+          if (i == currentMenuItem) {
+            matrix->background->setTextColor(activeColor);
+            matrix->background->println((">" + currentItemList[i]).c_str());
+          } else {
+            matrix->background->setTextColor(inactiveColor);
+            matrix->background->println((">" + currentItemList[i]).c_str());
+          }
+        }
+      }
+
+      matrix->background->display();
+      matrix->update();
+
+      if (optionSelected) {
+        if (confirmationRequired) {
+          if (currentMenuItem == 2) { // Yes
+            log_i("Confirmed: %s", itemToConfirm.c_str());
+            executeMenuItem(itemToConfirm);
+          }
+          confirmationRequired = false;
+        } else {
+          std::string selectedOption = getItemList()[currentMenuItem];
+          log_i("Selected option: %s", selectedOption.c_str());
+          executeMenuItem(selectedOption);
+        }
+        optionSelected = false;
+      }
+    }
   }
 
 
