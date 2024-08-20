@@ -177,9 +177,10 @@ void UI::begin() {
         JsonDocument json;
         DeserializationError err = deserializeJson(json, _server->arg("plain"));
         if (err == DeserializationError::Ok) {
-            // TODO: check if image exists
-            if (_on_image_cb) {
-                _on_image_cb(json["image"].as<const char*>());
+            if (imageExists(json["name"].as<const char*>())) {
+                if (_on_image_cb) {
+                    _on_image_cb(json["name"].as<const char*>());
+                }
             }
             return _server->send(200, "application/json", "{\"message\":\"OK\"}");
         } else {
@@ -192,9 +193,10 @@ void UI::begin() {
         JsonDocument json;
         DeserializationError err = deserializeJson(json, _server->arg("plain"));
         if (err == DeserializationError::Ok) {
-            // TODO: check if image exists
-            if (_on_image_cb) {
-                _on_image_cb(json["image"].as<const char*>());
+            if (imageExists(json["name"].as<const char*>())) {
+                if (_on_image_preview_cb) {
+                    _on_image_preview_cb(json["name"].as<const char*>());
+                }
             }
             return _server->send(200, "application/json", "{\"message\":\"OK\"}");
         } else {
@@ -237,6 +239,10 @@ void UI::onImage(onImageChangeCallback cb) {
     _on_image_cb = cb;
 }
 
+void UI::onImagePreview(onImagePreviewCallback cb) {
+    _on_image_preview_cb = cb;
+}
+
 void UI::onText(onTextChangeCallback cb) {
     _on_text_cb = cb;
 }
@@ -247,6 +253,15 @@ bool UI::_onAPFilter(WebServer &server) {
 
 bool UI::_onSTAFilter(WebServer &server) {
     return WiFi.STA.hasIP() && WiFi.STA.localIP() == server.client().localIP();
+}
+
+bool UI::imageExists(const char* name) {
+    File file = LittleFS.open("/img/" + String(name), "r");
+    if (!file) {
+        return false;
+    }
+    file.close();
+    return true;
 }
 
 UI::~UI() {

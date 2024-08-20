@@ -25,6 +25,7 @@ class UI {
         void onMode(onModeChangeCallback cb);
         void onEffect(onEffectChangeCallback cb);
         void onImage(onImageChangeCallback cb);
+        void onImagePreview(onImagePreviewCallback cb);
         void onText(onTextChangeCallback cb);
         ~UI();
     
@@ -37,7 +38,10 @@ class UI {
         onModeChangeCallback _on_mode_cb;
         onEffectChangeCallback _on_effect_cb;
         onImageChangeCallback _on_image_cb;
+        onImagePreviewCallback _on_image_preview_cb;
         onTextChangeCallback _on_text_cb;
+
+        bool imageExists(const char* name);
 
     protected:
         static bool _onAPFilter(WebServer &server);

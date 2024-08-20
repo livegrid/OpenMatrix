@@ -87,6 +87,27 @@ void WebServerManager::setupInterface() {
           Serial.printf("Effect changed to: %d\n", static_cast<int>(effect));
         }
     });
+
+    interface.onImage([this](String fileName) {
+        stateManager->getState()->image.selected = fileName;
+        stateManager->save();
+
+        // TODO: Change matrix image
+        Serial.printf("Image changed to: %s\n", fileName.c_str());
+    });
+
+    interface.onImagePreview([this](String fileName) {
+        // TODO: Show image preview on matrix
+        Serial.printf("Image preview changed to: %s\n", fileName.c_str());
+    });
+
+    interface.onText([this](String payload, TextSize size) {
+        stateManager->getState()->text.payload = payload;
+        stateManager->getState()->text.size = size;
+        stateManager->save();
+        // TODO: Update matrix text
+        Serial.printf("Text changed to: (%d) %s\n", size, payload.c_str());
+    });
 }
 
 void WebServerManager::startServer() {
