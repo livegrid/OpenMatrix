@@ -47,27 +47,27 @@ const images = [
     {
         id: 1,
         name: 'Image 1',
-        size: '2.3MB',
+        size: 200,
     },
     {
         id: 2,
-        name: 'Image 2',
-        size: '2.3MB',
+        name: 'Image 2.gif',
+        size: 200,
     },
     {
         id: 3,
         name: 'Image 3',
-        size: '2.3MB',
+        size: 200,
     },
     {
         id: 4,
         name: 'Image 4',
-        size: '2.3MB',
+        size: 200,
     },
     {
         id: 5,
         name: 'Image 5',
-        size: '2.3MB',
+        size: 200,
     },
 ];
 

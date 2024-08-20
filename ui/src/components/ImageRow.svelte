@@ -9,6 +9,9 @@
     let select_loading = false;
     let preview_loading = false;
 
+    // remove extension from name
+    $: formattedName = name.split('.').length > 1 ? name.split('.').slice(0, -1).join('.') : name;
+
     function humanFileSize(bytes, si=true, dp=1) {
         const thresh = si ? 1000 : 1024;
 
@@ -56,7 +59,7 @@
 
 <tr class="odd:bg-white/80 odd:dark:bg-zinc-950/50 even:bg-zinc-50/80 even:dark:bg-zinc-900/50">
     <th scope="row" class="px-6 py-6 font-medium text-zinc-900 whitespace-nowrap dark:text-zinc-200">
-      {name}
+      { formattedName }
     </th>
     <td class="px-6 py-6">
       { humanFileSize(size) }

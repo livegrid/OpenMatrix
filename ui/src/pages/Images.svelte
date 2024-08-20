@@ -42,8 +42,8 @@
           </tr>
         </thead>
         <tbody>
-            {#each $images as image (image.id)}
-              <ImageRow id={image.id} name={image.name} size={image.size} />
+            {#each $images as image (image.name)}
+              <ImageRow id={image.name} name={image.name} size={image.size} />
             {/each}
         </tbody>
       </table>

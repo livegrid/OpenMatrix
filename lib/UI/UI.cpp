@@ -120,12 +120,6 @@ void UI::begin() {
             }
 
             String name = file.name();
-            // Remove file extension
-            name = name.substring(0, name.lastIndexOf("."));
-            // if (name.length() > 20) {
-            //     name = name.substring(0, 20);
-            //     name += "...";
-            // }
             // Remove special characters
             name.replace("(", "");
             name.replace(")", "");
