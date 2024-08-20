@@ -1,12 +1,10 @@
 
 <script>
-  import Button from "@/components/Button.svelte";
   import ModePageLayout from "@/components/ModePageLayout.svelte";
-  import SelectButton from "@/components/SelectButton.svelte";
   import { onMount } from "svelte";
   import { images, fetchImages } from "@/store";
   import { get } from "svelte/store";
-    import ImageRow from "@/components/ImageRow.svelte";
+  import ImageRow from "@/components/ImageRow.svelte";
 
   const fetch = async () => {
     try {
@@ -18,7 +16,7 @@
 
   onMount(async () => {
     if (get(images) === null) {
-      setTimeout(fetch, 500);
+      setTimeout(fetch, 2000);
     } else {
       await fetch();
     }

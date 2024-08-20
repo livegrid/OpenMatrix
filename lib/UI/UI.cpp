@@ -100,6 +100,127 @@ void UI::begin() {
             return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
         }
     });
+
+    _server->on("/openmatrix/image", HTTP_GET, [&]() {
+        JsonDocument doc;
+        JsonArray json = doc.to<JsonArray>();
+        // Go through LitteFS and scan all files in 'img' directory
+        File root = LittleFS.open("/img", "r");
+
+        if (!root) {
+            return _server->send(200, "application/json", "[]");
+        }
+
+        // Loop over all files, adding them to the root array without (file extension)
+        File file = root.openNextFile();
+        while (file) {
+            // Skip directories
+            if (file.isDirectory()) {
+                continue;
+            }
+
+            String name = file.name();
+            // Remove file extension
+            name = name.substring(0, name.lastIndexOf("."));
+            // if (name.length() > 20) {
+            //     name = name.substring(0, 20);
+            //     name += "...";
+            // }
+            // Remove special characters
+            name.replace("(", "");
+            name.replace(")", "");
+            name.replace("[", "");
+            name.replace("]", "");
+            name.replace("{", "");
+            name.replace("}", "");
+            name.replace("|", "");
+            name.replace(":", "");
+            name.replace("?", "");
+            name.replace("\"", "");
+            name.replace("<", "");
+            name.replace(">", "");
+            name.replace("/", "");
+            name.replace("\\", "");
+            name.replace("*", "");
+            name.replace("\r", "");
+            name.replace("\n", "");
+
+            JsonDocument image;
+            image["name"] = name;
+            image["size"] = file.size();
+            json.add(image);
+
+            // Hard limiter for number of images to be listed
+            if (json.size() >= 30) {
+                log_i("Reached limit of 30 images in 'img' directory.");
+                break;
+            }
+
+            // Get next file
+            file.close();
+            file = root.openNextFile();
+        }
+        
+        root.close();
+
+        // If overflowed, delete elements from JsonArray until it doesn't overflow
+        if (doc.overflowed()) {
+            while (doc.overflowed() && json.size() > 0) {
+                json.remove(json.size() - 1);
+            }
+        }
+
+        // Serialize JSON
+        String payload;
+        serializeJson(doc, payload);
+        doc.clear();
+
+        return _server->send(200, "application/json", payload);
+    });
+
+    // on image selection
+    _server->on("/openmatrix/image", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            // TODO: check if image exists
+            if (_on_image_cb) {
+                _on_image_cb(json["image"].as<const char*>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on image preview
+    _server->on("/openmatrix/image", HTTP_PATCH, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            // TODO: check if image exists
+            if (_on_image_cb) {
+                _on_image_cb(json["image"].as<const char*>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on text change
+    _server->on("/openmatrix/text", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            if (_on_text_cb) {
+                _on_text_cb(json["payload"].as<const char*>(), json["size"].as<TextSize>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
 }
 
 void UI::onPower(onPowerCallback cb) {
@@ -116,6 +237,14 @@ void UI::onMode(onModeChangeCallback cb) {
 
 void UI::onEffect(onEffectChangeCallback cb) {
     _on_effect_cb = cb;
+}
+
+void UI::onImage(onImageChangeCallback cb) {
+    _on_image_cb = cb;
+}
+
+void UI::onText(onTextChangeCallback cb) {
+    _on_text_cb = cb;
 }
 
 bool UI::_onAPFilter(WebServer &server) {
