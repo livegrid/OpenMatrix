@@ -20,6 +20,8 @@
 
  ****************************************************************************************/
 
+#pragma once
+
 #if !defined CONFIG_IDF_TARGET_ESP32S3
 #pragma warning Not an ESP32S3! What are you doing?
 #endif
@@ -40,7 +42,7 @@
 #include <soc/io_mux_reg.h>
 
 // Custom includes
-#include "app_constants.hpp"
+#include "UMatrixSettings.hpp"
 
 #include "spi_dma_seg_tx_loop.h"
 #include "spi_dma_seg_tx_payload.h"

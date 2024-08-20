@@ -5,10 +5,11 @@ Boid boids[AVAILABLE_BOID_COUNT];
 
 Boid::Boid() : enabled(true) {}
 
-Boid::Boid(float x, float y) : 
+Boid::Boid(float x, float y, PVector* limits) : 
     acceleration(0, 0),
     velocity(randomf(), randomf()),
     location(x, y),
+    limits(*limits),
     maxspeed(1.5),
     maxforce(0.05),
     desiredseparation(4),
@@ -167,19 +168,19 @@ void Boid::arrive(PVector target) {
 }
 
 void Boid::wrapAroundBorders() {
-    if (location.x < 0) location.x = VIRTUAL_RES_X - 1;
-    if (location.y < 0) location.y = VIRTUAL_RES_Y - 1;
-    if (location.x >= VIRTUAL_RES_X) location.x = 0;
-    if (location.y >= VIRTUAL_RES_Y) location.y = 0;
+    if (location.x < 0) location.x = limits.x - 1;
+    if (location.y < 0) location.y = limits.y - 1;
+    if (location.x >= limits.x) location.x = 0;
+    if (location.y >= limits.y) location.y = 0;
 }
 
 void Boid::avoidBorders() {
     PVector desired(velocity.x, velocity.y);
 
     if (location.x < 8) desired.x = maxspeed;
-    if (location.x > VIRTUAL_RES_X - 8) desired.x = -maxspeed;
+    if (location.x > limits.x - 8) desired.x = -maxspeed;
     if (location.y < 8) desired.y = maxspeed;
-    if (location.y > VIRTUAL_RES_Y - 8) desired.y = -maxspeed;
+    if (location.y > limits.y - 8) desired.y = -maxspeed;
 
     if (desired != velocity) {
         PVector steer = desired - velocity;
@@ -195,8 +196,8 @@ bool Boid::bounceOffBorders(float bounce) {
         location.x = 0;
         velocity.x *= -bounce;
         bounced = true;
-    } else if (location.x >= VIRTUAL_RES_X) {
-        location.x = VIRTUAL_RES_X - 1;
+    } else if (location.x >= limits.x) {
+        location.x = limits.x - 1;
         velocity.x *= -bounce;
         bounced = true;
     }
@@ -205,8 +206,8 @@ bool Boid::bounceOffBorders(float bounce) {
         location.y = 0;
         velocity.y *= -bounce;
         bounced = true;
-    } else if (location.y >= VIRTUAL_RES_Y) {
-        location.y = VIRTUAL_RES_Y - 1;
+    } else if (location.y >= limits.y) {
+        location.y = limits.y - 1;
         velocity.y *= -bounce;
         bounced = true;
     }

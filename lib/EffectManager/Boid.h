@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MatrixSettings.h"
+#include <Arduino.h>
 #include "Vector.h"
 
 class Boid {
@@ -15,9 +15,10 @@ public:
     byte colorIndex;
     float mass;
     boolean enabled;
+    PVector limits;
 
     Boid();
-    Boid(float x, float y);
+    Boid(float x, float y, PVector* limits);
 
     static float randomf();
     static float mapfloat(float x, float in_min, float in_max, float out_min, float out_max);

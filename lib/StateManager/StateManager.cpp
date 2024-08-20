@@ -224,7 +224,7 @@ void StateManager::restore() {
 void StateManager::setDefaultState() {
     // Basic state
     _state.power = false;
-    _state.brightness = 255;
+    _state.brightness = 100;
     _state.mode = OpenMatrixMode::AQUARIUM;
 
     // Environment

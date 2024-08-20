@@ -9,6 +9,7 @@
 // Code modified from: https://github.com/MCJack123/craftos-esp/tree/master/main/driver
 //          Credit to: https://github.com/MCJack123/
 
+#pragma once
 
 #ifndef ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP
 #define ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP

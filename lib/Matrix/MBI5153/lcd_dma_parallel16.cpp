@@ -16,6 +16,9 @@
  PLEASE SUPPORT THEM!
 
  ********************************************************************************************/
+
+#pragma once
+
 #if __has_include(<hal/lcd_ll.h>)
 // Stop compile errors: /src/platforms/esp32s3/gdma_lcd_parallel16.hpp:64:10: fatal error: hal/lcd_ll.h: No such file or directory
 

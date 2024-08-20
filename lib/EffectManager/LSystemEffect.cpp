@@ -79,8 +79,8 @@ std::string LSystemEffect::applyRules(char c) {
 }
 
 void LSystemEffect::drawLSystem() {
-  int x = VIRTUAL_RES_X / 2;
-  int y = VIRTUAL_RES_Y - 1;
+  int x = m_matrix->getXResolution() / 2;
+  int y = m_matrix->getYResolution() - 1;
   float angle = -M_PI / 2;  // Start growing upwards
   std::vector<std::tuple<int, int, float>> stack;
 

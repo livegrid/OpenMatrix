@@ -1,6 +1,9 @@
 #include "GameofLifeEffect.h"
 
 GameofLifeEffect::GameofLifeEffect(Matrix* m) : Effect(m) {
+    WORLD_WIDTH = m->getXResolution() / CELL_SIZE;
+    WORLD_HEIGHT = m->getYResolution() / CELL_SIZE;
+    world.resize(WORLD_WIDTH, std::vector<Cell>(WORLD_HEIGHT));
     reset();
 }
 

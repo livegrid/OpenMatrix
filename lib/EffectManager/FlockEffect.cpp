@@ -32,7 +32,7 @@ void FlockEffect::reset() {
     initializeBoids();
     predatorPresent = random(2) >= 1;
     if (predatorPresent) {
-        predator = Boid(VIRTUAL_RES_X / 2, VIRTUAL_RES_Y / 2);
+        predator = Boid(m_matrix->getXResolution() / 2, m_matrix->getYResolution() / 2, new PVector(m_matrix->getXResolution(), m_matrix->getYResolution()));
         predator.maxspeed = 0.385;
         predator.maxforce = 0.020;
         predator.neighbordist = 16.0;
@@ -42,7 +42,7 @@ void FlockEffect::reset() {
 
 void FlockEffect::initializeBoids() {
     for (int i = 0; i < BOID_COUNT; i++) {
-        boids[i] = Boid(random(VIRTUAL_RES_X), random(VIRTUAL_RES_Y));
+        boids[i] = Boid(random(m_matrix->getXResolution()), random(m_matrix->getYResolution()), new PVector(m_matrix->getXResolution(), m_matrix->getYResolution()));
         boids[i].maxspeed = 0.380;
         boids[i].maxforce = 0.015;
     }
