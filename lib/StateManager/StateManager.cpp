@@ -254,6 +254,9 @@ void StateManager::setDefaultState() {
 
     // Effects
     _state.effects.selected = Effects::SIMPLEX_NOISE;
+    _state.image.selected = "Airplane.gif";
+    _state.text.payload = "Hello, World!";
+    _state.text.size = TextSize::MEDIUM;
 
     // Image
     _state.image.selected = "";

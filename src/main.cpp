@@ -25,7 +25,6 @@ UMatrix matrix;
 OMatrix matrix;
 #endif
 
-
 #ifdef SCD40_ENABLED
 #include "SCD40.h"
 SCD40 scd40;
@@ -36,22 +35,30 @@ SCD40 scd40;
 AutoRotate autoRotate(&matrix);
 #endif
 
+StateManager stateManager;
+
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
-TouchMenu touchMenu(&matrix, &taskManager);
+TouchMenu touchMenu(&matrix, &taskManager, &stateManager);
 #endif
 
 #include "EffectManager.h"
 EffectManager effectManager(&matrix);
 
-StateManager stateManager;
+#include "ImageDraw.h"
+ImageDraw imageDraw(&matrix);
+
+#include "TextDraw.h"
+TextDraw textDraw(&matrix);
 
 #ifdef WIFI_ENABLED
-WebServerManager webServerManager(&matrix, &effectManager, &stateManager);
+WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
+                                  &stateManager, &taskManager);
 #endif
 
-TaskHandle_t effectsTaskHandle;
+TaskHandle_t displayTaskHandle;
 TaskHandle_t touchTaskHandle;
+TaskHandle_t serverTaskHandle;
 
 #ifndef SCD40_ENABLED
 void demoTask(void* parameter) {
@@ -78,30 +85,70 @@ void demoTask(void* parameter) {
 }
 #endif
 
-void effectsTask(void* parameter) {
+void displayTask(void* parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(30);
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  uint8_t currentEffect = 0;
+  static unsigned long lastLogTime = 0;
+  static unsigned long frameCount = 0;
+  uint8_t currentMode = 99; // make sure currentMode is not the same as OpenMatrixMode
+  
+  // Initialize components
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
-
+  imageDraw.begin();
+  
   for (;;) {
-    static unsigned long lastLogTime = 0;
-    static unsigned long lastFrameTime = 0;
     unsigned long currentTime = millis();
 
-    effectManager.updateCurrentEffect();
+    if(currentMode != stateManager.getState()->mode) {
+      if(currentMode == OpenMatrixMode::IMAGE) {
+        imageDraw.closeGIF();
+      }
+      currentMode = stateManager.getState()->mode;
+      switch (currentMode) {
+        case OpenMatrixMode::EFFECT:
+          effectManager.setEffect(stateManager.getState()->effects.selected - 1);
+          break;
+        case OpenMatrixMode::IMAGE:
+          imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
+          break;
+        case OpenMatrixMode::TEXT:
+          textDraw.setSize(stateManager.getState()->text.size);
+          textDraw.drawText(stateManager.getState()->text.payload);
+          break;
+      }
+    }
+
+    
+    switch (stateManager.getState()->mode) {
+      case OpenMatrixMode::EFFECT:
+        effectManager.updateCurrentEffect();
+        break;
+      case OpenMatrixMode::IMAGE:
+        imageDraw.showGIF();
+        break;
+      case OpenMatrixMode::TEXT:
+        textDraw.setSize(stateManager.getState()->text.size);
+        textDraw.drawText(stateManager.getState()->text.payload);
+        break;
+      case OpenMatrixMode::AQUARIUM:
+        // Aquarium mode logic here
+        break;
+      default:
+        break;
+    }
+    
     matrix.background->display();
     matrix.update();
+    frameCount++;
 
-    // Calculate and print framerate every 5 seconds
-    if (currentTime - lastLogTime >= 10000) {
-      float framerate = 1000.0 / (currentTime - lastFrameTime);
-      log_e("Framerate: %.2f FPS", framerate);
+    if (millis() - lastLogTime >= 10000) {
+      float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
+      log_i("Framerate: %.2f FPS", framerate);
       lastLogTime = currentTime;
+      frameCount = 0;
     }
-    lastFrameTime = currentTime;
-    vTaskDelayUntil(&xLastWakeTime,
-                    xFrequency);  // Delay until the next interval
+    
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
@@ -167,8 +214,7 @@ void setup(void) {
   touchMenu.setupInterrupts();
 #endif
 
-  // Start matrix task
-  TaskManager::getInstance().createTask("EffectsTask", effectsTask, 4096, 1, 1);
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
 
 #ifdef WIFI_ENABLED
   // Start server task

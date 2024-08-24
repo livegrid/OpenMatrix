@@ -6,11 +6,13 @@
 #include "UI.h"
 #include "Matrix.h"
 #include "EffectManager.h"
+#include "ImageDraw.h"
+#include "TaskManager.h"
 #include <ElegantOTA.h>
 
 class WebServerManager {
 public:
-    WebServerManager(Matrix* matrix, EffectManager* effectManager, StateManager* stateManager);
+    WebServerManager(Matrix* matrix, EffectManager* effectManager, ImageDraw* imageDraw, StateManager* stateManager, TaskManager* taskManager);
     void begin();
     void handleClient();
 
@@ -21,8 +23,12 @@ private:
     StateManager* stateManager;
     Matrix* matrix;
     EffectManager* effectManager;
-
+    ImageDraw* imageDraw;
+    TaskManager* taskManager;
+    
     void setupNetWizard();
     void setupInterface();
     void startServer();
+    void handleModeChange();
+    void handleGetState();
 };
