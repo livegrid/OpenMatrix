@@ -9,7 +9,6 @@
 // Code modified from: https://github.com/MCJack123/craftos-esp/tree/master/main/driver
 //          Credit to: https://github.com/MCJack123/
 
-#pragma once
 
 #ifndef ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP
 #define ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP
@@ -18,8 +17,8 @@
 #include <esp_log.h>
 #include <esp_event.h>
 
-#define CHECK_CALLW(call, msg) if ((err = call) != ESP_OK) {ESP_LOGW(TAG, msg ": %s (%d)", esp_err_to_name(err), err); return 0;}
-#define CHECK_CALLE(call, msg) if ((err = call) != ESP_OK) {ESP_LOGE(TAG, msg ": %s (%d)", esp_err_to_name(err), err); return err;}
+#define CHECK_CALLW(call, msg) if ((err = call) != ESP_OK) {log_w(msg ": %s (%d)", esp_err_to_name(err), err); return 0;}
+#define CHECK_CALLE(call, msg) if ((err = call) != ESP_OK) {log_w(msg ": %s (%d)", esp_err_to_name(err), err); return err;}
 
 
 #ifdef __cplusplus

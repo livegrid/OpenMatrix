@@ -20,6 +20,8 @@ typedef enum {
     EFFECT,
     IMAGE,
     TEXT,
+    DMX,
+    STARTUP
 } OpenMatrixMode;
 
 // Effects

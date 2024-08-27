@@ -20,8 +20,6 @@
 
  ****************************************************************************************/
 
-#pragma once
-
 #if !defined CONFIG_IDF_TARGET_ESP32S3
 #pragma warning Not an ESP32S3! What are you doing?
 #endif
@@ -42,13 +40,10 @@
 #include <soc/io_mux_reg.h>
 
 // Custom includes
-#include "UMatrixSettings.hpp"
+#include "MBI5153/UMatrixSettings.hpp"
 
 #include "spi_dma_seg_tx_loop.h"
 #include "spi_dma_seg_tx_payload.h"
-
-//#define PERFORM_SPI_TRANS_CHK 1
-static const char* const TAG = "gpspi2_spi_dma_seg_tx_loop";
 
 /* 
  * Notes on using SPI & DMA in a continuous loop:
@@ -149,11 +144,11 @@ int lldesc_setup_chunk(lldesc_t *dmadesc, const void *data, int len, int offset)
         len -= dmachunklen;
         data += dmachunklen;
 
-        ESP_LOGI(TAG, "Configured dmadesc at pos %d, memory location %08x, pointing to data of size %d", n, (uintptr_t)&dmadesc[n], (int) dmadesc[n].size);
+        log_i("Configured dmadesc at pos %d, memory location %08x, pointing to data of size %d", n, (uintptr_t)&dmadesc[n], (int) dmadesc[n].size);
         n++;
     }
 
-    //ESP_LOGI(TAG, "lldesc_setup_chunk created %d descriptors!", n);
+    //log_i("lldesc_setup_chunk created %d descriptors!", n);
 
     return n;
 }
@@ -176,12 +171,12 @@ void lldesc_setup_chain(lldesc_t *dmadesc, int dma_desc_count, bool loop) {
     dmadesc[n-1].eof = 0;    
     dmadesc[n-1].qe.stqe_next = &dmadesc[n];     
 
-        ESP_LOGI(TAG, "desc %d points to desc %d", n-1, n);          
+        log_i("desc %d points to desc %d", n-1, n);          
     
     n--;
   }
 
-   ESP_LOGI(TAG, "lldesc_setup_chain() completed.");
+   log_i("lldesc_setup_chain() completed.");
 
 }
 /**************************************************************************************/
@@ -213,7 +208,7 @@ esp_err_t spi_setup(void)
   // let it run.
 
   // Initialize SPI host
-  ESP_LOGD(TAG, "Initializing SPI bus");
+  log_d("Initializing SPI bus");
   
   spi_bus_config_t host_conf;
 
@@ -240,7 +235,7 @@ esp_err_t spi_setup(void)
   CHECK_CALLE(spi_bus_initialize(SPI2_HOST, &host_conf, SPI_DMA_CH_AUTO), "Could not initialize SPI bus");
 
   // Initialize device
-  ESP_LOGD(TAG, "Initializing SPI device");
+  log_d("Initializing SPI device");
   spi_device_interface_config_t device_conf;
   device_conf.command_bits  = 0;
   device_conf.address_bits  = 0;
@@ -262,7 +257,7 @@ esp_err_t spi_setup(void)
   device_conf.post_cb       = NULL;
   CHECK_CALLE(spi_bus_add_device(SPI2_HOST, &device_conf, &spi_device), "Could not initialize SPI device");
 
-  ESP_LOGD(TAG, "spi_setup() complete");  
+  log_d("spi_setup() complete");  
 
   // populate payload
   allocate_gclk_dma_memory();
@@ -283,7 +278,7 @@ esp_err_t spi_transfer_initial_payload()
   esp_err_t err;
 
   // Dispatch transaction; link_trans will finish it off
-  ESP_LOGD(TAG, "Sending Initial Transfer: spi_transfer_setup()");
+  log_d("Sending Initial Transfer: spi_transfer_setup()");
 
   static spi_transaction_t trans;
   trans.flags     = SPI_TRANS_MODE_OCT;
@@ -299,7 +294,7 @@ esp_err_t spi_transfer_initial_payload()
   CHECK_CALLE(spi_device_polling_start(spi_device, &trans, portMAX_DELAY), "Could not start SPI transfer");
 
 
-  ESP_LOGD(TAG, "spi_transfer_loop_start() complete");
+  log_d("spi_transfer_loop_start() complete");
 
   return ESP_OK;
 }
@@ -314,7 +309,7 @@ esp_err_t spi_dma_seg_setup()
   // If there is ANY difference in the spi_seg_conf_X[1] size VS what the DMA engine 
   // sends, there will be a timeout / error with SPI.
 
-  ESP_LOGD(TAG, "Setup SPI DMA-controlled configurable segmented transfer");
+  log_d("Setup SPI DMA-controlled configurable segmented transfer");
 
   // This function has already been run, don't do it again! Memory leak.
   assert ( dma_lldesc_required == 0);
@@ -345,7 +340,7 @@ esp_err_t spi_dma_seg_setup()
   dma_lldesc_required = 1; // for CONF dma lldesc 
   //dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_octal_payload)); 
   dma_lldesc_required += lldesc_get_required_num(GCLK_TOTAL_SIZE * sizeof(uint8_t)); 
-  ESP_LOGI(TAG, "%d SPI DMA descriptors required for cover spi_tx_payload_chunk2 data.", dma_lldesc_required);   
+  log_i("%d SPI DMA descriptors required for cover spi_tx_payload_chunk2 data.", dma_lldesc_required);   
 
   // Allocate memory
   dma_data_lldesc = (lldesc_t*) heap_caps_malloc((sizeof(lldesc_t) * dma_lldesc_required), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);  
@@ -367,7 +362,7 @@ esp_err_t spi_transfer_loop_start()
   esp_err_t ret;
 
   // Need to do first start first to set registers.
-  ESP_LOGD(TAG, "Starting Output Loop");
+  // log_d("Starting Output Loop");
 
   // Ensure we keep looping, not interrupt when it reads the conf word
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_true; // If this bit is set, it means this configurable segmented transfer will continue its next 
@@ -429,7 +424,7 @@ esp_err_t spi_transfer_loop_start()
 // This will generate an interrupt due to the SPI_USR_CONF_NST being ZERO'd
 esp_err_t spi_transfer_loop_stop(void) {
 
-  ESP_LOGD(TAG, "Calling spi_transfer_loop_stop()");  
+  // log_d("Calling spi_transfer_loop_stop()");  
 
   //spi_seg_conf_2[1]  = GPSPI2.user.val & ~(SPI_USR_CONF_NXT); // If this bit is set, it means this configurable segmented transfer will continue its next 
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_false; // If this bit is set, it means this configurable segmented transfer will continue its next 
@@ -445,11 +440,11 @@ esp_err_t spi_transfer_loop_stop(void) {
 // Doesn't quite clean up cleanly.
 esp_err_t spi_dma_transfer_loop_unpause(void) {
 
-  ESP_LOGD(TAG, "Calling spi_dma_transfer_loop_unpause()");    
+  log_d("Calling spi_dma_transfer_loop_unpause()");    
 
   const spi_bus_attr_t* bus_attr = spi_bus_get_attr(SPI2_HOST); 
 
-  //ESP_LOGD(TAG, "Allocated DMA Channel is %d", bus_attr->tx_dma_chan);
+  //log_d("Allocated DMA Channel is %d", bus_attr->tx_dma_chan);
 
   dma_data_lldesc[dma_lldesc_required-1].eof = 0;
   dma_data_lldesc[dma_lldesc_required-1].qe.stqe_next = &dma_data_lldesc[0];  
@@ -466,7 +461,7 @@ esp_err_t spi_dma_transfer_loop_unpause(void) {
 // as the SPI periphal is in limbo waiting for data I presume.
 esp_err_t spi_dma_transfer_loop_pause(void) {
 
-  ESP_LOGD(TAG, "Calling spi_dma_transfer_loop_pause()");    
+  log_d("Calling spi_dma_transfer_loop_pause()");    
 
   const spi_bus_attr_t* bus_attr = spi_bus_get_attr(SPI2_HOST);   
 

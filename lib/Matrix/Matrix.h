@@ -7,13 +7,16 @@
 class Matrix {
  protected:
   uint8_t rotation;
-  uint8_t brightness;
+  uint8_t brightness = 100;
   uint8_t fontSize;
 
  public:
   virtual ~Matrix() = default;
 
   virtual void init() = 0;
+
+  virtual void drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data, uint8_t g_data,
+                     uint8_t b_data) = 0;
 
   virtual void setBrightness(uint8_t newBrightness) = 0;
   virtual uint8_t getBrightness() const = 0;

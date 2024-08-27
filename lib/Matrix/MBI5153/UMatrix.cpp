@@ -9,56 +9,48 @@
   }
 #endif
 
-static const uint16_t mbi_grey_data_latch_bits[] = {
-    79,    159,   239,   319,   399,   479,   559,   639,   719,   799,   879,
-    959,   1039,  1119,  1199,  1279,  1359,  1439,  1519,  1599,  1679,  1759,
-    1839,  1919,  1999,  2079,  2159,  2239,  2319,  2399,  2479,  2559,  2639,
-    2719,  2799,  2879,  2959,  3039,  3119,  3199,  3279,  3359,  3439,  3519,
-    3599,  3679,  3759,  3839,  3919,  3999,  4079,  4159,  4239,  4319,  4399,
-    4479,  4559,  4639,  4719,  4799,  4879,  4959,  5039,  5119,  5199,  5279,
-    5359,  5439,  5519,  5599,  5679,  5759,  5839,  5919,  5999,  6079,  6159,
-    6239,  6319,  6399,  6479,  6559,  6639,  6719,  6799,  6879,  6959,  7039,
-    7119,  7199,  7279,  7359,  7439,  7519,  7599,  7679,  7759,  7839,  7919,
-    7999,  8079,  8159,  8239,  8319,  8399,  8479,  8559,  8639,  8719,  8799,
-    8879,  8959,  9039,  9119,  9199,  9279,  9359,  9439,  9519,  9599,  9679,
-    9759,  9839,  9919,  9999,  10079, 10159, 10239, 10319, 10399, 10479, 10559,
-    10639, 10719, 10799, 10879, 10959, 11039, 11119, 11199, 11279, 11359, 11439,
-    11519, 11599, 11679, 11759, 11839, 11919, 11999, 12079, 12159, 12239, 12319,
-    12399, 12479, 12559, 12639, 12719, 12799, 12879, 12959, 13039, 13119, 13199,
-    13279, 13359, 13439, 13519, 13599, 13679, 13759, 13839, 13919, 13999, 14079,
-    14159, 14239, 14319, 14399, 14479, 14559, 14639, 14719, 14799, 14879, 14959,
-    15039, 15119, 15199, 15279, 15359, 15439, 15519, 15599, 15679, 15759, 15839,
-    15919, 15999, 16079, 16159, 16239, 16319, 16399, 16479, 16559, 16639, 16719,
-    16799, 16879, 16959, 17039, 17119, 17199, 17279, 17359, 17439, 17519, 17599,
-    17679, 17759, 17839, 17919, 17999, 18079, 18159, 18239, 18319, 18399, 18479,
-    18559, 18639, 18719, 18799, 18879, 18959, 19039, 19119, 19199, 19279, 19359,
-    19439, 19519, 19599, 19679, 19759, 19839, 19919, 19999, 20079, 20159, 20239,
-    20319, 20399, 20479, 20559, 20639, 20719, 20799, 20879, 20959, 21039, 21119,
-    21199, 21279, 21359, 21439, 21519, 21599, 21679, 21759, 21839, 21919, 21999,
-    22079, 22159, 22239, 22319, 22399, 22479, 22559, 22639, 22719, 22799, 22879,
-    22959, 23039, 23119, 23199, 23279, 23359, 23439, 23519, 23599, 23679, 23759,
-    23839, 23919, 23999, 24079, 24159, 24239, 24319, 24399, 24479, 24559, 24639,
-    24719, 24799, 24879, 24959, 25039, 25119, 25199, 25279, 25359, 25439, 25519,
-    25599};
+// CIE - Lookup table for converting between perceived LED brightness and PWM
+// https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
+
+// 8 bit lookup table as we're only passing through 8 bit colour data so pointless to scale it up
+// to 14-bit or 16-bit values for mbi_set_pixel as it'll just take longer to load the data to the
+// panel because of more bit iterations.
+const uint16_t CIE[256] = {
+    0,    0,    0,    0,    0,    1,    1,    1,    1,    1,    1,    1,    1,    1,    2,    2,
+    2,    2,    2,    2,    2,    2,    2,    3,    3,    3,    3,    3,    3,    3,    3,    4,
+    4,    4,    4,    4,    4,    5,    5,    5,    5,    5,    6,    6,    6,    6,    6,    7,
+    7,    7,    7,    8,    8,    8,    8,    9,    9,    9,   10,   10,   10,   10,   11,   11,
+   11,   12,   12,   12,   13,   13,   13,   14,   14,   15,   15,   15,   16,   16,   17,   17,
+   17,   18,   18,   19,   19,   20,   20,   21,   21,   22,   22,   23,   23,   24,   24,   25,
+   25,   26,   26,   27,   28,   28,   29,   29,   30,   31,   31,   32,   32,   33,   34,   34,
+   35,   36,   37,   37,   38,   39,   39,   40,   41,   42,   43,   43,   44,   45,   46,   47,
+   47,   48,   49,   50,   51,   52,   53,   54,   54,   55,   56,   57,   58,   59,   60,   61,
+   62,   63,   64,   65,   66,   67,   68,   70,   71,   72,   73,   74,   75,   76,   77,   79,
+   80,   81,   82,   83,   85,   86,   87,   88,   90,   91,   92,   94,   95,   96,   98,   99,
+  100,  102,  103,  105,  106,  108,  109,  110,  112,  113,  115,  116,  118,  120,  121,  123,
+  124,  126,  128,  129,  131,  132,  134,  136,  138,  139,  141,  143,  145,  146,  148,  150,
+  152,  154,  155,  157,  159,  161,  163,  165,  167,  169,  171,  173,  175,  177,  179,  181,
+  183,  185,  187,  189,  191,  193,  196,  198,  200,  202,  204,  207,  209,  211,  214,  216,
+  218,  220,  223,  225,  228,  230,  232,  235,  237,  240,  242,  245,  247,  250,  252,  255,
+};
 
 UMatrix::UMatrix() {
   fontSize = 2;
   rotation = 0;
-  brightness = 32;
 
   background =
       new GFX_Layer(PANEL_RES_X, PANEL_RES_Y,
                     [this](int16_t x, int16_t y, uint8_t r, uint8_t g,
-                           uint8_t b) { drawPixelRGB888(x, y, r, g, b); });
+                           uint8_t b) { mbi_set_pixel(x, y, r, g, b); });
 
   foreground =
       new GFX_Layer(PANEL_RES_X, PANEL_RES_Y,
                     [this](int16_t x, int16_t y, uint8_t r, uint8_t g,
-                           uint8_t b) { drawPixelRGB888(x, y, r, g, b); });
+                           uint8_t b) { mbi_set_pixel(x, y, r, g, b); });
 
   gfx_compositor = new GFX_LayerCompositor(
       [this](int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
-        drawPixelRGB888(x, y, r, g, b);
+        mbi_set_pixel(x, y, r, g, b);
       });
 }
 
@@ -130,15 +122,7 @@ uint8_t UMatrix::getYResolution() {
 
 void UMatrix::drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data,
                               uint8_t g_data, uint8_t b_data) {
-  if (x >= PANEL_RES_X || y >= PANEL_RES_Y)
-    return;
-
-  int16_t _x = x, _y = y;
-  int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
-  transform(_x, _y, _w, _h);
-
-  // mbi_set_pixel_old(_x, _y, r_data, g_data, b_data);
-  mbi_set_pixel(_x, _y, r_data, g_data, b_data);
+  mbi_set_pixel(x, y, r_data, g_data, b_data);
 }
 
 void UMatrix::transform(int16_t& x, int16_t& y, int16_t& w, int16_t& h) {
@@ -164,12 +148,11 @@ void UMatrix::transform(int16_t& x, int16_t& y, int16_t& w, int16_t& h) {
 }
 
 void UMatrix::setBrightness(uint8_t newBrightness) {
-  brightness = map(newBrightness, 0, 255, 0, 63);
-  refreshMatrixConfig();
+  brightness = newBrightness;
 }
 
 uint8_t UMatrix::getBrightness() const {
-  return map(brightness, 0, 63, 0, 255);
+  return brightness;
 }
 
 void UMatrix::setRotation(uint8_t newRotation) {
@@ -184,7 +167,7 @@ void UMatrix::rotate90() {
 }
 
 void UMatrix::clearScreen() {
-  // do nothing, not needed
+  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 }
 
 void UMatrix::update() {
@@ -197,7 +180,7 @@ void UMatrix::update() {
 
   // log_e("tsfr count: %d", dma_bus.get_transfer_count());
 
-  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+  clearScreen();
 }
 
 void UMatrix::mbi_update_frame(bool configure_latches) {
@@ -257,64 +240,57 @@ void UMatrix::refreshMatrixConfig() {
   mbi_send_config_reg1_dma();
 }
 
-void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data,
-                            uint8_t g_data, uint8_t b_data) {
-  // Use PANEL_MBI_RES_X and PANEL_MBI_RES_Y for bounds checking
-  if (x >= PANEL_MBI_RES_X || y >= PANEL_MBI_RES_Y) {
-    log_e("Pixel position out of bounds: x=%u, y=%u", x, y);
+void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
+                            uint8_t _g_data, uint8_t _b_data) {
+  if (x >= PANEL_RES_X || y >= PANEL_RES_Y)
+    return;
+
+  uint8_t r_data = CIE[_r_data];
+  uint8_t g_data = CIE[_g_data];
+  uint8_t b_data = CIE[_b_data];
+
+  int16_t _x = x, _y = y;
+  int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
+  transform(_x, _y, _w, _h);
+  CRGB color = CRGB(r_data, g_data, b_data);
+  color.nscale8(brightness);
+
+  // Merged mbi_set_pixel functionality
+  if (_x >= PANEL_MBI_RES_X || _y >= PANEL_MBI_RES_Y) {
+    log_e("Pixel position out of bounds: x=%u, y=%u", _x, _y);
     return;
   }
 
-  x += 2;  // offset for missing pixels on the left
+  _x += 2;  // offset for missing pixels on the left
 
-  // Calculate bitmasks
-  uint16_t _colourbitsoffset =
-      (y / PANEL_SCAN_LINES) * 3;  // three is an important bit
-  uint16_t _colourbitsclear = ~(0b111 << _colourbitsoffset);  // invert
+  uint16_t _colourbitsoffset = (_y / PANEL_SCAN_LINES) * 3;
+  uint16_t _colourbitsclear = ~(0b111 << _colourbitsoffset);
 
-  uint16_t g_gpio_bitmask = BIT_G1 << _colourbitsoffset;  // bit 0
-  uint16_t b_gpio_bitmask = BIT_B1 << _colourbitsoffset;  // bit 1
-  uint16_t r_gpio_bitmask = BIT_R1 << _colourbitsoffset;  // bit 2
+  uint16_t g_gpio_bitmask = BIT_G1 << _colourbitsoffset;
+  uint16_t b_gpio_bitmask = BIT_B1 << _colourbitsoffset;
+  uint16_t r_gpio_bitmask = BIT_R1 << _colourbitsoffset;
 
-  // Row offset + channel offset + individual IC LED offset
-  // Calculate data array start position
-  int y_normalised = y % PANEL_SCAN_LINES;  // Only have 20 rows of data...
-  int bit_start_pos = (1280 * y_normalised) + ((x % 16) * 80) + ((x / 16) * 16);
+  int y_normalised = _y % PANEL_SCAN_LINES;
+  int bit_start_pos = (1280 * y_normalised) + ((_x % 16) * 80) + ((_x / 16) * 16);
 
-  /*
-      MBI5153 provides a selectable 14-bit or 13-bit gray scale by setting the
-     configuration register1 bit [7]. The default value is set to ’0’ for 14-bit
-     color depth. In 14-bit gray scale mode, users should still send 16-bit data
-     with 2-bit ‘0’ in LSB bits. For example, {14’h1234, 2’h0}.
-  */
-
-  // RGB colour data provided is only 8bits, so we'll fill it from bit 16 down
-  // to bit 8 14-bit resolution = 16,384
-  //  8-bit resolutoin = 255
   int subpixel_colour_bit = 8;
   uint8_t mask;
-  while (subpixel_colour_bit > 0)  // shift out MSB first per the documentation.
-  {
-    subpixel_colour_bit--;  // start from 7
-    dma_grey_gpio_data[bit_start_pos] &=
-        _colourbitsclear;  // celear what was there before
+  while (subpixel_colour_bit > 0) {
+    subpixel_colour_bit--;
+    dma_grey_gpio_data[bit_start_pos] &= _colourbitsclear;
 
     mask = 1 << subpixel_colour_bit;
 
-    if (g_data & mask) {
+    if (color.g & mask) {
       dma_grey_gpio_data[bit_start_pos] |= g_gpio_bitmask;
     }
-
-    if (b_data & mask) {
+    if (color.b & mask) {
       dma_grey_gpio_data[bit_start_pos] |= b_gpio_bitmask;
     }
-
-    if (r_data & mask) {
+    if (color.r & mask) {
       dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
     }
 
-    // ESP_LOGV(TAG, "Setting dma_grey_gpio_data from bit_start_pos %d. Value
-    // %d", bit_start_pos, dma_grey_gpio_data[bit_start_pos]);
     bit_start_pos++;
   }
 }
@@ -388,7 +364,7 @@ void UMatrix::mbi_send_config_reg1_dma() {
   int line_num = PANEL_SCAN_LINES - 1;
   int gray_scale = gray_scale_14;
   int gclk_multiplier = gclk_multiplier_OFF;
-  int current = brightness;
+  int current = brightness_base;
 
   config_reg1_val = (ghost_elimination << 14) | (line_num << 8) |
                     (gray_scale << 7) | (gclk_multiplier << 6) | current;

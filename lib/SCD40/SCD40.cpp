@@ -113,7 +113,7 @@ void SCD40::runMeasurementTask() {
 }
 
 void SCD40::init() {
-  xTaskCreate(measurementTaskFunction, "MeasurementTask", 2048, this, 0, NULL);
+  xTaskCreatePinnedToCore(measurementTaskFunction, "MeasurementTask", 2048, this, 0, &measurementTaskHandle, 0);
 }
 
 bool SCD40::isFirstReadingReceived() {

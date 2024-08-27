@@ -6,6 +6,7 @@
 #include <ElegantOTA.h>
 #include <NetWizard.h>
 #include <WebServer.h>
+#include <Edmx.h>
 
 #include "UI.h"
 #include "WebServerManager.h"
@@ -30,6 +31,9 @@ OMatrix matrix;
 SCD40 scd40;
 #endif
 
+#include "Aquarium.h"
+Aquarium aquarium(&matrix, &scd40);
+
 #ifdef ADXL345_ENABLED
 #include "AutoRotate.h"
 AutoRotate autoRotate(&matrix);
@@ -51,14 +55,13 @@ ImageDraw imageDraw(&matrix);
 #include "TextDraw.h"
 TextDraw textDraw(&matrix);
 
+#include "Edmx.h"
+Edmx dmx(&matrix, &stateManager);
+
 #ifdef WIFI_ENABLED
 WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
                                   &stateManager, &taskManager);
 #endif
-
-TaskHandle_t displayTaskHandle;
-TaskHandle_t touchTaskHandle;
-TaskHandle_t serverTaskHandle;
 
 #ifndef SCD40_ENABLED
 void demoTask(void* parameter) {
@@ -86,8 +89,14 @@ void demoTask(void* parameter) {
 #endif
 
 void displayTask(void* parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(30);
+  const uint8_t idealFPS = 30; // Set your desired FPS here
+  const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
   TickType_t xLastWakeTime = xTaskGetTickCount();
+
+  // Refresh Matrix Config every 30 seconds
+  unsigned long lastRefreshTime = 0;
+  const unsigned long refreshInterval = 30000; // 30 seconds
+  
   static unsigned long lastLogTime = 0;
   static unsigned long frameCount = 0;
   uint8_t currentMode = 99; // make sure currentMode is not the same as OpenMatrixMode
@@ -95,9 +104,19 @@ void displayTask(void* parameter) {
   // Initialize components
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
+    stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   
   for (;;) {
     unsigned long currentTime = millis();
+    // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+    
+  #ifdef PANEL_UPCYCLED
+    if (currentTime - lastRefreshTime >= refreshInterval) {
+      log_i("Refreshing Matrix Config");
+      matrix.refreshMatrixConfig();
+      lastRefreshTime = currentTime;
+    }
+  #endif
 
     if(currentMode != stateManager.getState()->mode) {
       if(currentMode == OpenMatrixMode::IMAGE) {
@@ -117,33 +136,47 @@ void displayTask(void* parameter) {
           break;
       }
     }
-
     
     switch (stateManager.getState()->mode) {
       case OpenMatrixMode::EFFECT:
         effectManager.updateCurrentEffect();
+        matrix.background->display();
+        matrix.update();
         break;
       case OpenMatrixMode::IMAGE:
         imageDraw.showGIF();
+        matrix.background->display();
+        matrix.update();
         break;
       case OpenMatrixMode::TEXT:
         textDraw.setSize(stateManager.getState()->text.size);
         textDraw.drawText(stateManager.getState()->text.payload);
+        matrix.background->display();
+        matrix.update();
         break;
       case OpenMatrixMode::AQUARIUM:
-        // Aquarium mode logic here
+        aquarium.update();
+        matrix.gfx_compositor->Stack(*matrix.background, *matrix.foreground);
+        matrix.foreground->clear();
+        matrix.update();
+        break;
+      case OpenMatrixMode::DMX:
+        dmx.update();
+        matrix.update();
         break;
       default:
         break;
+      
     }
     
-    matrix.background->display();
-    matrix.update();
     frameCount++;
 
-    if (millis() - lastLogTime >= 10000) {
+    if (millis() - lastLogTime >= 30000) {
       float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
       log_i("Framerate: %.2f FPS", framerate);
+      log_i("Free heap: %u bytes", ESP.getFreeHeap());
+      log_i("Min free heap: %u bytes", ESP.getMinFreeHeap());
+      log_i("Max alloc heap: %u bytes", ESP.getMaxAllocHeap());
       lastLogTime = currentTime;
       frameCount = 0;
     }
@@ -227,7 +260,9 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   webServerManager.begin();
+  dmx.begin();
 #endif
+
 }
 
 void loop(void) {

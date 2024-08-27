@@ -45,7 +45,10 @@ uint8_t getByteValue(int position) {
 
     // Handle padding
     if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
-        return (repeatValue << 2);
+		// return (repeatValue << 2);
+
+		// fix slight gclk sync out of sync on ESP32S3... causes gclk to get out of sync with rowscan and image to slide around
+		return 0x80 | (repeatValue << 2);	
     }    
 
     // Calculate the byte value based on its position in the repeat
@@ -57,9 +60,13 @@ uint8_t getByteValue(int position) {
 }
 
 /*
+#include <cstdio>
+#include <bitset>
+#include <iostream>
+
 // Function to print the sequence in binary format for verification
 void printSequence() {
-    for (int i = 0; i < TOTAL_SIZE; ++i) {
+    for (int i = 0; i < GCLK_TOTAL_SIZE; ++i) {
         std::cout << std::bitset<8>(getByteValue(i)) << " ";
         if ((i + 1) % 8 == 0) std::cout << std::endl;
     }

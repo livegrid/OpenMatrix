@@ -15,6 +15,9 @@ class OMatrix : public Matrix {
   OMatrix();
 
   void init() override;
+  
+  void drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data, uint8_t g_data,
+                     uint8_t b_data) override;
 
   void setBrightness(uint8_t newBrightness) override;
   uint8_t getBrightness() const override;

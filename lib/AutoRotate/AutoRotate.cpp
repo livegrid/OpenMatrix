@@ -4,7 +4,7 @@ AutoRotate::AutoRotate(Matrix* matrix) : matrix(matrix), accel(12345), sensorWor
 }
 
 void AutoRotate::init() {
-  xTaskCreate(rotationTask, "RotationTask", 2048, this, 1, &rotationTaskHandle);
+  xTaskCreatePinnedToCore(rotationTask, "RotationTask", 2048, this, 0, &rotationTaskHandle, 0);
 }
 
 void AutoRotate::rotationTask(void* param) {

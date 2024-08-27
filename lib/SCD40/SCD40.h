@@ -17,6 +17,7 @@ class SCD40 {
   String uint16ToHex(uint16_t value);
   String getSerialNumber(uint16_t serial0, uint16_t serial1, uint16_t serial2);
   static void measurementTaskFunction(void* parameter);
+  TaskHandle_t measurementTaskHandle;
   void runMeasurementTask();
   void updateRunningAverage(State* state);
   void shiftHistoryAndResetAverage(State* state);

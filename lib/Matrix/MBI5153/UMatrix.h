@@ -23,7 +23,6 @@
 class UMatrix : public Matrix {
  private:
   bool initialized = false;
-
   // D<A Data to send
   Bus_Parallel16 dma_bus;
 
@@ -39,7 +38,7 @@ class UMatrix : public Matrix {
 
   void transform(int16_t &x, int16_t &y, int16_t &w, int16_t &h);
   void mbi_update_frame(bool configure_latches);
-  void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data);
+  void mbi_set_pixel(uint8_t x, uint8_t y,  uint8_t _r_data, uint8_t _g_data, uint8_t _b_data);
   void mbi_pre_active_dma();
   void mbi_v_sync_dma();
   void mbi_soft_reset_dma();
@@ -47,12 +46,15 @@ class UMatrix : public Matrix {
                           bool latch, bool reg2);
   void mbi_send_config_reg1_dma();
   void mbi_send_config_reg2_dma();
-  void refreshMatrixConfig();
+  void updateRegisters();
 
  public:
   UMatrix();
 
   void init() override;
+
+  void drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data, uint8_t g_data,
+                     uint8_t b_data) override;
 
   void setBrightness(uint8_t newBrightness) override;
   uint8_t getBrightness() const override;
@@ -64,8 +66,7 @@ class UMatrix : public Matrix {
   void clearScreen() override;
 
   void update() override;
+  void refreshMatrixConfig();
 
-  void updateRegisters();
-  void drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data, uint8_t g_data,
-                     uint8_t b_data);
+
 };

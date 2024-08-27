@@ -99,7 +99,7 @@
 #define ghost_elimination_OFF 0    // послесвечение включено
 #define gray_scale_13         1    // шкала серого 13 бит
 #define gray_scale_14         0    // шкала серого 14 бит
-
+#define brightness_base       63   // varies between 0 and 63
 /* 
   GCLK multiplier (grayscale clock multiplier)
 

@@ -3,7 +3,6 @@
 OMatrix::OMatrix() {
   fontSize = 2;
   rotation = 0;
-  brightness = 100;
 
   HUB75_I2S_CFG mxconfig(
       PANEL_RES_X,  // module width

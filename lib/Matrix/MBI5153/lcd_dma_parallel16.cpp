@@ -16,13 +16,8 @@
  PLEASE SUPPORT THEM!
 
  ********************************************************************************************/
-
-#pragma once
-
 #if __has_include(<hal/lcd_ll.h>)
 // Stop compile errors: /src/platforms/esp32s3/gdma_lcd_parallel16.hpp:64:10: fatal error: hal/lcd_ll.h: No such file or directory
-
-static const char *const TAG = "lcd_dma_parallel16";
 
 #ifdef ARDUINO_ARCH_ESP32
 #include <Arduino.h>
@@ -129,8 +124,8 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   LCD_CAM.lcd_clock.lcd_clkm_div_b = 0;  // fractal clock divider numerator
   LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;  // denominator
 
-  ESP_LOGD("S3", "Clock divider is %d", (int)LCD_CAM.lcd_clock.lcd_clkm_div_num);
-  ESP_LOGI(TAG, "Resulting LCD clock frequency: %d Hz", (int)(160000000L / LCD_CAM.lcd_clock.lcd_clkm_div_num));
+  log_d("Clock divider is %d", (int)LCD_CAM.lcd_clock.lcd_clkm_div_num);
+  log_i("Resulting LCD clock frequency: %d Hz", (int)(160000000L / LCD_CAM.lcd_clock.lcd_clkm_div_num));
 
   LCD_CAM.lcd_ctrl.lcd_rgb_mode_en = 0;     // i8080 mode (not RGB)
   LCD_CAM.lcd_rgb_yuv.lcd_conv_bypass = 0;  // Disable RGB/YUV converter
@@ -255,14 +250,14 @@ bool Bus_Parallel16::allocate_dma_desc_memory(size_t len) {
   if (len > _dmadesc_count_sram_alloc) {
     if (_dmadesc_a) { heap_caps_free(_dmadesc_a); }  // free all dma descrptios previously
 
-    ESP_LOGD(TAG, "Had to allocate more memory for DMA descriptors. Had space for %d, but need %d.", (int)_dmadesc_count_sram_alloc, (int)len);
+    log_d("Had to allocate more memory for DMA descriptors. Had space for %d, but need %d.", (int)_dmadesc_count_sram_alloc, (int)len);
     _dmadesc_count_sram_alloc = len;
 
-    ESP_LOGD(TAG, "Allocating %d bytes memory for DMA descriptors.", (int)sizeof(HUB75_DMA_DESCRIPTOR_T) * len);
+    log_d("Allocating %d bytes memory for DMA descriptors.", (int)sizeof(HUB75_DMA_DESCRIPTOR_T) * len);
     _dmadesc_a = (HUB75_DMA_DESCRIPTOR_T *)heap_caps_malloc(sizeof(HUB75_DMA_DESCRIPTOR_T) * len, MALLOC_CAP_DMA);
 
     if (_dmadesc_a == nullptr) {
-      ESP_LOGE(TAG, "ERROR: Couldn't malloc _dmadesc_a. Not enough memory.");
+      log_e("ERROR: Couldn't malloc _dmadesc_a. Not enough memory.");
       return false;
     }
   }
@@ -292,12 +287,12 @@ esp_err_t Bus_Parallel16::dma_transfer_start() {
 
 esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool is_greyscale_data) {
 
-  ESP_LOGV(TAG, "Sending DMA payload of length %d bytes.", size_in_bytes);
+  log_v("Sending DMA payload of length %d bytes.", size_in_bytes);
 
   int len = size_in_bytes;
 
   int dma_lldesc_required = lldesc_get_required_num(size_in_bytes);
-  ESP_LOGV(TAG, "Number of DMA descriptors required for LCD payload is: %d.", dma_lldesc_required);
+  log_v("Number of DMA descriptors required for LCD payload is: %d.", dma_lldesc_required);
 
   // Allocate descriptor block of memory if it hasn't already been allocated
   allocate_dma_desc_memory(dma_lldesc_required);
@@ -319,11 +314,11 @@ esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool
     len -= dmachunklen;
     data += dmachunklen;
 
-    ESP_LOGV(TAG, "Configured _dmadesc_a at pos %d, memory location %08x, pointing to data of size %d. Next dma desc is %d.", n, (uintptr_t)&_dmadesc_a[n], (int)_dmadesc_a[n].dw0.size, n + 1);
+    log_v("Configured _dmadesc_a at pos %d, memory location %08x, pointing to data of size %d. Next dma desc is %d.", n, (uintptr_t)&_dmadesc_a[n], (int)_dmadesc_a[n].dw0.size, n + 1);
     n++;
   }
 
-  ESP_LOGV(TAG, "Configured _dmadesc_a at pos %d, to have EOF flag = 1.", n - 1);
+  log_v("Configured _dmadesc_a at pos %d, to have EOF flag = 1.", n - 1);
 
   // All done, no looping here this time!
   _dmadesc_a[n - 1].dw0.suc_eof = 1;  //Mark last DMA desc as end of stream.
