@@ -1,4 +1,4 @@
- #include "TouchMenu.h"
+#include "TouchMenu.h"
 
 TouchMenu* TouchMenu::instance = nullptr;
 
@@ -6,7 +6,6 @@ TouchMenu* TouchMenu::getInstance() { return instance; }
 
 void TouchMenu::gotTouch1() { getInstance()->touch1detected = true; }
 void TouchMenu::gotTouch2() { getInstance()->touch2detected = true; }
-void TouchMenu::gotTouch3() { getInstance()->touch3detected = true; }
 
 TouchMenu::TouchMenu(Matrix* matrix, TaskManager* taskManager, StateManager* stateManager, long touchThreshold)
     : matrix(matrix), taskManager(taskManager), stateManager(stateManager), touchThreshold(touchThreshold) {
@@ -56,24 +55,19 @@ void TouchMenu::handleDoubleTap(uint8_t pin) {
   }
   log_i(" --- T%d Double Tap", pin - 10);
 }
-
 void TouchMenu::handleSingleTap(uint8_t pin) {
   if (menuOpen) {
     std::vector<std::string> currentItemList = getItemList();
     if (confirmationRequired) {
-      if (pin == 11) {
-        currentMenuItem = (currentMenuItem - 1 + 5) % 5; // 5 options in confirmation menu
-      } else if (pin == 13) {
-        currentMenuItem = (currentMenuItem + 1) % 5;
-      } else if (pin == 12) {
+      if (pin == 13) {
+        currentMenuItem = (currentMenuItem + 1) % 5; // 5 options in confirmation menu
+      } else if (pin == 11) {
         optionSelected = true;
       }
     } else {
-      if (pin == 11) {
-        currentMenuItem = (currentMenuItem - 1 + currentItemList.size()) % currentItemList.size();
-      } else if (pin == 13) {
+      if (pin == 13) {
         currentMenuItem = (currentMenuItem + 1) % currentItemList.size();
-      } else if (pin == 12) {
+      } else if (pin == 11) {
         if (currentItemList[currentMenuItem] == "Stop WiFi" ||
             currentItemList[currentMenuItem] == "Start WiFi" ||
             currentItemList[currentMenuItem] == "Factory Reset") {
@@ -85,8 +79,11 @@ void TouchMenu::handleSingleTap(uint8_t pin) {
         }
       }
     }
+  } else if (pin == 11) {
+    menuOpen = true;
+    taskManager->suspendTask("DisplayTask");
   }
-  log_i(" --- T%d Single Tap", pin - 10);
+  log_i(" --- T%d Single Tap", pin == 11 ? 1 : 2);
 }
 
 void TouchMenu::displayMenu() {
@@ -152,21 +149,19 @@ void TouchMenu::displayMenu() {
 
 void TouchMenu::setupInterrupts() {
   touchAttachInterrupt(11, gotTouch1, touchThreshold);
-  touchAttachInterrupt(12, gotTouch2, touchThreshold);
-  touchAttachInterrupt(13, gotTouch3, touchThreshold);
+  touchAttachInterrupt(13, gotTouch2, touchThreshold);
 }
 
 void TouchMenu::update() {
   unsigned long now = millis();
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 2; i++) {
     bool* touchDetected = nullptr;
-    uint8_t pin = 11 + i;
+    uint8_t pin = 11 + i * 2; // This will give us pins 11 and 13
 
     switch (i) {
       case 0: touchDetected = &touch1detected; break;
       case 1: touchDetected = &touch2detected; break;
-      case 2: touchDetected = &touch3detected; break;
     }
 
     if (*touchDetected) {
@@ -174,11 +169,7 @@ void TouchMenu::update() {
       if (touchInterruptGetLastStatus(pin)) {
         log_i(" --- T%d Touched", i + 1);
         
-        if (now - lastTapTime[i] < DOUBLE_TAP_INTERVAL) {
-          handleDoubleTap(pin);
-        } else {
-          handleSingleTap(pin);
-        }
+        handleSingleTap(pin);
         if(menuOpen) {
           displayMenu();
         }

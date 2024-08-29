@@ -71,7 +71,7 @@ class Edmx {
 
   void begin() {
     // Listen via Unicast
-    if (_e131.begin(E131_MULTICAST, 1, numUniverses, PROTOCOL_ARTNET)) {
+    if (_e131.begin(E131_MULTICAST, 1, numUniverses, PROTOCOL_E131)) {
       log_i("Listening for data...");
     } else {
       log_e("*** e131.begin failed ***");

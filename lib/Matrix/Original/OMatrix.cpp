@@ -38,13 +38,7 @@ void OMatrix::init() {
 }
 
 void OMatrix::setBrightness(uint8_t newBrightness) {
-  if (newBrightness > 255) {
-    brightness = 255;
-  } else if (newBrightness < 0) {
-    brightness = 0;
-  } else {
-    brightness = newBrightness;
-  }
+  brightness = newBrightness;
   matrix->setBrightness8(brightness);
 }
 
@@ -54,6 +48,11 @@ uint8_t OMatrix::getBrightness() const {
 
 uint8_t OMatrix::getXResolution() {
   return PANEL_RES_X;
+}
+
+void OMatrix::drawPixelRGB888(uint16_t x, uint16_t y, uint8_t r_data,
+                              uint8_t g_data, uint8_t b_data) {
+  matrix->drawPixelRGB888(x, y, r_data, g_data, b_data);
 }
 
 uint8_t OMatrix::getYResolution() {

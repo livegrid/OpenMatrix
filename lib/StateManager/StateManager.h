@@ -147,5 +147,5 @@ class StateManager {
         static void saveTask(void* parameter);
                 
         void setDefaultState();
-        static const uint32_t SAVE_INTERVAL = 60000; // 60 seconds in milliseconds
+        static const uint32_t SAVE_INTERVAL = 600000; // 60 seconds in milliseconds
 };

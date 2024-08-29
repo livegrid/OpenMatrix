@@ -7,14 +7,11 @@
 #include <NetWizard.h>
 #include <WebServer.h>
 #include <Edmx.h>
+#include "MQTTManager.h"
 
 #include "UI.h"
 #include "WebServerManager.h"
 #endif
-
-#define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 0
 
 TaskManager& taskManager = TaskManager::getInstance();
 
@@ -57,6 +54,8 @@ TextDraw textDraw(&matrix);
 
 #include "Edmx.h"
 Edmx dmx(&matrix, &stateManager);
+
+#include "MQTTManager.h"
 
 #ifdef WIFI_ENABLED
 WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
@@ -197,14 +196,49 @@ void touchTask(void* parameter) {
 }
 #endif
 
-#ifdef WIFI_ENABLED
 void serverTask(void* parameter) {
   for (;;) {
     webServerManager.handleClient();
     vTaskDelay(1);  // Small delay to prevent watchdog timer issues
   }
 }
-#endif
+
+void mqttTask(void* parameter) {
+  MQTTManager& mqttManager = MQTTManager::getInstance();
+  mqttManager.begin("192.168.1.102", 1883, &stateManager); // Replace with your MQTT broker IP and port
+
+  // Set up a callback for incoming messages
+  mqttManager.setCallback([](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+    log_i("Received message on topic: %s", topic);
+    // Handle incoming messages here
+  });
+
+  const TickType_t xFrequency = pdMS_TO_TICKS(5000); // 5 seconds
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+
+  bool configPublished = false;
+
+  for (;;) {
+    if (mqttManager.isConnected()) {
+      if (!configPublished) {
+        // Publish Home Assistant discovery messages
+        mqttManager.publishHomeAssistantConfig();
+        configPublished = true;
+        log_i("MQTT: Published Home Assistant discovery config");
+      }
+      float temperature = stateManager.getState()->environment.temperature.value;
+      float humidity = stateManager.getState()->environment.humidity.value;
+      int co2 = stateManager.getState()->environment.co2.value;
+
+      mqttManager.publishSensorData(temperature, humidity, co2);
+      log_i("MQTT: Sent sensor data to Home Assistant");
+    } else {
+      log_w("MQTT: Not connected, skipping message");
+    }
+
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
 
 void setup(void) {
   // Serial.begin(115200);
@@ -262,6 +296,9 @@ void setup(void) {
   webServerManager.begin();
   dmx.begin();
 #endif
+
+  // Initialize MQTT
+  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
 
 }
 
