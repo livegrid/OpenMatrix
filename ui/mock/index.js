@@ -40,7 +40,32 @@ const state = {
     text: {
         payload: "Hello! 12345",
         size: 0,
-    }
+    },
+    settings: {
+        mqtt: {
+            status: 0,
+            host: 'localhost',
+            port: 1883,
+            client_id: 'client_id',
+            username: 'username',
+            password: 'password',
+            co2_topic: 'co2',
+            matrix_text_topic: 'text',
+            show_text: false,
+        },
+        hass: {
+            status: 0,
+            show_text: false,
+        },
+        edmx: {
+            protocol: 0,
+            multicast: true,
+            start_universe: true,
+            start_address: 1,
+            mode: 0,
+            timeout: 5000
+        }
+    },
 };
 
 const images = [
@@ -180,6 +205,61 @@ export default [
             state.text.payload = body.payload;
             state.text.size = body.size;
 
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
+        }
+    },
+    {
+        url: '/openmatrix/settings/mqtt',
+        method: 'post',
+        timeout: 1000,
+        response: async ({ body }) => {
+            state.settings.mqtt = body;
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
+        }
+    },
+    {
+        url: '/openmatrix/settings/edmx',
+        method: 'post',
+        timeout: 1000,
+        response: async ({ body }) => {
+            state.settings.edmx = body;
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
+        }
+    },
+    {
+        url: '/openmatrix/settings/hass',
+        method: 'post',
+        timeout: 1000,
+        response: async ({ body }) => {
+            state.settings.hass = body;
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
+        }
+    },
+    {
+        url: '/openmatrix/settings/network/reset',
+        method: 'post',
+        timeout: 1000,
+        response: () => {
             return {
                 code: 200,
                 data: {

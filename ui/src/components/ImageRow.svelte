@@ -71,14 +71,5 @@
         absolute={false}
         on:click={select}
       />
-      {#if $state.image.selected !== id}
-        <Button
-            on:click={preview}
-            loading={preview_loading}
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            Preview
-        </Button>
-      {/if}
     </td>
 </tr>

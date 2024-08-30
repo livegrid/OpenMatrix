@@ -56,155 +56,192 @@ setTimeout(() => {
 }, 1000);
 
 export const togglePower = async ({ detail }) => {
-    try {
-
-        const response = await fetchWithTimeout(`${API_URL}./openmatrix/power`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
-                power: detail
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
-                // @ts-ignore
-                power: detail
-            })
-        }
-    } catch (err) {
-        console.error(err);
+    const response = await fetchWithTimeout(`${API_URL}./openmatrix/power`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            power: detail
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            power: detail
+        })
     }
+    return response;
 }
 
 export const updateBrightness = async (value) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/brightness`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
-                brightness: value
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
-                // @ts-ignore
-                brightness: value
-            })
-        }
-    } catch (err) {
-        console.error(err);
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/brightness`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            brightness: value
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            brightness: value
+        })
     }
+    return response;
 }
 
 export const selectMode = async (modeId) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/mode`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
-                mode: modeId
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
-                // @ts-ignore
-                mode: modeId
-            })
-        }
-    } catch (err) {
-        console.error(err);
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/mode`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            mode: modeId
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            mode: modeId
+        })
     }
+    return response;
 }
 
 export const selectEffect = async (effect) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/effect`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
-                effect
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/effect`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            effect
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            effects: {
                 // @ts-ignore
-                effects: {
-                    // @ts-ignore
-                    ...get(state)?.effects,
-                    selected: effect
-                }
-            })
-        }
-    } catch (err) {
-        console.error(err);
+                ...get(state)?.effects,
+                selected: effect
+            }
+        })
     }
+    return response;
 }
 
 export const selectImage = async ({ name }) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
-                name
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
-                // @ts-ignore
-                image: {
-                    selected: name
-                }
-            })
-        }
-    } catch (err) {
-        console.error(err);
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            name
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            image: {
+                selected: name
+            }
+        })
     }
+    return response;
 }
 
 export const invokePreview = async ({ name }) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
-            method: 'PATCH',
-            timeout: 2000,
-            body: JSON.stringify({
-                name
-            })
-        });
-        if (response.status === 200) {
-            return true;
-        }
-    } catch (err) {
-        console.error(err);
-    }
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+        method: 'PATCH',
+        timeout: 2000,
+        body: JSON.stringify({
+            name
+        })
+    });
+    return response;
 }
 
 export const updateText = async ({ payload, size }) => {
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/openmatrix/text`, {
-            method: 'POST',
-            timeout: 2000,
-            body: JSON.stringify({
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/text`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            payload,
+            size
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            text: {
                 payload,
                 size
-            })
-        });
-        if (response.status === 200) {
-            state.set({
-                ...get(state),
-                // @ts-ignore
-                text: {
-                    payload,
-                    size
-                }
-            })
-        }
-    } catch (err) {
-        console.error(err);
+            }
+        })
     }
+    return response;
+}
+
+export const updateMQTTSettings = async (settings) => {
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/mqtt`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify(settings)
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            settings: {
+                ...get(state)?.settings,
+                mqtt: settings
+            }
+        })
+    }
+    return response;
+}
+
+export const updateDMXSettings = async (settings) => {
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/edmx`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify(settings)
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            settings: {
+                ...get(state)?.settings,
+                edmx: settings
+            }
+        })
+    }
+    return response;
+}
+
+export const updateHASSSettings = async (settings) => {
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/hass`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify(settings)
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            settings: {
+                ...get(state)?.settings,
+                hass: settings
+            }
+        })
+    }
+    return response;
+}
+
+export const resetNetwork = async () => {
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/network/reset`, {
+        method: 'POST',
+        timeout: 2000
+    });
+    return response;
 }
