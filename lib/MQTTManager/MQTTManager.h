@@ -15,6 +15,8 @@ class MQTTManager {
   void setCallback(std::function<void(char*, char*, AsyncMqttClientMessageProperties, size_t, size_t, size_t)> callback);
   void publishHomeAssistantConfig();
   void publishSensorData(float temperature, float humidity, int co2);
+  void subscribeToTextTopic();
+  void handleIncomingMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
 
  private:
   MQTTManager();

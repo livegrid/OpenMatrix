@@ -205,13 +205,13 @@ void serverTask(void* parameter) {
 
 void mqttTask(void* parameter) {
   MQTTManager& mqttManager = MQTTManager::getInstance();
-  mqttManager.begin("192.168.1.102", 1883, &stateManager); // Replace with your MQTT broker IP and port
+  mqttManager.begin("192.168.1.102", 1883, &stateManager);
 
   // Set up a callback for incoming messages
-  mqttManager.setCallback([](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-    log_i("Received message on topic: %s", topic);
-    // Handle incoming messages here
+  mqttManager.setCallback([&mqttManager](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+    mqttManager.handleIncomingMessage(topic, payload, properties, len, index, total);
   });
+  
 
   const TickType_t xFrequency = pdMS_TO_TICKS(5000); // 5 seconds
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -299,7 +299,7 @@ void setup(void) {
 
   // Initialize MQTT
   TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
-
+  stateManager.getState()->settings.mqtt.matrix_text_topic = "homeassistant/text/livegrid/matrix_text/set";
 }
 
 void loop(void) {

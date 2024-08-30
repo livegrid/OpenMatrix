@@ -57,6 +57,7 @@ void MQTTManager::setupCallbacks() {
 
 void MQTTManager::onMqttConnect(bool sessionPresent) {
   log_i("Connected to MQTT. Session present: %d", sessionPresent);
+  MQTTManager::getInstance().subscribeToTextTopic();
 }
 
 void MQTTManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
@@ -67,8 +68,25 @@ void MQTTManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
 }
 
 void MQTTManager::onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  if (MQTTManager::getInstance().messageCallback) {
-    MQTTManager::getInstance().messageCallback(topic, payload, properties, len, index, total);
+  MQTTManager::getInstance().handleIncomingMessage(topic, payload, properties, len, index, total);
+}
+
+void MQTTManager::subscribeToTextTopic() {
+  const char* textTopic = stateManager->getState()->settings.mqtt.matrix_text_topic.c_str();
+  subscribe(textTopic, 0);
+  log_i("Subscribed to text topic: %s", textTopic);
+}
+
+void MQTTManager::handleIncomingMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+  String topicStr = String(topic);
+  String payloadStr = String(payload, len);
+
+  log_i("Received message on topic: %s", topicStr.c_str());
+  log_i("Payload: %s", payloadStr.c_str());
+
+  if (topicStr == stateManager->getState()->settings.mqtt.matrix_text_topic) {
+    stateManager->getState()->text.payload = payloadStr;
+    log_i("Updated text payload: %s", payloadStr.c_str());
   }
 }
 
@@ -96,6 +114,25 @@ void MQTTManager::publishHomeAssistantConfig() {
 
     publish(discoveryTopic, 0, true, payload);
   }
+
+  // Add MQTT text component configuration
+  char textDiscoveryTopic[128];
+  snprintf(textDiscoveryTopic, sizeof(textDiscoveryTopic), "homeassistant/text/livegrid/matrix_text/config");
+
+  DynamicJsonDocument textDoc(512);
+  textDoc["name"] = "Matrix Text";
+  textDoc["unique_id"] = String("livegrid_") + String((uint32_t)ESP.getEfuseMac(), HEX) + "_matrix_text";
+  textDoc["command_topic"] = stateManager->getState()->settings.mqtt.matrix_text_topic;
+  textDoc["state_topic"] = stateManager->getState()->settings.mqtt.matrix_text_topic;
+  textDoc["device"]["identifiers"][0] = String("livegrid_") + String((uint32_t)ESP.getEfuseMac(), HEX);
+  textDoc["device"]["name"] = "Livegrid Device";
+  textDoc["device"]["model"] = "Livegrid v1.0";
+  textDoc["device"]["manufacturer"] = "Livegrid.tech";
+
+  char textPayload[512];
+  serializeJson(textDoc, textPayload);
+
+  publish(textDiscoveryTopic, 0, true, textPayload);
 }
 
 void MQTTManager::publishSensorData(float temperature, float humidity, int co2) {
