@@ -73,7 +73,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   settings["mqtt"]["matrix_text_topic"] = _state.settings.mqtt.matrix_text_topic;
   settings["mqtt"]["show_text"] = _state.settings.mqtt.show_text;
   // Home Assistant
-  settings["home_assistant"]["show_text"] = _state.settings.home_assistant.show_text;
+  settings["hass"]["show_text"] = _state.settings.home_assistant.show_text;
   // eDMX
   settings["edmx"]["protocol"] = _state.settings.edmx.protocol;
   settings["edmx"]["multicast"] = _state.settings.edmx.multicast;
@@ -206,7 +206,7 @@ void StateManager::restore() {
   log_i("  Show Text: %d", _state.settings.mqtt.show_text);
 
   // Home Assistant
-  _state.settings.home_assistant.show_text = settings["home_assistant"]["show_text"].as<bool>();
+  _state.settings.home_assistant.show_text = settings["hass"]["show_text"].as<bool>();
   log_i("Restored Home Assistant show_text: %d", _state.settings.home_assistant.show_text);
 
   // eDMX

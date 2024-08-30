@@ -52,6 +52,13 @@ typedef enum {
     DMX_MODE_WHITE
 } eDmxMode;
 
+typedef enum {
+    DISCONNECTED = 0,
+    CONNECTED,
+    RECONNECTING,
+    FAILED,
+} ConnectionStatus;
+
 struct State {
     bool power = false;
     uint8_t brightness = 255;
@@ -107,7 +114,7 @@ struct State {
     // Settings
     struct {
         struct {
-            bool connected = false;
+            ConnectionStatus status = DISCONNECTED;
             String host;
             String port;
             String client_id;
@@ -118,7 +125,7 @@ struct State {
             bool show_text = false;
         } mqtt;
         struct {
-            bool connected = false;
+            ConnectionStatus status = DISCONNECTED;
             bool show_text = false;
         } home_assistant;
         struct {
