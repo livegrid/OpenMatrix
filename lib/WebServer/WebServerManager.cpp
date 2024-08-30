@@ -182,19 +182,19 @@ void WebServerManager::setupInterface() {
     uint16_t start_address,
     uint16_t timeout
   ) {
-    stateManager->getState()->settings.dmx.protocol = protocol;
-    stateManager->getState()->settings.dmx.mode = mode;
-    stateManager->getState()->settings.dmx.multicast = multicast;
-    stateManager->getState()->settings.dmx.start_universe = start_universe;
-    stateManager->getState()->settings.dmx.start_address = start_address;
-    stateManager->getState()->settings.dmx.timeout = timeout;
+    stateManager->getState()->settings.edmx.protocol = protocol;
+    stateManager->getState()->settings.edmx.mode = mode;
+    stateManager->getState()->settings.edmx.multicast = multicast;
+    stateManager->getState()->settings.edmx.start_universe = start_universe;
+    stateManager->getState()->settings.edmx.start_address = start_address;
+    stateManager->getState()->settings.edmx.timeout = timeout;
     stateManager->save();
 
     // TODO: Do something with these DMX settings
   });
 
   interface.onHomeAssistantSettings([this](
-    bool show_text,
+    bool show_text
   ) {
     stateManager->getState()->settings.home_assistant.show_text = show_text;
     stateManager->save();

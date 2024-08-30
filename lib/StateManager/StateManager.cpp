@@ -267,7 +267,7 @@ void StateManager::setDefaultState() {
 
     // Settings
     // MQTT
-    _state.settings.mqtt.connected = false;
+    _state.settings.mqtt.status = ConnectionStatus::DISCONNECTED;
     _state.settings.mqtt.host = "";
     _state.settings.mqtt.port = "";
     _state.settings.mqtt.client_id = "";
@@ -278,7 +278,7 @@ void StateManager::setDefaultState() {
     _state.settings.mqtt.show_text = false;
 
     // Home Assistant
-    _state.settings.home_assistant.connected = false;
+    _state.settings.home_assistant.status = ConnectionStatus::DISCONNECTED;
     _state.settings.home_assistant.show_text = false;
 
     // eDMX
