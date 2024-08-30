@@ -77,6 +77,8 @@
           image={effect.image}
           loading={effect.id === loading_effect_id}
           selected={effect.id === $state?.effects?.selected}
+          color={$state?.effects?.colors?.[effect.id] || '#ffffff'}
+          onColorChange={(color) => updateEffectColor(effect.id, color)}
         />
       {/if}
     {/each}

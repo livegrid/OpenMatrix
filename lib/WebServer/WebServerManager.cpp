@@ -147,6 +147,46 @@ void WebServerManager::setupInterface() {
     // TODO: Update matrix text
     log_i("Text changed to: (%d) %s", size, payload.c_str());
   });
+
+  server.on("/upload", HTTP_POST, [this]() {
+      server.send(200, "text/plain", "File uploaded successfully");
+  }, [this]() {
+      handleImageUpload();
+  });
+}
+
+
+void WebServerManager::handleImageUpload() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+        String filename = upload.filename;
+        if (!filename.startsWith("/")) filename = "/" + filename;
+        if (!filename.endsWith(".gif")) filename += ".gif";
+        log_i("handleFileUpload Name: %s", filename.c_str());
+        
+        // Open the file for writing
+        File file = LittleFS.open("/img" + filename, "w");
+        if (!file) {
+            log_e("Failed to open file for writing");
+            return;
+        }
+        file.write(upload.buf, upload.currentSize);
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        File file = LittleFS.open("/img/" + upload.filename, "a");
+        if (file) {
+            file.write(upload.buf, upload.currentSize);
+        }
+    } else if (upload.status == UPLOAD_FILE_END) {
+        File file = LittleFS.open("/img/" + upload.filename, "a");
+        if (file) {
+            file.close();
+        }
+        log_i("handleFileUpload Size: %d", upload.totalSize);
+        
+        // Update the state with the new image
+        stateManager->getState()->image.selected = "/img/" + upload.filename;
+        stateManager->save();
+    }
 }
 
 void WebServerManager::startServer() {

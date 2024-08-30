@@ -4,6 +4,9 @@
   import { onDestroy, onMount } from "svelte";
   import { state, updateText } from "@/store";
   import { get } from 'svelte/store';
+  export let color = '#ffffff';
+  export let onColorChange;
+  let showColorPicker = false;
 
   let payload = null;
   let size = 0;
@@ -54,6 +57,16 @@
   onDestroy(() => {
     unsubscribe();
   });
+
+  function toggleColorPicker() {
+    console.log("Toggle color picker clicked");
+    showColorPicker = !showColorPicker;
+  }
+
+  function handleColorChange(event) {
+    const newColor = event.target.value;
+    onColorChange(newColor);
+  }
 </script>
 
 <!-- Your content -->
@@ -63,7 +76,7 @@
   </div>
 </div>
 
-<div class="mt-8">
+<div class="mt-8 relative">
   <form>
     <div class="w-full mb-4 border border-gray-200 rounded-md bg-white/50 dark:bg-zinc-950/50 dark:border-zinc-900">
       <div class="px-4 py-2 bg-transparent rounded-t-lg">
@@ -88,8 +101,23 @@
               </span>
             </Button>
           {/each}
+          <button
+            type="button"
+            class="w-3 h-3 aspect-square rounded-md border border-gray-300 mr-2"
+            style="background-color: {color};"
+            on:click={() => showColorPicker = !showColorPicker}
+          ></button>
         </div>
       </div>
     </div>
   </form>
+  {#if showColorPicker}
+    <div class="absolute right-0 top-full mt-2 z-50">
+      <input
+        type="color"
+        value={color}
+        on:change={handleColorChange}
+      />
+    </div>
+  {/if}
 </div>
