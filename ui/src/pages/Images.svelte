@@ -5,6 +5,8 @@
   import { images, fetchImages } from "@/store";
   import { get } from "svelte/store";
   import ImageRow from "@/components/ImageRow.svelte";
+  import { compressAndConvertToGif } from "@/imageProcessing.js";
+  let fileInput;
 
   const fetch = async () => {
     try {
@@ -21,7 +23,49 @@
       await fetch();
     }
   })
+
+  function triggerFileInput() {
+    fileInput.click();
+  }
+
+  async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        const processedGif = await compressAndConvertToGif(file);
+        
+        // Create a new File object with the processed GIF
+        const gifFile = new File([processedGif], file.name.replace(/\.[^/.]+$/, ".gif"), {
+          type: "image/gif"
+        });
+
+        // Create FormData and append the file
+        const formData = new FormData();
+        formData.append("file", gifFile);
+
+        // Send the file to the server
+        const response = await fetch("/upload", {
+          method: "POST",
+          body: formData
+        });
+
+        if (response.ok) {
+          console.log("File uploaded successfully");
+          // Refresh the image list
+          await fetch();
+        } else {
+          console.error("File upload failed");
+          // TODO: Show error message to user
+        }
+      } catch (error) {
+        console.error("Error processing image:", error);
+        // TODO: Show error message to user
+      }
+    }
+  }
 </script>
+
+<!-- ... rest of the component remains the same ... -->
 
 <ModePageLayout name={'Images'} id={2}>
   <!-- list -->
@@ -59,4 +103,19 @@
       <div class="bg-gray-300/50 rounded dark:bg-zinc-700/50 w-full h-[100px]"></div>
     </div>
   {/if}
+  <div class="mt-6 flex justify-center">
+    <input
+      type="file"
+      accept="image/*"
+      on:change={handleFileUpload}
+      class="hidden"
+      bind:this={fileInput}
+    />
+    <button
+      on:click={triggerFileInput}
+      class="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-opacity-50"
+    >
+      Upload New Image
+    </button>
+  </div>
 </ModePageLayout>

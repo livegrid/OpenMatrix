@@ -5,6 +5,9 @@
   import { onDestroy, onMount } from "svelte";
   import { state, updateText } from "@/store";
   import { get } from 'svelte/store';
+  export let color = '#ffffff';
+  export let onColorChange;
+  let showColorPicker = false;
 
   let payload = null;
   let size = 0;
@@ -55,9 +58,27 @@
   onDestroy(() => {
     unsubscribe();
   });
+
+  function toggleColorPicker() {
+    console.log("Toggle color picker clicked");
+    showColorPicker = !showColorPicker;
+  }
+
+  function handleColorChange(event) {
+    const newColor = event.target.value;
+    onColorChange(newColor);
+  }
 </script>
 
 <ModePageLayout name={'Text'} id={3}>
+
+<div>
+  <div class="flex flex-wrap items-center gap-6 sm:flex-nowrap sm:justify-between">
+    <h1 class="text-base text-lg font-semibold leading-7 text-gray-900 dark:text-zinc-300">Text</h1>
+  </div>
+</div>
+
+<div class="mt-8 relative">
   <form>
     {#if $state?.text !== null && $state?.text !== undefined}
       <div class="w-full mb-4 border border-gray-200 rounded-md bg-white/50 dark:bg-zinc-950/50 dark:border-zinc-900">
@@ -93,3 +114,13 @@
     {/if}
   </form>
 </ModePageLayout>
+  {#if showColorPicker}
+    <div class="absolute right-0 top-full mt-2 z-50">
+      <input
+        type="color"
+        value={color}
+        on:change={handleColorChange}
+      />
+    </div>
+  {/if}
+</div>
