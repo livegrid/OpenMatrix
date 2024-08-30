@@ -202,6 +202,42 @@ void UI::begin() {
             return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
         }
     });
+
+    // on mqtt settings
+    _server->on("/openmatrix/settings/mqtt", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            if (_on_mqtt_settings_cb) {
+                _on_mqtt_settings_cb(json["host"].as<const char*>(), json["port"].as<uint16_t>(), json["client_id"].as<const char*>(), json["username"].as<const char*>(), json["password"].as<const char*>(), json["co2_topic"].as<const char*>(), json["matrix_text_topic"].as<const char*>(), json["show_text"].as<bool>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on dmx settings
+    _server->on("/openmatrix/settings/dmx", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+        if (err == DeserializationError::Ok) {
+            if (_on_dmx_settings_cb) {
+                _on_dmx_settings_cb(json["protocol"].as<eDmxProtocol>(), json["mode"].as<eDmxMode>(), json["multicast"].as<bool>(), json["start_universe"].as<bool>(), json["start_address"].as<uint16_t>(), json["timeout"].as<uint16_t>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
+    // on network reset
+    _server->on("/openmatrix/network/reset", HTTP_POST, [&]() {
+        if (_on_network_reset_cb) {
+            _on_network_reset_cb();
+        } 
+        return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+    });
 }
 
 void UI::onPower(onPowerCallback cb) {
@@ -230,6 +266,22 @@ void UI::onImagePreview(onImagePreviewCallback cb) {
 
 void UI::onText(onTextChangeCallback cb) {
     _on_text_cb = cb;
+}
+
+void UI::onMqttSettings(onMqttSettingsCallback cb) {
+    _on_mqtt_settings_cb = cb;
+}
+
+void UI::onDmxSettings(onDmxSettingsCallback cb) {
+    _on_dmx_settings_cb = cb;
+}
+
+void UI::onHomeAssistantSettings(onHomeAssistantSettingsCallback cb) {
+    _on_home_assistant_settings_cb = cb;
+}
+
+void UI::onNetworkReset(onNetworkResetCallback cb) {
+    _on_network_reset_cb = cb;
 }
 
 bool UI::_onAPFilter(WebServer &server) {

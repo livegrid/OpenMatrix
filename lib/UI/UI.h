@@ -17,6 +17,10 @@ class UI {
         typedef std::function<void(const char* path)> onImageChangeCallback;
         typedef std::function<void(const char* path)> onImagePreviewCallback;
         typedef std::function<void(const char* payload, TextSize size)> onTextChangeCallback;
+        typedef std::function<void(const char* host, uint16_t port, const char* client_id, const char* username, const char* password, const char* co2_topic, const char* matrix_text_topic, bool show_text)> onMqttSettingsCallback;
+        typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, bool start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
+        typedef std::function<void(bool show_text)> onHomeAssistantSettingsCallback;
+        typedef std::function<void()> onNetworkResetCallback;
 
         UI(WebServer* server, StateManager* stateManager);
         void begin();
@@ -27,6 +31,10 @@ class UI {
         void onImage(onImageChangeCallback cb);
         void onImagePreview(onImagePreviewCallback cb);
         void onText(onTextChangeCallback cb);
+        void onMqttSettings(onMqttSettingsCallback cb);
+        void onDmxSettings(onDmxSettingsCallback cb);
+        void onHomeAssistantSettings(onHomeAssistantSettingsCallback cb);
+        void onNetworkReset(onNetworkResetCallback cb);
         ~UI();
     
     private:
@@ -40,6 +48,10 @@ class UI {
         onImageChangeCallback _on_image_cb;
         onImagePreviewCallback _on_image_preview_cb;
         onTextChangeCallback _on_text_cb;
+        onMqttSettingsCallback _on_mqtt_settings_cb;
+        onDmxSettingsCallback _on_dmx_settings_cb;
+        onHomeAssistantSettingsCallback _on_home_assistant_settings_cb;
+        onNetworkResetCallback _on_network_reset_cb;
 
         bool imageExists(const char* name);
 
