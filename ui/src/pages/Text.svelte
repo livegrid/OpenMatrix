@@ -59,7 +59,7 @@
 
 <ModePageLayout name={'Text'} id={3}>
   <form>
-    {#if $state?.text?.payload}
+    {#if $state?.text !== null && $state?.text !== undefined}
       <div class="w-full mb-4 border border-gray-200 rounded-md bg-white/50 dark:bg-zinc-950/50 dark:border-zinc-900">
         <div class="px-4 py-2 bg-transparent rounded-t-lg">
           <label for="text" class="sr-only">Your text</label>
