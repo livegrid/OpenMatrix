@@ -1,7 +1,7 @@
 <script>
   import '@/App.scss'
   import Navbar from '@/components/Navbar.svelte';
-  import Environment from './pages/Environment.svelte';
+  import Aquarium from './pages/Aquarium.svelte';
   import Effects from './pages/Effects.svelte';
   import Images from './pages/Images.svelte';
   import Text from './pages/Text.svelte';
@@ -12,7 +12,7 @@
   // import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, LinearScale, TimeScale, PointElement, CategoryScale } from 'chart.js';
   // ChartJS.register(Title, Tooltip, Legend, TimeScale, LineElement, LinearScale, PointElement, CategoryScale);
 
-  let currentTab = 'environment';
+  let currentTab = 'aquarium';
 </script>
 
 <Navbar {currentTab} on:tabchange={(e) => currentTab = e.detail} />
@@ -35,8 +35,8 @@
     </svg>
   </div>
   <div class="px-6 sm:px-6 lg:px-8">
-    {#if currentTab === 'environment'}
-      <Environment />
+    {#if currentTab === 'aquarium'}
+      <Aquarium />
     {:else if currentTab === 'effects'}
       <Effects />
     {:else if currentTab === 'images'}

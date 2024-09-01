@@ -13,7 +13,7 @@
 
   const loadTab = () => {
     const tab =location.hash.substring(1);
-    dispatch('tabchange', tab  == '' ? 'environment' : tab);
+    dispatch('tabchange', tab  == '' ? 'aquarium' : tab);
   }
 
   const changeTab = (tab) => {
@@ -43,17 +43,11 @@
 
   let navMenu = [
     {
-      id: 'environment',
-      title: 'Environment',
-      icon: 'home',
-      disabled: false,
-    },
-    {
       id: 'aquarium',
       modeId: 0,
       title: 'Aquarium',
       icon: 'fish',
-      disabled: true,
+      disabled: false,
     },
     {
       id: 'effects',
