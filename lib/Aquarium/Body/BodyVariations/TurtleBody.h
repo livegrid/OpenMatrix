@@ -15,28 +15,9 @@ public:
     colorPalette = new ColorPalette(rad);
   }
 
-  void displayChild() override {
-    // head->display(pos, angle, length, size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-    
-    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1-sinAngle/2) * size, angle + PI/2, colorPalette->colors[0]);
-  }
-
-  void displayTeen(float transitionFactor) override {
-    // head->display(pos, angle, length, size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-    
-    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1-sinAngle/2) * size, angle + PI/2, colorPalette->colors[0]);
-  }
-
-  void displayAdult() override {
-    // head->display(pos, angle, length, size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-    
-    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1-sinAngle/2) * size, angle + PI/2, colorPalette->colors[0]);
-  }
-
-  void displaySenior(float transitionFactor) override {
-    // head->display(pos, angle, length, size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-    
-    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1-sinAngle/2) * size, angle + PI/2, colorPalette->colors[0]);
+  void display() override {
+    colorPalette->adjustColorbyAge(size);
+    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1+vel.mag()/20) * size, angle + PI/2, colorPalette->colors[0]);
   }
 };
 

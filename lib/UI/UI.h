@@ -11,6 +11,7 @@
 class UI {
     public:
         typedef std::function<void(bool value)> onPowerCallback;
+        typedef std::function<void(bool value)> onAutoBrightnessCallback;
         typedef std::function<void(uint16_t value)> onBrightnessCallback;
         typedef std::function<void(OpenMatrixMode mode)> onModeChangeCallback;
         typedef std::function<void(Effects effect)> onEffectChangeCallback;
@@ -25,6 +26,7 @@ class UI {
         UI(WebServer* server, StateManager* stateManager);
         void begin();
         void onPower(onPowerCallback cb);
+        void onAutoBrightness(onAutoBrightnessCallback cb);
         void onBrightness(onBrightnessCallback cb);
         void onMode(onModeChangeCallback cb);
         void onEffect(onEffectChangeCallback cb);
@@ -42,6 +44,7 @@ class UI {
         StateManager* _state_manager;
 
         onPowerCallback _on_power_cb;
+        onAutoBrightnessCallback _on_autobrightness_cb;
         onBrightnessCallback _on_brightness_cb;
         onModeChangeCallback _on_mode_cb;
         onEffectChangeCallback _on_effect_cb;

@@ -115,62 +115,23 @@ void displayTask(void* parameter) {
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  uint8_t colNow = 0;
 
   for (;;) {
     unsigned long currentTime = millis();
-
-    if (currentMode != stateManager.getState()->mode) {
-      if (currentMode == OpenMatrixMode::IMAGE) {
-        imageDraw.closeGIF();
-      }
-      currentMode = stateManager.getState()->mode;
-      switch (currentMode) {
-        case OpenMatrixMode::EFFECT:
-          effectManager.setEffect(stateManager.getState()->effects.selected -
-                                  1);
-          break;
-        case OpenMatrixMode::IMAGE:
-          imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
-          break;
-        case OpenMatrixMode::TEXT:
-          textDraw.setSize(stateManager.getState()->text.size);
-          textDraw.drawText(stateManager.getState()->text.payload);
-          break;
-      }
+    matrix.setBrightness(200);
+    switch (colNow) {
+      case 0:
+        matrix.background->fillScreen(CRGB(255, 0, 0));
+        break;
+      case 1:
+        matrix.background->fillScreen(CRGB(0, 255, 0));
+        break;
+      case 2:
+        matrix.background->fillScreen(CRGB(0, 0, 255));
+        break;
     }
-
-    if (touchMenu.shouldStartDemo()) {
-      aquarium.startDemo();
-    }
-
-    if (touchMenu.isMenuOpen()) {
-      touchMenu.displayMenu();
-    } else {
-      switch (stateManager.getState()->mode) {
-        case OpenMatrixMode::EFFECT:
-          effectManager.updateCurrentEffect();
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::IMAGE:
-          imageDraw.showGIF();
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::TEXT:
-          textDraw.setSize(stateManager.getState()->text.size);
-          textDraw.drawText(stateManager.getState()->text.payload);
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::AQUARIUM:
-          aquarium.update();
-          aquarium.display(touchMenu.showSensorData());
-          break;
-        case OpenMatrixMode::DMX:
-          dmx.update();
-          break;
-        default:
-          break;
-      }
-    }
+    matrix.background->display();
 
     #ifdef PANEL_UPCYCLED
     if (currentTime - lastRefreshTime >= refreshInterval) {
@@ -186,7 +147,12 @@ void displayTask(void* parameter) {
 
     frameCount++;
 
-    if (millis() - lastLogTime >= 30000) {
+    if (currentTime - lastLogTime >= 5000) {
+      colNow++;
+      if (colNow > 2) {
+        colNow = 0;
+      }
+      log_i("color: %d", colNow);
       float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
       // TaskManager::getInstance().printTaskInfo();
       lastLogTime = currentTime;

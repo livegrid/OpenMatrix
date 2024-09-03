@@ -5,8 +5,8 @@
 
 class FishMotion : public Motion {
  public:
-  FishMotion(PVector pos, uint16_t xResolution, uint16_t yResolution, std::vector<std::shared_ptr<Attractor>>* attractors)
-      : Motion(pos, xResolution, yResolution, attractors) {
+  FishMotion(PVector pos, uint16_t xResolution, uint16_t yResolution)
+      : Motion(pos, xResolution, yResolution) {
     maxSpeed = FISH_MAX_SPEED;
     minSpeed = FISH_MIN_SPEED;
     maxforce = FISH_MAX_FORCE;

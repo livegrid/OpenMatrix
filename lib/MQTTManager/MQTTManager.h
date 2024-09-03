@@ -17,12 +17,15 @@ class MQTTManager {
   void publishSensorData(float temperature, float humidity, int co2);
   void subscribeToTextTopic();
   void handleIncomingMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+  void updateSettingsFromState();
+  void checkSettingsAndReconnect();
 
  private:
   MQTTManager();
   ~MQTTManager();
   MQTTManager(const MQTTManager&) = delete;
   MQTTManager& operator=(const MQTTManager&) = delete;
+  String currentHost;
 
   StateManager* stateManager;
   AsyncMqttClient mqttClient;

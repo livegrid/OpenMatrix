@@ -6,7 +6,6 @@
 #include <FastNoise.h>
 #include <AquariumSettings.h>
 #include <SCD40Settings.h>
-#include "Attractor.h"
 
 class Motion {
  protected:
@@ -29,7 +28,6 @@ class Motion {
   FastNoiseLite noise;
   float noiseAmplitude;
   float noiseFrequency;
-  float sinAngle;
   long co2;
 
   uint16_t xResolution;
@@ -37,11 +35,9 @@ class Motion {
 
   bool followingFood = false;
 
-  std::vector<std::shared_ptr<Attractor>>* attractors;  // Pointer to a vector of shared pointers to Attractors
-
  public:
-  Motion(PVector pos, uint16_t xResolution, uint16_t yResolution, std::vector<std::shared_ptr<Attractor>>* attractors)
-      : pos(pos), xResolution(xResolution), yResolution(yResolution), attractors(attractors) {}
+  Motion(PVector pos, uint16_t xResolution, uint16_t yResolution)
+      : pos(pos), xResolution(xResolution), yResolution(yResolution) {}
 
   virtual ~Motion() {}                 // Virtual destructor for proper cleanup
 
@@ -59,10 +55,6 @@ class Motion {
 
   float getAngle() {
     return angle;
-  }
-
-  float getSinAngle() {
-    return sinAngle;
   }
 
   virtual void doMotion() = 0;
@@ -131,8 +123,8 @@ protected:
 
   void frontSineMotion() {
     float theta = vel.heading();
-    sinAngle = sin(millis() * sinFrequency + angleOffset);
-    float yOffset = sinAngle * sinAmplitude;
+    float angle = (millis() * sinFrequency + angleOffset);
+    float yOffset = sin(angle) * sinAmplitude;
     PVector sinusoidalForce = PVector::fromAngle(theta);
     sinusoidalForce *= yOffset;
     applyForce(sinusoidalForce);
@@ -140,8 +132,8 @@ protected:
 
   void sideSineMotion() {
     float theta = vel.heading() + PI / 2;
-    float angle = sin(millis() * sinFrequency + angleOffset);
-    float yOffset = angle * sinAmplitude;
+    float angle = (millis() * sinFrequency + angleOffset);
+    float yOffset = sin(angle) * sinAmplitude;
     PVector sinusoidalForce = PVector::fromAngle(theta);
     sinusoidalForce *= yOffset;
     applyForce(sinusoidalForce);
@@ -164,56 +156,15 @@ protected:
   }
 
   void flock() {
-    if(attractors->size() > 0) {
-      separate();
-      // align();
-      cohere();
-    }
   }
 
   void separate() {
-    PVector steer(0, 0);
-    for (std::shared_ptr<Attractor> other : *attractors) {
-      float d = pos.dist(other->getPosition());
-      if ((d > 0) && (d < SEPARATION_DISTANCE * PHYSICS_SCALE)) {
-        PVector diff = pos - other->getPosition();
-        diff.normalize();
-        diff /= d;
-        steer += diff;
-      }
-    }
-    steer /= attractors->size();
-    steer *= SEPARATION_WEIGHT;
-    steer.limit(FLOCK_MAX_FORCE);
-    applyForce(steer);
   }
 
   void align() {
-    PVector sum(0, 0);
-    for (std::shared_ptr<Attractor> other : *attractors) {
-      float d = pos.dist(other->getPosition());
-      if ((d > 0) && (d < ALIGNMENT_DISTANCE * PHYSICS_SCALE)) {
-        sum += other->getVelocity();
-      }
-    }
-    sum /= attractors->size();
-    sum *= ALIGNMENT_WEIGHT;
-    sum.limit(FLOCK_MAX_FORCE);
-    applyForce(sum);
   }
 
   void cohere() {
-    PVector sum(0, 0);
-    for (std::shared_ptr<Attractor> other : *attractors) {
-      float d = pos.dist(other->getPosition());
-      if ((d > 0) && (d < COHESION_DISTANCE * PHYSICS_SCALE)) {
-        sum += other->getPosition() - pos;
-      }
-    }
-    sum /= attractors->size();
-    sum *= COHESION_WEIGHT;
-    sum.limit(FLOCK_MAX_FORCE);
-    applyForce(sum);
   }
 
 public:

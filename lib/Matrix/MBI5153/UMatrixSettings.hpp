@@ -115,6 +115,3 @@
 
 #define pwm_hi 65535
 #define pwm_lo 0
-
-#define PHYSICS_SCALE 100
-#define OFFSET 0

@@ -9,18 +9,18 @@
 
 class MotionFactory {
 public:
-    static std::unique_ptr<Motion> createMotion(const std::string& type, PVector pos, uint16_t xResolution, uint16_t yResolution, std::vector<std::shared_ptr<Attractor>>* attractors) {
+    static std::unique_ptr<Motion> createMotion(const std::string& type, PVector pos, uint16_t xResolution, uint16_t yResolution) {
         if (type == "Fish") {
-            return std::make_unique<FishMotion>(pos, xResolution, yResolution, attractors);
+            return std::make_unique<FishMotion>(pos, xResolution, yResolution);
         }
         else if (type == "Turtle") {
-            return std::make_unique<TurtleMotion>(pos, xResolution, yResolution, attractors);
+            return std::make_unique<TurtleMotion>(pos, xResolution, yResolution);
         }
         else if (type == "Star") {
-            return std::make_unique<StarMotion>(pos, xResolution, yResolution, attractors);
+            return std::make_unique<StarMotion>(pos, xResolution, yResolution);
         }
         else if (type == "Snake") {
-            return std::make_unique<SnakeMotion>(pos, xResolution, yResolution, attractors);
+            return std::make_unique<SnakeMotion>(pos, xResolution, yResolution);
         }
         else {
           return nullptr;

@@ -54,12 +54,13 @@ public:
 };
 
 class NeedleHead : public Head {
+  uint8_t noseLengthMultiplier = random(FISH_NEEDLE_NOSE_LENGTH_MULTIPLIER);
 public:
   NeedleHead(Matrix* m) : Head(m) {}
 
   void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector pt1 = PVector::fromAngle(angle);
-    pt1 *= segmentSize * bodySize * 5;
+    pt1 *= segmentSize * bodySize * noseLengthMultiplier;
     pt1 += position;
     matrix->foreground->drawLine(pt1.x, pt1.y, position.x, position.y, CRGB(r, g, b));
   }

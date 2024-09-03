@@ -5,15 +5,15 @@
 
 class StarMotion : public Motion {
  public:
-  StarMotion(PVector pos, uint16_t xResolution, uint16_t yResolution, std::vector<std::shared_ptr<Attractor>>* attractors)
-      : Motion(pos, xResolution, yResolution, attractors) {
-    maxSpeed = 30;
-    minSpeed = 10;
-    maxforce = 0.3;
-    sinAmplitude = 5;
-    sinFrequency = .001;
-    noiseAmplitude = 2;
-    noiseFrequency = 0.01;
+  StarMotion(PVector pos, uint16_t xResolution, uint16_t yResolution)
+      : Motion(pos, xResolution, yResolution) {
+    maxSpeed = STAR_MAX_SPEED;
+    minSpeed = STAR_MIN_SPEED;
+    maxforce = STAR_MAX_FORCE;
+    sinAmplitude = STAR_SIN_AMPLITUDE;
+    sinFrequency = STAR_SIN_FREQUENCY;
+    noiseAmplitude = STAR_NOISE_AMPLITUDE;
+    noiseFrequency = STAR_NOISE_FREQUENCY;
     do {
       vel = PVector(int8_t(random(-10, 10)), int8_t(random(-10, 10)));
     } while (vel.mag() < 5);
@@ -26,6 +26,7 @@ class StarMotion : public Motion {
     frontSineMotion();
     // sideSineMotion();
     noiseMotion();
+    // angle += vel.mag() * 0.01;
   }
 };
 

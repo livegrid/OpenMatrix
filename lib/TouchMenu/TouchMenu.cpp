@@ -7,8 +7,8 @@ TouchMenu* TouchMenu::getInstance() { return instance; }
 void TouchMenu::gotTouch1() { getInstance()->touch1detected = true; }
 void TouchMenu::gotTouch2() { getInstance()->touch2detected = true; }
 
-TouchMenu::TouchMenu(Matrix* matrix, TaskManager* taskManager, StateManager* stateManager, long touchThreshold)
-    : matrix(matrix), taskManager(taskManager), stateManager(stateManager), touchThreshold(touchThreshold) {
+TouchMenu::TouchMenu(Matrix* matrix, StateManager* stateManager, long touchThreshold)
+    : matrix(matrix), stateManager(stateManager), touchThreshold(touchThreshold) {
   instance = this;
 }
 
@@ -17,7 +17,7 @@ std::string TouchMenu::getSensorDataMenuText() const {
 }
 
 std::vector<std::string> TouchMenu::getItemList() const {
-  std::vector<std::string> baseList = {"Go Back", getSensorDataMenuText(), "Turn Off", "Factory Reset"};
+  std::vector<std::string> baseList = {"Go Back", getSensorDataMenuText(), "Start Demo", "Turn Off", "Factory Reset"};
   if (WiFiConnected) {
     baseList.insert(baseList.end() - 1, {"Stop WiFi", "Show WiFi Info"});
   } else {
@@ -29,10 +29,13 @@ std::vector<std::string> TouchMenu::getItemList() const {
 void TouchMenu::executeMenuItem(const std::string& selectedOption) {
   if (selectedOption == "Go Back") {
     menuOpen = false;
-    taskManager->resumeTask("DisplayTask");
   } else if (selectedOption == "Show SensorData" || selectedOption == "Hide SensorData") {
     sensorDataVisible = !sensorDataVisible;
-  } else if (selectedOption == "Start WiFi") {
+  }else if (selectedOption == "Start Demo") {
+    menuOpen = false;
+    startDemo = true;
+  } 
+  else if (selectedOption == "Start WiFi") {
     // Add action for Start WiFi
   } else if (selectedOption == "Turn Off") {
     menuOpen = false;
@@ -51,7 +54,6 @@ void TouchMenu::executeMenuItem(const std::string& selectedOption) {
 void TouchMenu::handleDoubleTap(uint8_t pin) {
   if(!menuOpen) {
     menuOpen = true;
-    taskManager->suspendTask("DisplayTask");
   }
   log_i(" --- T%d Double Tap", pin - 10);
 }
@@ -81,7 +83,6 @@ void TouchMenu::handleSingleTap(uint8_t pin) {
     }
   } else if (pin == 11) {
     menuOpen = true;
-    taskManager->suspendTask("DisplayTask");
   }
   log_i(" --- T%d Single Tap", pin == 11 ? 1 : 2);
 }
@@ -129,7 +130,6 @@ void TouchMenu::displayMenu() {
   }
 
   matrix->background->display();
-  matrix->update();
 
   if (optionSelected) {
     if (confirmationRequired) {
@@ -170,9 +170,6 @@ void TouchMenu::update() {
         log_i(" --- T%d Touched", i + 1);
         
         handleSingleTap(pin);
-        if(menuOpen) {
-          displayMenu();
-        }
         lastTapTime[i] = now;
       } else {
         log_i(" --- T%d Released", i + 1);
@@ -195,4 +192,11 @@ bool TouchMenu::showSensorData() {
 
 bool TouchMenu::showWiFiInfo() {
   return WiFiInfoVisible;
+}
+bool TouchMenu::shouldStartDemo() {
+  if (startDemo) {
+    startDemo = false;
+    return true;
+  }
+  return false;
 }

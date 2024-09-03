@@ -4,16 +4,6 @@ AutoRotate::AutoRotate(Matrix* matrix) : matrix(matrix), accel(12345), sensorWor
 }
 
 void AutoRotate::init() {
-  xTaskCreatePinnedToCore(rotationTask, "RotationTask", 2048, this, 0, &rotationTaskHandle, 0);
-}
-
-void AutoRotate::rotationTask(void* param) {
-  AutoRotate* self = static_cast<AutoRotate*>(param);
-  self->initializeSensor();
-  self->runRotationTask();
-}
-
-void AutoRotate::initializeSensor() {
   if (!accel.begin()) {
     log_e("Ooops, no ADXL345 detected ... Check your wiring!");
     sensorWorking = false;
@@ -21,16 +11,6 @@ void AutoRotate::initializeSensor() {
   }
   sensorWorking = true;
   accel.setRange(ADXL345_RANGE_16_G);
-}
-
-void AutoRotate::runRotationTask() {
-  while (true) {
-    updateSensorValues();
-    currentRotation = calculateRotation();
-    matrix->setRotation(currentRotation);
-    // log_i("Current rotation: %d", currentRotation);
-    vTaskDelay(1000 / portTICK_PERIOD_MS); // Update every 1 second
-  }
 }
 
 uint8_t AutoRotate::getCurrentRotation() {
@@ -71,11 +51,15 @@ void AutoRotate::setRange(int range) {
 }
 
 void AutoRotate::updateSensorValues() {
-  sensors_event_t event; 
-  accel.getEvent(&event);
-  x = event.acceleration.x;
-  y = event.acceleration.y;
-  z = event.acceleration.z;
+  if (sensorWorking) {
+    sensors_event_t event; 
+    accel.getEvent(&event);
+    x = event.acceleration.x;
+    y = event.acceleration.y;
+    z = event.acceleration.z;
+    currentRotation = calculateRotation();
+    matrix->setRotation(currentRotation);
+  }
 }
 
 float AutoRotate::getX() {

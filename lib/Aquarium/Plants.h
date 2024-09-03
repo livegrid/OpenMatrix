@@ -44,11 +44,12 @@ class Plants {
 
   void update(uint8_t humidity = 50) {
     unsigned long currentTime = millis();
-    float sizeFactor = map(humidity, 0, 100, 0, 3);
+    float sizeFactor = map(humidity, 0, 100, 0, 250);
+    sizeFactor /= 100;
 
     for (uint8_t i = 0; i < branches.size(); i++) {
       matrix->foreground->drawLine(branches[i].nodes[0].x * sizeFactor + pos.x, branches[i].nodes[0].y * sizeFactor + pos.y, pos.x, pos.y, CRGB(0, 0, 0));
-      // matrix->foreground->fillCircle(branches[i].nodes[0].x, branches[i].nodes[0].y, branchSizeBase, CRGB(0, 0, 0));
+      // matrix->background->drawLine(branches[i].nodes[0].x * sizeFactor + pos.x, branches[i].nodes[0].y * sizeFactor + pos.y, pos.x, pos.y, CRGB(0, 0, 0));
       for (uint8_t j = 1; j < branches[i].nodes.size(); j++) {
         PVector node = branches[i].nodes[j];
         PVector prevNode = branches[i].nodes[j - 1];
@@ -58,14 +59,15 @@ class Plants {
         float sway = sin(currentTime / 10000.0 + phaseOffsets[i]) * swayAmplitude;
 
         // Apply sway to x coordinates
+        // matrix->background->drawLine(prevNode.x * sizeFactor + sway + pos.x, prevNode.y * sizeFactor + pos.y, node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, CRGB(0,0,1));
         matrix->foreground->drawLine(prevNode.x * sizeFactor + sway + pos.x, prevNode.y * sizeFactor + pos.y, node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, CRGB(0,0,1));
-        // matrix->foreground->drawLine(prevNode.x + sway, prevNode.y, node.x + sway, node.y, CRGB(j*2, j*20, j*5));
         
         // Flower at the end of the branch
         if(j == branches[i].nodes.size()-1){
           float glowFactor = (sin(currentTime / 10000.0 + phaseOffsets[i])) - 0.8; // Shift and scale the sine wave
           if(glowFactor > 0) {
             uint8_t glowIntensity = static_cast<uint8_t>(glowFactor * 1000); // Scale to color intensity
+            // matrix->background->fillCircle(node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, 1, CRGB(glowIntensity, glowIntensity, 0));
             matrix->foreground->fillCircle(node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, 1, CRGB(glowIntensity, glowIntensity, 0));
           }
         }

@@ -67,7 +67,6 @@ void SCD40::runMeasurementTask() {
 
     scd4x.startPeriodicMeasurement();
 
-
     const TickType_t xFrequency = pdMS_TO_TICKS(5000);
     TickType_t xLastWakeTime = xTaskGetTickCount();
     // char tempBuffer[4];

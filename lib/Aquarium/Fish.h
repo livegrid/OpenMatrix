@@ -12,7 +12,6 @@
 #include "Motion/MotionFactory.h"
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
-#include "Attractor.h"
 
 //Probably not a good idea to create a new BodyFactory for every fish
 
@@ -24,7 +23,6 @@ class Fish {
 
   std::unique_ptr<Motion> motion;  // Use smart pointer for automatic memory management
   std::unique_ptr<Body> body;
-  std::vector<std::shared_ptr<Attractor>>* attractors;  // Pointer to a vector of shared pointers to Attractors
 
   Food* food = nullptr;
 
@@ -35,9 +33,8 @@ class Fish {
   };
 
 public:
-  Fish(Matrix* matrix, std::vector<std::shared_ptr<Attractor>>* attractors, PVector pos = PVector(0,0), float age = 0, uint8_t health = 1)
-  : matrix(matrix), attractors(attractors), pos(pos), age(age){ // Member initializer list{ // Default constructor
-    this->pos = pos; 
+  Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, uint8_t health = 1)
+  : matrix(matrix), pos(pos), age(age){ // Member initializer list{ // Default constructor
     BodyFactory bodyFactory(matrix);
     // this->body = std::unique_ptr<Body>(bodyFactory.createRandomBody());
 
@@ -58,7 +55,7 @@ public:
     auto selectedType = selectType(types);
 
     this->body = std::unique_ptr<Body>(bodyFactory.createBody(selectedType.bodyType));
-    this->motion = MotionFactory::createMotion(selectedType.motionType, pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE, attractors);
+    this->motion = MotionFactory::createMotion(selectedType.motionType, pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE);
     bodyFactory.~BodyFactory();
   }
   // ~Fish(); // Destructor
@@ -66,7 +63,7 @@ public:
   bool update(long co2 = 600) {
     motion->update(age, co2);
     pos = motion->getPosition() / PHYSICS_SCALE;
-    body->update(pos, motion->getAngle(), motion->getSinAngle(), age, co2);
+    body->update(pos, motion->getVelocity(), motion->getAngle(), age, co2);
     updateAge(co2);
     if(food != nullptr) {
       PVector foodDistance = food->getPosition() - pos;

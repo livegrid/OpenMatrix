@@ -5,15 +5,15 @@
 
 class TurtleMotion : public Motion {
  public:
-  TurtleMotion(PVector pos, uint16_t xResolution, uint16_t yResolution, std::vector<std::shared_ptr<Attractor>>* attractors)
-      : Motion(pos, xResolution, yResolution, attractors) {
-    maxSpeed = 80;
-    minSpeed = 20;
-    maxforce = 0.3;
-    sinAmplitude = 5;
-    sinFrequency = .002;
-    noiseAmplitude = 2;
-    noiseFrequency = 0.01;
+  TurtleMotion(PVector pos, uint16_t xResolution, uint16_t yResolution)
+      : Motion(pos, xResolution, yResolution) {
+    maxSpeed = TURTLE_MAX_SPEED;
+    minSpeed = TURTLE_MIN_SPEED;
+    maxforce = TURTLE_MAX_FORCE;
+    sinAmplitude = TURTLE_SIN_AMPLITUDE;
+    sinFrequency = TURTLE_SIN_FREQUENCY;
+    noiseAmplitude = TURTLE_NOISE_AMPLITUDE;
+    noiseFrequency = TURTLE_NOISE_FREQUENCY;
     do {
       vel = PVector(int8_t(random(-10, 10)), int8_t(random(-10, 10)));
     } while (vel.mag() < 5);

@@ -1,5 +1,6 @@
 const state = {
     power: false,
+    autobrightness: true,
     brightness: 100,
     mode: 0,
     environment: {
@@ -113,6 +114,19 @@ export default [
         method: 'post',
         response: ({ body }) => {
             state.power = body.power;
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            }
+        }
+    },
+    {
+        url: '/openmatrix/autobrightness',
+        method: 'post',
+        response: ({ body }) => {
+            state.autobrightness = body.autobrightness;
             return {
                 code: 200,
                 data: {

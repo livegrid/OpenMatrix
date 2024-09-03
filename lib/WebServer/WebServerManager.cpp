@@ -15,6 +15,7 @@ WebServerManager::WebServerManager(Matrix* matrix, EffectManager* effectManager,
 
 void WebServerManager::begin() {
   setupNetWizard();
+  // setupUniqueHostname();
   setupInterface();
   startServer();
 }
@@ -27,6 +28,7 @@ void WebServerManager::handleClient() {
 
 void WebServerManager::setupNetWizard() {
   nw.setStrategy(NetWizardStrategy::NON_BLOCKING);
+  nw.setHostname("LiveGrid");
 
   nw.onConnectionStatus([this](NetWizardConnectionStatus status) {
     String status_str = "";
@@ -91,6 +93,31 @@ void WebServerManager::setupNetWizard() {
   nw.autoConnect("LiveGrid", "");
 }
 
+
+void WebServerManager::setupUniqueHostname() {
+  const char* baseHostname = "livegrid";
+  String hostname = baseHostname;
+  int suffix = 1;
+
+  while (true) {
+    if (MDNS.begin(hostname.c_str())) {
+      log_i("Hostname set to: %s", hostname.c_str());
+      MDNS.end();
+      WiFi.setHostname(hostname.c_str());
+      return;
+    }
+
+    // If setting the hostname fails, increment the suffix and try again
+    hostname = String(baseHostname) + String(suffix);
+    suffix++;
+
+    if (suffix > 5) {  // Arbitrary limit to prevent infinite loop
+      log_w("Failed to set unique hostname after 99 attempts. Using default.");
+      return;
+    }
+  }
+}
+
 void WebServerManager::setupInterface() {
   interface.begin();
   interface.onPower([this](bool state) {
@@ -99,6 +126,15 @@ void WebServerManager::setupInterface() {
     // TODO: Change matrix power state
     log_i("Power state changed to: %s", state ? "ON" : "OFF");
   });
+
+  interface.onAutoBrightness([this](bool state) {
+    stateManager->getState()->autobrightness = state;
+    stateManager->save();
+    // TODO: Change matrix power state
+    log_i("Autobrightness state changed to: %s", state ? "ON" : "OFF");
+  });
+
+  
 
   interface.onBrightness([this](uint8_t value) {
     stateManager->getState()->brightness = value;
@@ -169,7 +205,8 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.mqtt.co2_topic = co2_topic;
     stateManager->getState()->settings.mqtt.matrix_text_topic = matrix_text_topic;
     stateManager->getState()->settings.mqtt.show_text = show_text;
-    stateManager->save();
+    
+    MQTTManager::getInstance().checkSettingsAndReconnect();
 
     // TODO: Do something with these MQTT settings     
   });

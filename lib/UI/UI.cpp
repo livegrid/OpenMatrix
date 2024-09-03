@@ -55,6 +55,21 @@ void UI::begin() {
         }
     });
 
+    // on Power Change
+    _server->on("/openmatrix/autobrightness", HTTP_POST, [&]() {
+        JsonDocument json;
+        DeserializationError err = deserializeJson(json, _server->arg("plain"));
+
+        if (err == DeserializationError::Ok) {
+            if (_on_autobrightness_cb) {
+                _on_autobrightness_cb(json["autobrightness"].as<bool>());
+            }
+            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        } else {
+            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+        }
+    });
+
     // on Brightness Change
     _server->on("/openmatrix/brightness", HTTP_POST, [&]() {
         JsonDocument json;
@@ -242,6 +257,10 @@ void UI::begin() {
 
 void UI::onPower(onPowerCallback cb) {
     _on_power_cb = cb;
+}
+
+void UI::onAutoBrightness(onAutoBrightnessCallback cb) {
+    _on_autobrightness_cb = cb;
 }
 
 void UI::onBrightness(onBrightnessCallback cb) {

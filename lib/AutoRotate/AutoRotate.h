@@ -12,11 +12,6 @@ class AutoRotate {
   bool sensorWorking;
   float x, y, z;
   uint8_t currentRotation;
-  TaskHandle_t rotationTaskHandle;  // Handle for the rotation task
-
-  static void rotationTask(void* param);
-  void initializeSensor();
-  void runRotationTask();
 
  public:
   AutoRotate(Matrix* matrix);

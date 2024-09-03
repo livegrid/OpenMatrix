@@ -49,36 +49,13 @@ public:
     }
   }
 
-  void displayChild() override {
+  void display() override {
+    colorPalette->adjustColorbyAge(size);
     for(int8_t i=segments.size()-2; i > -1; i--) {
-      drawSegment(i+1, segmentPositions[i], CHILD_COLOR, false);
+      drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
     }
-    drawSegment(0, pos, CHILD_COLOR, false);
+    drawSegment(0, pos, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b, false);
     head->display(pos, angle, segments[0], size, 255, 255, 255);
-  }
-
-  void displayTeen(float transitionFactor) override {
-    for(int8_t i=segments.size()-2; i > -1; i--) {
-      drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
-    }
-    drawSegment(0, pos, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b, true);
-    head->display(pos, angle, segments[0], size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-  }
-
-  void displayAdult() override {
-    for(int8_t i=segments.size()-2; i > -1; i--) {
-      drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
-    }
-    drawSegment(0, pos, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b, true);
-    head->display(pos, angle, segments[0], size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
-  }
-
-  void displaySenior(float transitionFactor) override {
-    for(int8_t i=segments.size()-2; i > -1; i--) {
-      drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
-    }
-    drawSegment(0, pos, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b, true);
-    head->display(pos, angle, segments[0], size, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
   }
 
 };

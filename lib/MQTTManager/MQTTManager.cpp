@@ -20,12 +20,38 @@ MQTTManager::~MQTTManager() {
 void MQTTManager::begin(const char* host, uint16_t port, StateManager* stateManager) {
   this->stateManager = stateManager;
   setupCallbacks();
-  mqttClient.setServer(host, port);
-  connect();
+  updateSettingsFromState();
+  
+  const State* state = stateManager->getState();
+  if (!state->settings.mqtt.host.isEmpty() && state->settings.mqtt.host != "0") {
+    connect();
+  } else {
+    log_i("MQTT host not defined or set to 0. Skipping initial connection.");
+  }
+}
+
+void MQTTManager::updateSettingsFromState() {
+  const State* state = stateManager->getState();
+  mqttClient.setServer(state->settings.mqtt.host.c_str(), state->settings.mqtt.port.toInt());
+  
+  // Only set optional parameters if they are not empty
+  if (!state->settings.mqtt.client_id.isEmpty()) {
+    mqttClient.setClientId(state->settings.mqtt.client_id.c_str());
+  }
+  if (!state->settings.mqtt.username.isEmpty() && !state->settings.mqtt.password.isEmpty()) {
+    mqttClient.setCredentials(state->settings.mqtt.username.c_str(), state->settings.mqtt.password.c_str());
+  }
 }
 
 void MQTTManager::connect() {
+  const State* state = stateManager->getState();
+  if (state->settings.mqtt.host.isEmpty() || state->settings.mqtt.host == "0") {
+    log_i("MQTT host not defined or set to 0. Skipping connection attempt.");
+    return;
+  }
+  
   log_i("Connecting to MQTT...");
+  updateSettingsFromState();
   mqttClient.connect();
 }
 
@@ -57,13 +83,16 @@ void MQTTManager::setupCallbacks() {
 
 void MQTTManager::onMqttConnect(bool sessionPresent) {
   log_i("Connected to MQTT. Session present: %d", sessionPresent);
+  MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = CONNECTED;
   MQTTManager::getInstance().subscribeToTextTopic();
 }
 
 void MQTTManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   log_w("Disconnected from MQTT. Reason: %d", static_cast<int>(reason));
+  MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = DISCONNECTED;
   if (WiFi.isConnected()) {
     xTimerStart(MQTTManager::getInstance().mqttReconnectTimer, 0);
+    MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = RECONNECTING;
   }
 }
 
@@ -88,38 +117,43 @@ void MQTTManager::handleIncomingMessage(char* topic, char* payload, AsyncMqttCli
     stateManager->getState()->text.payload = payloadStr;
     log_i("Updated text payload: %s", payloadStr.c_str());
   }
+
+  // Check for settings changes after processing each message
+  checkSettingsAndReconnect();
 }
 
 void MQTTManager::publishHomeAssistantConfig() {
   const char* sensors[] = {"temperature", "humidity", "co2"};
   const char* units[] = {"°C", "%", "ppm"};
+  const char* icons[] = {"mdi:thermometer", "mdi:water-percent", "mdi:molecule-co2"};
 
   for (int i = 0; i < 3; i++) {
     char discoveryTopic[128];
-    snprintf(discoveryTopic, sizeof(discoveryTopic), "homeassistant/sensor/livegrid/%s/config", sensors[i]);
+    snprintf(discoveryTopic, sizeof(discoveryTopic), "homeassistant/sensor/livegrid_%s/config", sensors[i]);
 
-    DynamicJsonDocument doc(256);
-    doc["name"] = sensors[i];
+    JsonObject doc;
+    doc["name"] = String("Livegrid ") + sensors[i];
     doc["unique_id"] = String("livegrid_") + String((uint32_t)ESP.getEfuseMac(), HEX) + "_" + sensors[i];
     doc["state_topic"] = "homeassistant/sensor/livegrid/state";
     doc["unit_of_measurement"] = units[i];
     doc["value_template"] = String("{{ value_json.") + sensors[i] + " }}";
+    doc["icon"] = icons[i];
     doc["device"]["identifiers"][0] = String("livegrid_") + String((uint32_t)ESP.getEfuseMac(), HEX);
     doc["device"]["name"] = "Livegrid Sensor";
     doc["device"]["model"] = "Livegrid v1.0";
     doc["device"]["manufacturer"] = "Livegrid.tech";
 
-    char payload[256];
+    char payload[512];
     serializeJson(doc, payload);
 
-    publish(discoveryTopic, 0, true, payload);
+    publish(discoveryTopic, 0, true, payload); // Ensure retain flag is true
   }
 
   // Add MQTT text component configuration
   char textDiscoveryTopic[128];
   snprintf(textDiscoveryTopic, sizeof(textDiscoveryTopic), "homeassistant/text/livegrid/matrix_text/config");
 
-  DynamicJsonDocument textDoc(512);
+  JsonObject textDoc;
   textDoc["name"] = "Matrix Text";
   textDoc["unique_id"] = String("livegrid_") + String((uint32_t)ESP.getEfuseMac(), HEX) + "_matrix_text";
   textDoc["command_topic"] = stateManager->getState()->settings.mqtt.matrix_text_topic;
@@ -132,12 +166,12 @@ void MQTTManager::publishHomeAssistantConfig() {
   char textPayload[512];
   serializeJson(textDoc, textPayload);
 
-  publish(textDiscoveryTopic, 0, true, textPayload);
+  publish(textDiscoveryTopic, 0, true, textPayload); // Ensure retain flag is true
 }
 
 void MQTTManager::publishSensorData(float temperature, float humidity, int co2) {
-  DynamicJsonDocument doc(128);
-  doc["temperature"] = temperature;
+  JsonObject doc;
+  doc["temperature"] = String(temperature, 2); // Limit to 2 decimal places
   doc["humidity"] = humidity;
   doc["co2"] = co2;
 
@@ -145,4 +179,21 @@ void MQTTManager::publishSensorData(float temperature, float humidity, int co2) 
   serializeJson(doc, payload);
 
   publish("homeassistant/sensor/livegrid/state", 0, false, payload);
+}
+
+void MQTTManager::checkSettingsAndReconnect() {
+  const State* state = stateManager->getState();
+  bool settingsChanged = false;
+
+  // Check if the host setting has changed
+  if (mqttClient.getClientId() != state->settings.mqtt.host) {
+    settingsChanged = true;
+  }
+
+  if (settingsChanged) {
+    log_i("MQTT host changed. Reconnecting...");
+    disconnect();
+    updateSettingsFromState();
+    connect();
+  }
 }

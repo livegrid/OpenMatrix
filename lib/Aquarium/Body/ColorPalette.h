@@ -59,7 +59,7 @@ class ColorPalette {
 
       if (age < AGE_ADULT) {
         // Adjust saturation from 0 to 130 between AGE_CHILD and AGE_TEEN
-        float saturationFactor = (age - AGE_CHILD) / (AGE_ADULT - AGE_CHILD);
+        float saturationFactor = (age - AGE_EGG) / (AGE_ADULT - AGE_EGG);
         hsvColor.sat = static_cast<uint8_t>(130 * saturationFactor);
       }
 

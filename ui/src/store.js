@@ -73,6 +73,24 @@ export const togglePower = async ({ detail }) => {
     return response;
 }
 
+export const toggleAutoBrightness = async ({ detail }) => {
+    const response = await fetchWithTimeout(`${API_URL}./openmatrix/autobrightness`, {
+        method: 'POST',
+        timeout: 2000,
+        body: JSON.stringify({
+            autobrightness: detail
+        })
+    });
+    if (response.status === 200) {
+        state.set({
+            ...get(state),
+            // @ts-ignore
+            autobrightness: detail
+        })
+    }
+    return response;
+}
+
 export const updateBrightness = async (value) => {
     const response = await fetchWithTimeout(`${API_URL}/openmatrix/brightness`, {
         method: 'POST',

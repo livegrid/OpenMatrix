@@ -11,6 +11,7 @@ class Food {
   PVector position;
   static constexpr float fallSpeed = 0.3;
   bool eaten = false;
+  bool offScreen = false;
 
  public:
   Food(Matrix* m, float x)
@@ -18,6 +19,9 @@ class Food {
 
   void update() {
     position.y += fallSpeed;
+    if (position.y >= matrix->getYResolution()) {
+      offScreen = true;  // Set the flag instead of relying on real-time calculation
+    }
   }
 
   void display() {
@@ -31,7 +35,7 @@ class Food {
   }
 
   bool isOffScreen() {
-    return position.y >= matrix->getYResolution();
+    return offScreen;
   }
 
   void eat() {

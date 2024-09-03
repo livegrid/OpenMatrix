@@ -32,9 +32,9 @@ void Boid::run(Boid boids[], uint8_t boidCount) {
     wrapAroundBorders();
 }
 
-void Boid::update() {
+void Boid::update(float speedMultiplier) {
     velocity += acceleration;
-    velocity.limit(maxspeed);
+    velocity.limit(maxspeed * speedMultiplier);
     location += velocity;
     acceleration *= 0;
 }

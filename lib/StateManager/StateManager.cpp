@@ -13,6 +13,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 
   // Convert State to JSON
   json["power"] = _state.power;
+  json["autobrightness"] = _state.autobrightness;
   json["brightness"] = _state.brightness;
   json["mode"] = _state.mode;
 
@@ -139,10 +140,12 @@ void StateManager::restore() {
 
   // Convert JSON to State
   _state.power = json["power"].as<bool>();
+  _state.autobrightness = json["autobrightness"].as<bool>();
   _state.brightness = json["brightness"].as<uint8_t>();
   _state.mode = json["mode"].as<OpenMatrixMode>();
 
   log_i("Restored power: %d", _state.power);
+  log_i("Restored autobrightness: %d", _state.autobrightness);
   log_i("Restored brightness: %d", _state.brightness);
   log_i("Restored mode: %d", static_cast<int>(_state.mode));
 
@@ -234,6 +237,7 @@ void StateManager::restore() {
 void StateManager::setDefaultState() {
     // Basic state
     _state.power = false;
+    _state.autobrightness = true;
     _state.brightness = 100;
     _state.mode = OpenMatrixMode::AQUARIUM;
 
@@ -269,12 +273,12 @@ void StateManager::setDefaultState() {
     // MQTT
     _state.settings.mqtt.status = ConnectionStatus::DISCONNECTED;
     _state.settings.mqtt.host = "";
-    _state.settings.mqtt.port = "";
-    _state.settings.mqtt.client_id = "";
+    _state.settings.mqtt.port = "1883";
+    _state.settings.mqtt.client_id = "livegrid";
     _state.settings.mqtt.username = "";
     _state.settings.mqtt.password = "";
-    _state.settings.mqtt.co2_topic = "";
-    _state.settings.mqtt.matrix_text_topic = "";
+    _state.settings.mqtt.co2_topic = "livegrid/co2";
+    _state.settings.mqtt.matrix_text_topic = "livegrid/text";
     _state.settings.mqtt.show_text = false;
 
     // Home Assistant

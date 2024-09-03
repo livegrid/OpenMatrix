@@ -61,6 +61,7 @@ typedef enum {
 
 struct State {
     bool power = false;
+    bool autobrightness = false;
     uint8_t brightness = 255;
     OpenMatrixMode mode = AQUARIUM;
 
@@ -131,7 +132,7 @@ struct State {
         struct {
             eDmxProtocol protocol = S_ACN;
             bool multicast = true;
-            bool start_universe = true;
+            uint16_t start_universe = 1;
             uint16_t start_address = 1;
             eDmxMode mode = DMX_MODE_RGB;
             uint16_t timeout = 5000;

@@ -15,7 +15,7 @@ class TouchMenu {
   StateManager* stateManager;
   long touchThreshold;
   bool menuOpen = false;
-  bool sensorDataVisible = false;
+  bool sensorDataVisible = true;
   bool turnOff = false;
   bool WiFiInfoVisible = false;
   bool WiFiConnected = false;
@@ -46,14 +46,16 @@ class TouchMenu {
   void executeMenuItem(const std::string& selectedOption);
   void handleDoubleTap(uint8_t pin);
   void handleSingleTap(uint8_t pin);
-  void displayMenu();
+  bool startDemo = false;
 
  public:
-  TouchMenu(Matrix* matrix, TaskManager* taskManager, StateManager* stateManager, long touchThreshold = 10000);
+  TouchMenu(Matrix* matrix, StateManager* stateManager, long touchThreshold = 10000);
   void setupInterrupts();
   void update();
   bool isMenuOpen();
   bool isDisplayOn();
   bool showSensorData();
   bool showWiFiInfo();
+  void displayMenu();
+  bool shouldStartDemo();
 };
