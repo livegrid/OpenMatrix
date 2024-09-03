@@ -4,6 +4,11 @@
 //GENERAL SETTINGS
 #define PHYSICS_SCALE 50
 
+//AGE SETTINGS
+#define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
+#define FISH_LIFESPAN_VARIATION 0.2f  // Variation in lifespan (20% by default)
+
+
 #define NUM_FISH_START 20
 #define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 3

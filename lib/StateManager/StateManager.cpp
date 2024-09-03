@@ -215,7 +215,7 @@ void StateManager::restore() {
   // eDMX
   _state.settings.edmx.protocol = settings["edmx"]["protocol"].as<eDmxProtocol>();
   _state.settings.edmx.multicast = settings["edmx"]["multicast"].as<bool>();
-  _state.settings.edmx.start_universe = settings["edmx"]["start_universe"].as<bool>();
+  _state.settings.edmx.start_universe = settings["edmx"]["start_universe"].as<uint16_t>();
   _state.settings.edmx.start_address = settings["edmx"]["start_address"].as<uint16_t>();
   _state.settings.edmx.mode = settings["edmx"]["mode"].as<eDmxMode>();
   _state.settings.edmx.timeout = settings["edmx"]["timeout"].as<uint16_t>();
@@ -236,7 +236,7 @@ void StateManager::restore() {
 
 void StateManager::setDefaultState() {
     // Basic state
-    _state.power = false;
+    _state.power = true;
     _state.autobrightness = true;
     _state.brightness = 100;
     _state.mode = OpenMatrixMode::AQUARIUM;
@@ -288,7 +288,7 @@ void StateManager::setDefaultState() {
     // eDMX
     _state.settings.edmx.protocol = eDmxProtocol::S_ACN;
     _state.settings.edmx.multicast = true;
-    _state.settings.edmx.start_universe = true;
+    _state.settings.edmx.start_universe = 1;
     _state.settings.edmx.start_address = 1;
     _state.settings.edmx.mode = eDmxMode::DMX_MODE_RGB;
     _state.settings.edmx.timeout = 5000;

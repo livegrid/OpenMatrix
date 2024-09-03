@@ -11,11 +11,13 @@
 #include <ElegantOTA.h>
 #include "MQTTManager.h"
 #include <ESPmDNS.h>
-
+#include "Edmx.h"
 
 class WebServerManager {
 public:
-    WebServerManager(Matrix* matrix, EffectManager* effectManager, ImageDraw* imageDraw, StateManager* stateManager, TaskManager* taskManager);
+    WebServerManager(Matrix* matrix, EffectManager* effectManager,
+                     ImageDraw* imageDraw, StateManager* stateManager,
+                     TaskManager* taskManager);
     void begin();
     void handleClient();
     void setupUniqueHostname();

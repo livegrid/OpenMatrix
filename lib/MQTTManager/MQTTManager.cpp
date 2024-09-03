@@ -169,7 +169,7 @@ void MQTTManager::publishHomeAssistantConfig() {
   publish(textDiscoveryTopic, 0, true, textPayload); // Ensure retain flag is true
 }
 
-void MQTTManager::publishSensorData(float temperature, float humidity, int co2) {
+void MQTTManager::publishSensorData(float temperature, float humidity, int co2, const char* topic) {
   JsonObject doc;
   doc["temperature"] = String(temperature, 2); // Limit to 2 decimal places
   doc["humidity"] = humidity;
@@ -178,7 +178,7 @@ void MQTTManager::publishSensorData(float temperature, float humidity, int co2) 
   char payload[128];
   serializeJson(doc, payload);
 
-  publish("homeassistant/sensor/livegrid/state", 0, false, payload);
+  publish(topic, 0, false, payload);
 }
 
 void MQTTManager::checkSettingsAndReconnect() {

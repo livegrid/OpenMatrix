@@ -39,7 +39,7 @@ void TouchMenu::executeMenuItem(const std::string& selectedOption) {
     // Add action for Start WiFi
   } else if (selectedOption == "Turn Off") {
     menuOpen = false;
-    turnOff = true;
+    stateManager->getState()->power = false;
   } else if (selectedOption == "Stop WiFi") {
     // Add action for Stop WiFi
   } else if (selectedOption == "Show WiFi Info") {
@@ -52,12 +52,20 @@ void TouchMenu::executeMenuItem(const std::string& selectedOption) {
 }
 
 void TouchMenu::handleDoubleTap(uint8_t pin) {
+  if (stateManager->getState()->power == false) {
+    stateManager->getState()->power = true;
+    return;
+  }
   if(!menuOpen) {
     menuOpen = true;
   }
   log_i(" --- T%d Double Tap", pin - 10);
 }
 void TouchMenu::handleSingleTap(uint8_t pin) {
+  if (!stateManager->getState()->power) {
+    stateManager->getState()->power = true;
+    return;
+  }
   if (menuOpen) {
     std::vector<std::string> currentItemList = getItemList();
     if (confirmationRequired) {

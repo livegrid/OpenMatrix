@@ -36,14 +36,8 @@ public:
   Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, uint8_t health = 1)
   : matrix(matrix), pos(pos), age(age){ // Member initializer list{ // Default constructor
     BodyFactory bodyFactory(matrix);
+    initializeAgingRate();
     // this->body = std::unique_ptr<Body>(bodyFactory.createRandomBody());
-
-    // std::vector<BodyMotionType> types = {
-    //   {"Fish", "Fish", 1},
-    //   {"Star", "Star", 0},
-    //   {"Turtle", "Turtle", 0},
-    //   {"Snake", "Snake", 0}
-    // };
 
     std::vector<BodyMotionType> types = {
       {"Fish", "Fish", 0.5},
@@ -122,13 +116,21 @@ public:
 
 private:
   unsigned long lastUpdateTime = millis();
+  float agingRate;
+  
+  void initializeAgingRate() {
+    float baseRate = 1.0f / (FISH_LIFESPAN_DAYS * 24 * 60 * 60 * 1000);  // Convert days to milliseconds
+    float variation = FISH_LIFESPAN_VARIATION * ((float)random(200) / 100.0f - 1.0f);  // Random variation between -20% and +20%
+    agingRate = baseRate * (1.0f + variation);
+  }
+
   void updateAge(long co2) {
     unsigned long currentTime = millis();
     float timeDiff = currentTime - lastUpdateTime;
     if (co2 < 2000) {
-      age += timeDiff / 60000.0; // Increment age based on the elapsed time to reach 1.0 in 600,000 ms (10 minutes)
+      age += timeDiff * agingRate;
     }
-    lastUpdateTime = currentTime; // Update the lastUpdateTime to the current time
+    lastUpdateTime = currentTime;
   }
 
   BodyMotionType selectType(const std::vector<BodyMotionType>& types) {

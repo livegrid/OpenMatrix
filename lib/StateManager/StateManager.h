@@ -130,11 +130,11 @@ struct State {
             bool show_text = false;
         } home_assistant;
         struct {
-            eDmxProtocol protocol = S_ACN;
+            eDmxProtocol protocol = eDmxProtocol::S_ACN;
             bool multicast = true;
             uint16_t start_universe = 1;
             uint16_t start_address = 1;
-            eDmxMode mode = DMX_MODE_RGB;
+            eDmxMode mode = eDmxMode::DMX_MODE_RGB;
             uint16_t timeout = 5000;
         } edmx;
     } settings;

@@ -62,7 +62,7 @@ ImageDraw imageDraw(&matrix);
 TextDraw textDraw(&matrix);
 
 #include "Edmx.h"
-Edmx dmx(&matrix, &stateManager);
+Edmx& dmx = Edmx::getInstance();
 
 #include "MQTTManager.h"
 
@@ -119,78 +119,84 @@ void displayTask(void* parameter) {
   for (;;) {
     unsigned long currentTime = millis();
 
-    if (currentMode != stateManager.getState()->mode) {
-      if (currentMode == OpenMatrixMode::IMAGE) {
-        imageDraw.closeGIF();
+    if (stateManager.getState()->power) {
+      if (currentMode != stateManager.getState()->mode) {
+        if (currentMode == OpenMatrixMode::IMAGE) {
+          imageDraw.closeGIF();
+        }
+        currentMode = stateManager.getState()->mode;
+        switch (currentMode) {
+          case OpenMatrixMode::EFFECT:
+            effectManager.setEffect(stateManager.getState()->effects.selected -
+                                    1);
+            break;
+          case OpenMatrixMode::IMAGE:
+            imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
+            break;
+          case OpenMatrixMode::TEXT:
+            textDraw.setSize(stateManager.getState()->text.size);
+            textDraw.drawText(stateManager.getState()->text.payload);
+            break;
+        }
       }
-      currentMode = stateManager.getState()->mode;
-      switch (currentMode) {
-        case OpenMatrixMode::EFFECT:
-          effectManager.setEffect(stateManager.getState()->effects.selected -
-                                  1);
-          break;
-        case OpenMatrixMode::IMAGE:
-          imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
-          break;
-        case OpenMatrixMode::TEXT:
-          textDraw.setSize(stateManager.getState()->text.size);
-          textDraw.drawText(stateManager.getState()->text.payload);
-          break;
+
+      if (touchMenu.shouldStartDemo()) {
+        aquarium.startDemo();
       }
-    }
 
-    if (touchMenu.shouldStartDemo()) {
-      aquarium.startDemo();
-    }
-
-    if (touchMenu.isMenuOpen()) {
-      touchMenu.displayMenu();
-    } else {
-      switch (stateManager.getState()->mode) {
-        case OpenMatrixMode::EFFECT:
-          effectManager.updateCurrentEffect();
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::IMAGE:
-          imageDraw.showGIF();
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::TEXT:
-          textDraw.setSize(stateManager.getState()->text.size);
-          textDraw.drawText(stateManager.getState()->text.payload);
-          matrix.background->display();
-          break;
-        case OpenMatrixMode::AQUARIUM:
-          aquarium.update();
-          aquarium.display(touchMenu.showSensorData());
-          break;
-        case OpenMatrixMode::DMX:
-          dmx.update();
-          break;
-        default:
-          break;
+      if (touchMenu.isMenuOpen()) {
+        touchMenu.displayMenu();
+      } else {
+        switch (stateManager.getState()->mode) {
+          case OpenMatrixMode::EFFECT:
+            effectManager.updateCurrentEffect();
+            matrix.background->display();
+            break;
+          case OpenMatrixMode::IMAGE:
+            imageDraw.showGIF();
+            matrix.background->display();
+            break;
+          case OpenMatrixMode::TEXT:
+            textDraw.setSize(stateManager.getState()->text.size);
+            textDraw.drawText(stateManager.getState()->text.payload);
+            matrix.background->display();
+            break;
+          case OpenMatrixMode::AQUARIUM:
+            aquarium.update();
+            aquarium.display(touchMenu.showSensorData());
+            break;
+          case OpenMatrixMode::DMX:
+            dmx.update();
+            break;
+          default:
+            break;
+        }
       }
-    }
 
-    #ifdef PANEL_UPCYCLED
-    if (currentTime - lastRefreshTime >= refreshInterval) {
-      log_i("Refreshing Matrix Config");
-      matrix.refreshMatrixConfig();
-      lastRefreshTime = currentTime;
-    } else {
+#ifdef PANEL_UPCYCLED
+      if (currentTime - lastRefreshTime >= refreshInterval) {
+        log_i("Refreshing Matrix Config");
+        matrix.refreshMatrixConfig();
+        lastRefreshTime = currentTime;
+      } else {
+        matrix.update();
+      }
+#else
       matrix.update();
+#endif
+
+      frameCount++;
+
+      if (millis() - lastLogTime >= 30000) {
+        float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
+        // TaskManager::getInstance().printTaskInfo();
+        lastLogTime = currentTime;
+        frameCount = 0;
+      }
     }
-    #else
-    matrix.update();
-    #endif
-
-    frameCount++;
-
-    if (millis() - lastLogTime >= 30000) {
-      float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
-      // TaskManager::getInstance().printTaskInfo();
-      lastLogTime = currentTime;
-      frameCount = 0;
+    else {
+      matrix.clearScreen();
+      matrix.update();
     }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -248,6 +254,9 @@ void mqttTask(void* parameter) {
       int co2 = stateManager.getState()->environment.co2.value;
 
       mqttManager.publishSensorData(temperature, humidity, co2);
+      mqttManager.publishSensorData(
+          temperature, humidity, co2,
+          stateManager.getState()->settings.mqtt.co2_topic.c_str());
       log_v("MQTT: Sent sensor data to Home Assistant");
     } else {
       log_v("MQTT: Not connected, skipping message");
@@ -264,7 +273,9 @@ void sensorTask(void* parameter) {
   for (;;) {
 #ifdef BH1750_ENABLED
     autoBrightness.updateSensorValues();
-    matrix.setBrightness(autoBrightness.matrixBrightness());
+    if (stateManager.getState()->autobrightness) {
+      matrix.setBrightness(autoBrightness.matrixBrightness());
+    }
 #endif
     vTaskDelay(pdMS_TO_TICKS(5));  // 5 milliseconds delay
 
@@ -335,7 +346,8 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   webServerManager.begin();
-  dmx.begin();
+  dmx.begin(&matrix,
+            &stateManager);  // Initialize E1.31 after WiFi is connected
 #endif
 
   // Initialize MQTT
@@ -351,4 +363,14 @@ void setup(void) {
 
 void loop(void) {
   vTaskDelete(NULL);  // Delete the task running the loop function
+}
+
+// Add this function near the top of the file
+void waitForWiFiConnection() {
+  log_i("Waiting for WiFi connection...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    log_i(".");
+  }
+  log_i("WiFi connected. IP address: %s", WiFi.localIP().toString().c_str());
 }

@@ -1,8 +1,7 @@
 #include "WebServerManager.h"
 
 WebServerManager::WebServerManager(Matrix* matrix, EffectManager* effectManager,
-                                   ImageDraw* imageDraw,
-                                   StateManager* stateManager,
+                                   ImageDraw* imageDraw, StateManager* stateManager,
                                    TaskManager* taskManager)
     : matrix(matrix),
       effectManager(effectManager),
@@ -123,14 +122,13 @@ void WebServerManager::setupInterface() {
   interface.onPower([this](bool state) {
     stateManager->getState()->power = state;
     stateManager->save();
-    // TODO: Change matrix power state
     log_i("Power state changed to: %s", state ? "ON" : "OFF");
+    stateManager->save();
   });
 
   interface.onAutoBrightness([this](bool state) {
     stateManager->getState()->autobrightness = state;
     stateManager->save();
-    // TODO: Change matrix power state
     log_i("Autobrightness state changed to: %s", state ? "ON" : "OFF");
   });
 
@@ -141,6 +139,7 @@ void WebServerManager::setupInterface() {
     stateManager->save();
     matrix->setBrightness(value);
     log_i("Brightness changed to: %d", value);
+    stateManager->save();
   });
 
   interface.onMode([this](OpenMatrixMode mode) {
@@ -148,6 +147,7 @@ void WebServerManager::setupInterface() {
       stateManager->getState()->mode = mode;
       stateManager->save();
       log_i("Mode changed to: %d", static_cast<int>(mode));
+      stateManager->save();
     }
   });
 
@@ -183,7 +183,6 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->text.size = size;
     stateManager->getState()->mode = OpenMatrixMode::TEXT;
     stateManager->save();
-    // TODO: Update matrix text
     log_i("Text changed to: (%d) %s", size, payload.c_str());
   });
 
@@ -207,6 +206,7 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.mqtt.show_text = show_text;
     
     MQTTManager::getInstance().checkSettingsAndReconnect();
+    stateManager->save();
 
     // TODO: Do something with these MQTT settings     
   });
@@ -215,7 +215,7 @@ void WebServerManager::setupInterface() {
     eDmxProtocol protocol,
     eDmxMode mode,
     bool multicast,
-    bool start_universe,
+    uint16_t start_universe,
     uint16_t start_address,
     uint16_t timeout
   ) {
@@ -227,7 +227,8 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.edmx.timeout = timeout;
     stateManager->save();
 
-    // TODO: Do something with these DMX settings
+    // Apply the new settings to the Edmx instance
+    Edmx::getInstance().applySettings();
   });
 
   interface.onHomeAssistantSettings([this](
@@ -240,7 +241,8 @@ void WebServerManager::setupInterface() {
   });
 
   interface.onNetworkReset([this]() {
-    // TODO: Reset network (NetWizard)
+    log_i("[*] Resetting network");
+    nw.reset();
   });
 }
 

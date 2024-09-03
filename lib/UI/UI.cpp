@@ -233,7 +233,7 @@ void UI::begin() {
     });
 
     // on dmx settings
-    _server->on("/openmatrix/settings/dmx", HTTP_POST, [&]() {
+    _server->on("/openmatrix/settings/edmx", HTTP_POST, [&]() {
         JsonDocument json;
         DeserializationError err = deserializeJson(json, _server->arg("plain"));
         if (err == DeserializationError::Ok) {
