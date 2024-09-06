@@ -23,8 +23,8 @@ public:
     static float randomf();
     static float mapfloat(float x, float in_min, float in_max, float out_min, float out_max);
 
-    void run(Boid boids[], uint8_t boidCount);
-    void update(float speedMultiplier = 1.0);
+    void run(Boid boids[], uint8_t boidCount, float speedMultiplier = 1.0);
+    void update(float speedMultiplier);
     void applyForce(PVector force);
     void repelForce(PVector obstacle, float radius);
     void flock(Boid boids[], uint8_t boidCount);

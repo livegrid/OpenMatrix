@@ -62,7 +62,7 @@ ImageDraw imageDraw(&matrix);
 TextDraw textDraw(&matrix);
 
 #include "Edmx.h"
-Edmx dmx(&matrix, &stateManager);
+Edmx& dmx = Edmx::getInstance();
 
 #include "MQTTManager.h"
 
@@ -301,7 +301,8 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   webServerManager.begin();
-  dmx.begin();
+  dmx.begin(&matrix,
+            &stateManager);  // Initialize E1.31 after WiFi is connected
 #endif
 
   // Initialize MQTT

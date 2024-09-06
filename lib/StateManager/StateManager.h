@@ -142,7 +142,7 @@ struct State {
 
 class StateManager {
     public:
-        StateManager();
+        StateManager(unsigned long saveIntervalinMinutes = 10);
         State* getState();
         void serialize(String& buffer, bool settings_only = false);
         void save();
@@ -155,5 +155,5 @@ class StateManager {
         static void saveTask(void* parameter);
                 
         void setDefaultState();
-        static const uint32_t SAVE_INTERVAL = 600000; // 60 seconds in milliseconds
+        unsigned long SAVE_INTERVAL;
 };

@@ -45,7 +45,7 @@ AutoBrightness autoBrightness(&matrix);
 AutoRotate autoRotate(&matrix);
 #endif
 
-StateManager stateManager;
+StateManager stateManager(STATE_SAVE_INTERVAL);
 
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
@@ -313,6 +313,8 @@ void setup(void) {
   matrix.setBrightness(stateManager.getState()->brightness);
   // Start periodic save task
   stateManager.startPeriodicSave();
+
+  aquarium.begin();
 
 #ifdef SCD40_ENABLED
   scd40.init();

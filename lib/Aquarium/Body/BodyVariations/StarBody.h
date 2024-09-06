@@ -21,11 +21,11 @@ class StarBody : public Body {
 
     colorPalette = new ColorPalette(3);
     nodes = random(0, 2);
+    type = "Star";
   }
 
   void display() override {
     starAngle += vel.mag() * rotationSpeed;
-    colorPalette->adjustColorbyAge(size);
     PVector pt1 = PVector::fromAngle(starAngle);
     pt1.setMag(length * 2 * size);
 

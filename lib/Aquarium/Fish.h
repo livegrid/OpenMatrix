@@ -12,14 +12,17 @@
 #include "Motion/MotionFactory.h"
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
+#include "AquariumSettings.h"
 
 //Probably not a good idea to create a new BodyFactory for every fish
 
 class Fish {
   PVector pos;
   float age;
+  float health;
   Matrix* matrix = nullptr;
   BodyFactory* bodyFactory = nullptr;
+  uint8_t offspringCount = 0;
 
   std::unique_ptr<Motion> motion;  // Use smart pointer for automatic memory management
   std::unique_ptr<Body> body;
@@ -27,14 +30,44 @@ class Fish {
   Food* food = nullptr;
 
   struct BodyMotionType {
-    std::string bodyType;
-    std::string motionType;
+    String bodyType;
+    String motionType;
     double probability;
   };
 
 public:
-  Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, uint8_t health = 1)
-  : matrix(matrix), pos(pos), age(age){ // Member initializer list{ // Default constructor
+
+  struct FishDefinition {
+    float age;
+    float health;
+    String bodyType;
+    String headType;
+    String tailType;
+    String finType;
+    String motionType;
+    std::vector<CHSV> colors;
+  };
+
+  FishDefinition fishDefinition;
+  const std::vector<CHSV>& getColorsHSV() const { return body->getColorPaletteHSV(); }
+
+  Fish(Matrix* matrix, const FishDefinition& fishDef)
+  : matrix(matrix), pos(PVector(0,0)), age(fishDef.age), health(fishDef.health) { // Member initializer list
+    BodyFactory bodyFactory(matrix);
+    initializeAgingRate();
+
+    this->body = std::unique_ptr<Body>(bodyFactory.createBody(fishDef.bodyType, fishDef.headType, fishDef.tailType, fishDef.finType));
+    this->motion = MotionFactory::createMotion(fishDef.motionType, pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE);
+    
+    if (!fishDef.colors.empty()) {
+        body->setColorPaletteHSV(fishDef.colors);
+    }
+
+    fishDefinition = fishDef;
+  }
+
+  Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, float health = 1)
+  : matrix(matrix), pos(pos), age(age), health(health) {
     BodyFactory bodyFactory(matrix);
     initializeAgingRate();
     // this->body = std::unique_ptr<Body>(bodyFactory.createRandomBody());
@@ -50,15 +83,25 @@ public:
 
     this->body = std::unique_ptr<Body>(bodyFactory.createBody(selectedType.bodyType));
     this->motion = MotionFactory::createMotion(selectedType.motionType, pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE);
-    bodyFactory.~BodyFactory();
+
+    fishDefinition = {
+      age,
+      health,
+      selectedType.bodyType,
+      this->body->getHeadType(),
+      this->body->getTailType(),
+      this->body->getFinType(),
+      selectedType.motionType
+    };
   }
   // ~Fish(); // Destructor
 
-  bool update(long co2 = 600) {
-    motion->update(age, co2);
+  bool update(long co2 = 600, bool stayInside = false) {
+    motion->update(age, co2, stayInside);
     pos = motion->getPosition() / PHYSICS_SCALE;
-    body->update(pos, motion->getVelocity(), motion->getAngle(), age, co2);
     updateAge(co2);
+    updateHealth(co2);
+    body->update(pos, motion->getVelocity(), motion->getAngle(), age, health);
     if(food != nullptr) {
       PVector foodDistance = food->getPosition() - pos;
       if(food->isOffScreen()) {
@@ -70,7 +113,7 @@ public:
       }
       else {
         motion->followFood(food->getPosition() * PHYSICS_SCALE);
-        // matrix->foreground->drawLine(pos.x,pos.y,food->getPosition().x,food->getPosition().y,255,0,0); 
+        // matrix->foreground->drawLine(pos.x,pos.y,food->getPosition().x,food->getPosition().y, CRGB(255,0,0)); 
       }
     }
     if (age > 1.0) age = 0;
@@ -78,13 +121,15 @@ public:
   }
 
   bool tryReproduce() {
-    // Simple reproduction chance based on age
-    // Fish can only reproduce if they're between 0.3 and 0.7 age
-    if (age > 0.5 && age < 0.9) {
+    // Fish can only reproduce if they're between 0.5 and 0.9 age and have less than 2 offspring
+    if (age > 0.5 && age < 0.9 && offspringCount < 2) {
       auto seed = std::chrono::system_clock::now().time_since_epoch().count();
       std::mt19937 gen(seed);
       std::uniform_real_distribution<> dis(0.0, 1.0);
-      return dis(gen) < 0.01;  // 1% chance of reproduction per update
+      if (dis(gen) < 0.01) {  // 1% chance of reproduction per update
+        offspringCount++;  // Increment offspring count
+        return true;
+      }
     }
     return false;
   }
@@ -106,13 +151,19 @@ public:
   }
 
   void setFood(Food* assignedFood) {
-    // motion->setFood(food);
     food = assignedFood;
   }
 
   Food* getFood() {
     return food;
   }
+
+  float getHealth() const { return health; }
+  String getBodyType() const { return fishDefinition.bodyType; }
+  String getHeadType() const { return fishDefinition.headType; }
+  String getTailType() const { return fishDefinition.tailType; }
+  String getFinType() const { return fishDefinition.finType; }
+  String getMotionType() const { return fishDefinition.motionType; }
 
 private:
   unsigned long lastUpdateTime = millis();
@@ -131,6 +182,18 @@ private:
       age += timeDiff * agingRate;
     }
     lastUpdateTime = currentTime;
+  }
+
+  void updateHealth(long co2) {
+    if (co2 >= CO2_REALBAD) {
+      health -= HEALTH_REDUCTION_RATE_REALBAD;
+    } else if (co2 >= CO2_BAD) {
+      health -= HEALTH_REDUCTION_RATE_BAD;
+    }
+    else if (co2 < CO2_BAD) {
+      health += HEALTH_INCREASE_RATE_GOOD;
+    }
+    health = max(0.0f, min(1.0f, health));
   }
 
   BodyMotionType selectType(const std::vector<BodyMotionType>& types) {

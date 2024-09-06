@@ -9,7 +9,7 @@
 
 class MotionFactory {
 public:
-    static std::unique_ptr<Motion> createMotion(const std::string& type, PVector pos, uint16_t xResolution, uint16_t yResolution) {
+    static std::unique_ptr<Motion> createMotion(const String& type, PVector pos, uint16_t xResolution, uint16_t yResolution) {
         if (type == "Fish") {
             return std::make_unique<FishMotion>(pos, xResolution, yResolution);
         }

@@ -10,13 +10,15 @@ protected:
 
 public:
   Head(Matrix* m) : matrix(m) {}
-
+  String type;
   virtual void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) = 0;
 };
 
 class TriangleHead : public Head {
 public:
-  TriangleHead(Matrix* m) : Head(m) {}
+  TriangleHead(Matrix* m) : Head(m) {
+    type = "TriangleHead";
+  }
 
   void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector pt1 = PVector::fromAngle(angle);
@@ -36,7 +38,10 @@ public:
 
 class FrogHead : public Head {
 public:
-  FrogHead(Matrix* m) : Head(m) {}
+  FrogHead(Matrix* m) : Head(m) {
+    type = "FrogHead";
+  }
+
   void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector heading = PVector::fromAngle(angle);
     heading *= 0.5;
@@ -56,7 +61,9 @@ public:
 class NeedleHead : public Head {
   uint8_t noseLengthMultiplier = random(FISH_NEEDLE_NOSE_LENGTH_MULTIPLIER);
 public:
-  NeedleHead(Matrix* m) : Head(m) {}
+  NeedleHead(Matrix* m) : Head(m) {
+    type = "NeedleHead";
+  }
 
   void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector pt1 = PVector::fromAngle(angle);

@@ -10,13 +10,16 @@ protected:
 
 public:
   Fin(Matrix* m) : matrix(m) {}
+  String type;
   virtual void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) = 0;
 };
 
 class TriangleFin : public Fin {
   uint8_t varY = random(0,5);
-public:
-  TriangleFin(Matrix* m) : Fin(m) {}
+  public:
+  TriangleFin(Matrix* m) : Fin(m) {
+    type = "TriangleFin";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
     PVector heading = PVector::fromAngle(angle);
@@ -42,7 +45,9 @@ public:
 
 class EllipseFin : public Fin {
 public:
-  EllipseFin(Matrix* m) : Fin(m) {}
+  EllipseFin(Matrix* m) : Fin(m) {
+    type = "EllipseFin";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
     matrix->foreground->drawCircleArray(pos.x, pos.y, size*3, size/3, angle, CRGB(r, g, b));
@@ -71,7 +76,9 @@ public:
 
 class RoundFin : public Fin {
 public:
-  RoundFin(Matrix* m) : Fin(m) {}
+  RoundFin(Matrix* m) : Fin(m) {
+    type = "RoundFin";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
     // PVector heading = PVector::fromAngle(angle);

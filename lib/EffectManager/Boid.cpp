@@ -26,9 +26,9 @@ float Boid::mapfloat(float x, float in_min, float in_max, float out_min, float o
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-void Boid::run(Boid boids[], uint8_t boidCount) {
+void Boid::run(Boid boids[], uint8_t boidCount, float speedMultiplier) {
     flock(boids, boidCount);
-    update();
+    update(speedMultiplier);
     wrapAroundBorders();
 }
 

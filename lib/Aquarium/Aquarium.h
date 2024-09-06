@@ -2,16 +2,19 @@
 #define AQUARIUM_H
 
 #include <Arduino.h>
+#include <Fonts\Font4x7Fixed.h>
 #include <Matrix.h>
 #include <scd40.h>
+
 #include <vector>
+
 #include "AquariumSettings.h"
+#include "AquariumStateManager.h"
+#include "BoidManager.h"
 #include "Fish.h"
 #include "Food.h"
 #include "Plants.h"
 #include "Water.h"
-#include "BoidManager.h"
-#include <Fonts\Font4x7Fixed.h>
 
 class Aquarium {
  private:
@@ -22,7 +25,10 @@ class Aquarium {
   std::vector<std::unique_ptr<Plants>> plantArray;
   std::vector<std::unique_ptr<Food>> foodArray;
   BoidManager boidManager;
-  
+  AquariumStateManager stateManager;
+  unsigned long lastSaveTime;
+  char buffer[100];
+
   // Demo settings
   bool demoMode;
   int demoStep;
@@ -31,10 +37,19 @@ class Aquarium {
   float demoHumidity;
   float demoCO2;
 
+  enum class TextAlignment { LEFT, CENTER, RIGHT };
+
  public:
-  // Constructor that initializes the matrix and water
-  Aquarium(Matrix* m, SCD40* s) : matrix(m), water(matrix), scd40(s), boidManager(m), demoMode(false), demoStep(0) {
-    initializeFish();
+  Aquarium(Matrix* m, SCD40* s)
+      : matrix(m),
+        scd40(s),
+        water(matrix),
+        boidManager(m),
+        demoMode(false),
+        demoStep(0) {}
+
+  void begin() {
+    loadState();
     initializePlants();
     boidManager.initializeBoids();
   }
@@ -49,29 +64,150 @@ class Aquarium {
   }
 
   void updateDemo() {
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = currentTime - demoStartTime;
+
+  // Define step durations in milliseconds
+  const unsigned long stepDurations[] = {
+    5000,  // 0 - Welcome to Livegrid
+    5000,  // 1 - Your very own aquatic ecosystem
+    5000,  // 2 - You start with 5 fish
+    5000,  // 3 - They will slowly grow, and reproduce
+    5000,  // 4 - But they are affected by the environment
+    5000,  // 5 - Temperature affects water color
+    15000, // 6 - show
+    5000,  // 7 - Humidity affects plant growth
+    15000, // 8 - show
+    5000,  // 9 - CO2 affects fish behavior
+    20000, // 10 - show
+    5000,  // 11 - If your environment is good, they will thrive
+    5000,  // 12 - And soon you will have an amazing ecosystem
+    5000,  // 13 - Take care of them by taking care of yourself
+    5000   // 14 - Enjoy
+  };
+
+  // Calculate current step and time within step
+  unsigned long totalDuration = 0;
+  for (demoStep = 0; demoStep < sizeof(stepDurations) / sizeof(stepDurations[0]); demoStep++) {
+    if (elapsedTime < totalDuration + stepDurations[demoStep]) {
+      break;
+    }
+    totalDuration += stepDurations[demoStep];
+  }
+
+  unsigned long stepElapsedTime = elapsedTime - totalDuration;
+
+  auto pausingSine = [](float t, float pauseDuration) {
+    float sineValue = sin(t);
+    if (abs(sineValue) < 0.1) {  // Pause near the midpoint
+      return 0.0f;
+    }
+    return sineValue;
+  };
+
+  float t;
+
+  // Update demo values and display text based on the current step
+  switch (demoStep) {
+    case 0:
+      snprintf(buffer, sizeof(buffer), "Welcome to\nLivegrid");
+      break;
+    case 1:
+      snprintf(buffer, sizeof(buffer), "Your very own\naquatic\necosystem");
+      break;
+    case 2:
+      snprintf(buffer, sizeof(buffer), "You start\nwith 5 fish");
+      break;
+    case 3:
+      snprintf(buffer, sizeof(buffer), "They will\nslowly grow,\nand reproduce");
+      break;
+    case 4:
+      snprintf(buffer, sizeof(buffer), "But they are\naffected by the\nenvironment");
+      break;
+    case 5:
+      snprintf(buffer, sizeof(buffer), "Temperature\naffects\nwater color");
+      updateWater();
+      break;
+    case 6:
+      t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
+      demoTemperature = 25.0f + 25.0f * pausingSine(t, 0.2);
+      snprintf(buffer, sizeof(buffer), "Temperature:\n%.1f C", demoTemperature);
+      updateWater();
+      break;
+    case 7:
+      snprintf(buffer, sizeof(buffer), "Humidity\naffects\nplant growth");
+      updateWater();
+      updatePlants();
+      break;
+    case 8:
+      t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
+      demoHumidity = 50.0f + 40.0f * pausingSine(t, 0.2);
+      snprintf(buffer, sizeof(buffer), "Humidity:\n%.0f %%", demoHumidity);
+      updateWater();
+      updatePlants();
+      break;
+     case 9:
+      snprintf(buffer, sizeof(buffer), "CO2 affects\nfish behavior");
+      updateWater();
+      updateFish();
+      updatePlants();
+      break;
+    case 10:
+      t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
+      demoCO2 = 1200.0f + 800.0f * pausingSine(t, 0.2);
+      snprintf(buffer, sizeof(buffer), "CO2:\n%.0f ppm", demoCO2);
+      updateWater();
+      updateFish();
+      updatePlants();
+      break;
+    case 11:
+      snprintf(buffer, sizeof(buffer), "If your\nenvironment\nis good,\nthey will thrive");
+      break;
+    case 12:
+      snprintf(buffer, sizeof(buffer), "And soon you\nwill have an\namazing\necosystem");
+      break;
+    case 13:
+      snprintf(buffer, sizeof(buffer), "Take care of\nthem by taking\ncare of\nyourself");
+      break;
+    case 14:
+      snprintf(buffer, sizeof(buffer), "Enjoy");
+      break;
+    default:
+      demoMode = false;
+      return;
+  }
+
+  if (demoStep < 5 || demoStep > 10) {
+    updateWater();
+    boidManager.updateBoids(demoCO2);
+    boidManager.renderBoids();
+    updateFish();
+    updateFood();
+    updatePlants();
+  }
+
+  drawMultilineText(matrix->foreground, buffer, MIDDLE,
+                    TextAlignment::CENTER, &Font4x7Fixed,
+                    CRGB(150, 150, 150));
+}
+
+  void loadState() {
+    if (!stateManager.loadState(fishArray, matrix)) {
+      log_w("Failed to load aquarium state, initializing with default values");
+      initializeFish();
+    }
+  }
+
+  void saveState() {
+    stateManager.saveState(fishArray);
+    log_i("Aquarium state saved");
+  }
+
+  void periodicSave() {
     unsigned long currentTime = millis();
-    unsigned long elapsedTime = currentTime - demoStartTime;
-
-    // Each step lasts 60 seconds
-    const unsigned long stepDuration = 20000;
-    
-    // Calculate the current demo step
-    demoStep = (elapsedTime / stepDuration) % 4;
-
-    // Update demo values based on the current step
-    switch (demoStep) {
-      case 0: // Temperature swing
-        demoTemperature = 25.0f + 25.0f * sin(2 * PI * elapsedTime / stepDuration);
-        break;
-      case 1: // Humidity swing
-        demoHumidity = 50.0f + 40.0f * sin(2 * PI * elapsedTime / stepDuration);
-        break;
-      case 2: // CO2 swing
-        demoCO2 = 400.0f + 1600.0f * sin(2 * PI * elapsedTime / stepDuration);
-        break;
-      case 3: // Return to normal
-        demoMode = false;
-        break;
+    if (currentTime - lastSaveTime >= AQUARIUM_SAVE_INTERVAL*60000) {
+      stateManager.saveState(fishArray);
+      lastSaveTime = currentTime;
     }
   }
 
@@ -80,8 +216,11 @@ class Aquarium {
     PVector centerPos(matrix->getXResolution() / 2,
                       matrix->getYResolution() / 2);
     for (int i = 0; i < NUM_FISH_START; i++) {
-      fishArray.emplace_back(std::make_unique<Fish>(
-          matrix, centerPos, random(0, 100) / 100.0));
+      fishArray.emplace_back(
+          std::make_unique<Fish>(matrix,
+                                 PVector(random(0, matrix->getXResolution()),
+                                         random(0, matrix->getYResolution())),
+                                 0.5));
     }
   }
 
@@ -119,7 +258,10 @@ class Aquarium {
 
   // Update all plants in the aquarium
   void updatePlants() {
-    float humidity = demoMode ? demoHumidity : (scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
+    float humidity =
+        demoMode
+            ? demoHumidity
+            : (scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
     for (auto& plant : plantArray) {
       plant->update(humidity);
     }
@@ -127,15 +269,20 @@ class Aquarium {
 
   // Update the water environment
   void updateWater() {
-    float temperature = demoMode ? demoTemperature : (scd40->isFirstReadingReceived() ? scd40->getTemperature() : 25);
+    float temperature =
+        demoMode
+            ? demoTemperature
+            : (scd40->isFirstReadingReceived() ? scd40->getTemperature() : 25);
     water.update(temperature);
   }
 
   // Update all fish in the aquarium
   void updateFish() {
-    float co2 = demoMode ? demoCO2 : (scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
+    float co2 = demoMode
+                    ? demoCO2
+                    : (scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
     for (auto it = fishArray.begin(); it != fishArray.end();) {
-      bool destroy = (*it)->update(co2);
+      bool destroy = (*it)->update(co2, demoMode);
       if (destroy) {
         it = fishArray.erase(it);
       } else {
@@ -150,8 +297,7 @@ class Aquarium {
       for (auto& fish : fishArray) {
         if (fish->tryReproduce()) {
           PVector newPos = fish->getPosition();
-          fishArray.emplace_back(
-              std::make_unique<Fish>(matrix, newPos));
+          fishArray.emplace_back(std::make_unique<Fish>(matrix, newPos));
           break;  // Only add one fish per update cycle
         }
       }
@@ -171,7 +317,7 @@ class Aquarium {
   }
 
   void handleTouchInput() {
-    if (touchRead(13) / 1000 > 70) {
+    if (touchRead(13) / 1000 > FOOD_TOUCH_THRESHOLD) {
       addFood();
     }
   }
@@ -182,45 +328,34 @@ class Aquarium {
 
     if (demoMode) {
       updateDemo();
-      switch (demoStep) {
-        case 0:
-          updateWater();
-          break;
-        case 1:
-          updateWater();
-          updatePlants();
-          break;
-        case 2:
-          updateWater();
-          updateFish();
-          updateWater();
-          break;
-      }
     } else {
       updateWater();
-      boidManager.updateBoids();  // Update Boids
-      boidManager.renderBoids();  // Render Boids
+      boidManager.updateBoids(scd40->getCO2());  // Update Boids
+      boidManager.renderBoids();                 // Render Boids
       updateFish();
       updateFood();
       updatePlants();
+      periodicSave();
     }
   }
 
   void display(bool showSensorData) {
-    // matrix->gfx_compositor->StackWithThreshold(*matrix->background, *matrix->foreground, 12);
-    if (showSensorData) {
-      if(scd40->isFirstReadingReceived()) {
-        char buffer[100];
-        float temperature = demoMode ? demoTemperature : scd40->getTemperature();
-        float humidity = demoMode ? demoHumidity : scd40->getHumidity();
-        float co2 = demoMode ? demoCO2 : scd40->getCO2();
-        
-        snprintf(buffer, sizeof(buffer), "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", 
-                demoMode ? "DEMO" : "",
-                temperature, humidity, co2);
-        drawMultilineText(matrix->background, buffer, TOP, &Font4x7Fixed, CRGB(150,150,150));
+    if (showSensorData && !demoMode) {
+      if (scd40->isFirstReadingReceived()) {
+        float temperature = scd40->getTemperature();
+        float humidity = scd40->getHumidity();
+        float co2 = scd40->getCO2();
+
+        snprintf(buffer, sizeof(buffer),
+                 "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
+                 temperature, humidity, co2);
+        drawMultilineText(matrix->background, buffer, MIDDLE,
+                          TextAlignment::CENTER, &Font4x7Fixed,
+                          CRGB(150, 150, 150));
       } else {
-        drawMultilineText(matrix->background, "Sensor Warming Up...", TOP, &Font4x7Fixed, CRGB(150,150,150));
+        drawMultilineText(matrix->background, "Sensors\nWarming Up...", MIDDLE,
+                          TextAlignment::CENTER, &Font4x7Fixed,
+                          CRGB(150, 150, 150));
       }
     }
 
@@ -228,7 +363,6 @@ class Aquarium {
     matrix->foreground->reduceBrightness(20);
     // matrix->gfx_compositor->Stack(*matrix->background, *matrix->foreground);
     matrix->foreground->clear();
-
   }
 
   // Destructor to clean up resources
@@ -236,52 +370,68 @@ class Aquarium {
     // Unique pointers automatically clean up
   }
 
-  void drawMultilineText(GFX_Layer* layer, const char* text, textPosition textPos, const GFXfont* f, CRGB color) {
-  layer->setFont(f);
-  layer->setTextColor(layer->color565(color.r, color.g, color.b));
+  void drawMultilineText(GFX_Layer* layer, const char* text,
+                         textPosition textPos, TextAlignment alignment,
+                         const GFXfont* f, CRGB color) {
+    layer->setFont(f);
+    layer->setTextColor(layer->color565(color.r, color.g, color.b));
 
-  // Split the text into lines
-  std::vector<String> lines;
-  String currentLine;
-  for (const char* p = text; *p; p++) {
-    if (*p == '\n') {
+    // Split text into lines
+    std::vector<String> lines;
+    String currentLine;
+    for (const char* c = text; *c; ++c) {
+      if (*c == '\n') {
+        lines.push_back(currentLine);
+        currentLine = "";
+      } else {
+        currentLine += *c;
+      }
+    }
+    if (!currentLine.isEmpty()) {
       lines.push_back(currentLine);
-      currentLine = "";
-    } else {
-      currentLine += *p;
+    }
+
+    // Calculate total height and maximum width
+    int16_t x1, y1;
+    uint16_t w, h, maxWidth = 0, totalHeight = 0;
+    for (const String& line : lines) {
+      layer->getTextBounds(line.c_str(), 0, 0, &x1, &y1, &w, &h);
+      maxWidth = max(maxWidth, w);
+      totalHeight += h;
+    }
+
+    // Calculate starting Y position
+    int16_t startY;
+    if (textPos == TOP) {
+      startY = h;
+    } else if (textPos == BOTTOM) {
+      startY = layer->getHeight() - totalHeight;
+    } else {  // MIDDLE
+      startY = (layer->getHeight() - totalHeight) / 2 + h;
+    }
+
+    // Draw each line
+    for (const String& line : lines) {
+      int16_t lineX;
+      layer->getTextBounds(line.c_str(), 0, 0, &x1, &y1, &w, &h);
+
+      switch (alignment) {
+        case TextAlignment::LEFT:
+          lineX = 0;
+          break;
+        case TextAlignment::CENTER:
+          lineX = (layer->getWidth() - w) / 2;
+          break;
+        case TextAlignment::RIGHT:
+          lineX = layer->getWidth() - w;
+          break;
+      }
+
+      layer->setCursor(lineX, startY);
+      layer->print(line);
+      startY += h;
     }
   }
-  if (currentLine.length() > 0) {
-    lines.push_back(currentLine);
-  }
-
-  // Calculate total height and maximum width
-  int16_t x1, y1;
-  uint16_t w, h, maxWidth = 0, totalHeight = 0;
-  for (const String& line : lines) {
-    layer->getTextBounds(line.c_str(), 0, 0, &x1, &y1, &w, &h);
-    maxWidth = max(maxWidth, w);
-    totalHeight += h;
-  }
-
-  // Calculate starting position
-  int16_t startX = (layer->getWidth() - maxWidth) / 2;
-  int16_t startY;
-  if (textPos == TOP) {
-    startY = h;
-  } else if (textPos == BOTTOM) {
-    startY = layer->getHeight() - totalHeight;
-  } else { // MIDDLE
-    startY = (layer->getHeight() - totalHeight) / 2 + h;
-  }
-
-  // Draw each line
-  for (const String& line : lines) {
-    layer->setCursor(startX, startY);
-    layer->print(line);
-    startY += h;
-  }
-}
 };
 
 #endif  // AQUARIUM_H

@@ -56,6 +56,7 @@ void SCD40::runMeasurementTask() {
     log_i("SCD40 connected");
     sensorAvailable = true;  // Update sensor availability status
 
+      scd4x.setCalibrationMode(true);
     // Check if auto-calibration is enabled
     if (scd4x.getCalibrationMode()) {
       // Disable auto-calibration
@@ -75,17 +76,18 @@ void SCD40::runMeasurementTask() {
     for (;;) {
       if (scd4x.isDataReady()) {
         if (scd4x.readMeasurement(co2, temperature, humidity) == 0) {
+          uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
           State* state = stateManager.getState();
           state->environment.temperature.value = temperature;
           state->environment.temperature.diff.type = DiffType::DISABLE;
-          state->environment.humidity.value = round(humidity);
+          state->environment.humidity.value = humidityValue;
           state->environment.humidity.diff.type = DiffType::DISABLE;
           state->environment.co2.value = co2;
           state->environment.co2.diff.type = DiffType::DISABLE;
 
           // Accumulate readings
           tempSum += temperature;
-          humiditySum += round(humidity);
+          humiditySum += humidityValue;
           co2Sum += co2;
           readingCount++;
 

@@ -7,10 +7,8 @@
 // Define the palette at global scope
 DEFINE_GRADIENT_PALETTE( waterPalette ) {
     0,    0,  20,  80,  // 10°C: Cold
-  //  64,    0,  80,  60,  // 20°C: Cool
   112,    0, 100,  80,  // 24°C: Normal
   176,    0, 100,  80,  // 28°C: Normal (extended)
-  // 216,   70,   0,  20,  // 32°C: Intermediate
   255,   100,   0,  20   // 35°C: Warm
 };
 
@@ -59,7 +57,7 @@ class Water {
     }
 
     uint8_t limitTemperature = constrain(temperature, 0, 50);
-    uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 250);
+    uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 245);
     simplexColor = ColorFromPalette(palette, colorIndex);
     
     // Update a portion of the buffer

@@ -19,6 +19,7 @@ public:
       segmentPositions.push_back(PVector(0, 0));
     }
     colorPalette = new ColorPalette(numSegments, true);
+    type = "Fish";
   }
 
   void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b, bool drawExtras = false) {
@@ -50,7 +51,6 @@ public:
   }
 
   void display() override {
-    colorPalette->adjustColorbyAge(size);
     for(int8_t i=segments.size()-2; i > -1; i--) {
       drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
     }

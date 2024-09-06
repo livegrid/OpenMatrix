@@ -21,11 +21,11 @@ void BoidManager::initializeBoids() {
 }
 
 void BoidManager::updateBoids(long co2) {
-// float maxSpeedCO2 = map(co2, CO2_BAD, CO2_REALBAD, maxSpeed, 0);
-// maxSpeedCO2 = constrain(maxSpeedCO2, 0, maxSpeed);
+  float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 1.0f, 0.0f);
+  speedMultiplier = constrain(speedMultiplier, 0.0f, 1.0f);
   for (auto& group : boidGroups) {
     for (auto& boid : group) {
-      boid.run(group.data(), group.size());
+      boid.run(group.data(), group.size(),speedMultiplier);
       boid.wrapAroundBorders();
     }
   }

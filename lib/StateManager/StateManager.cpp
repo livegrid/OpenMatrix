@@ -1,7 +1,8 @@
 #include "StateManager.h"
 #include "esp_log.h"
 
-StateManager::StateManager() {
+StateManager::StateManager(unsigned long saveIntervalinMinutes) {
+    SAVE_INTERVAL = saveIntervalinMinutes * 60000;
 }
 
 State* StateManager::getState() {
@@ -314,10 +315,10 @@ void StateManager::startPeriodicSave() {
 void StateManager::saveTask(void* parameter) {
     StateManager* stateManager = static_cast<StateManager*>(parameter);
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(SAVE_INTERVAL);
+    const TickType_t xFrequency = pdMS_TO_TICKS(stateManager->SAVE_INTERVAL);
     log_i("Save task started");
     // Wait for 10 seconds before starting the periodic save task
-    vTaskDelay(pdMS_TO_TICKS(SAVE_INTERVAL));
+    vTaskDelay(pdMS_TO_TICKS(stateManager->SAVE_INTERVAL));
 
     for (;;) {   
         log_i("Saving state periodically");

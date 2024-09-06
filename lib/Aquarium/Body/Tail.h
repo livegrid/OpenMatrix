@@ -9,14 +9,19 @@ protected:
   Matrix* matrix;
 
 public:
-  Tail(Matrix* m) : matrix(m) {}
+  Tail(Matrix* m) : matrix(m) {
+    type = "noTail";
+  }
+  String type;
 
   virtual void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) = 0;
 };
 
 class noTail : public Tail {
 public:
-  noTail(Matrix* m) : Tail(m) {}
+  noTail(Matrix* m) : Tail(m) {
+    type = "noTail";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) override {
     // Do nothing
@@ -25,7 +30,9 @@ public:
 
 class TriangleTail : public Tail {
 public:
-  TriangleTail(Matrix* m) : Tail(m) {}
+  TriangleTail(Matrix* m) : Tail(m) {
+    type = "TriangleTail";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) override {
     PVector heading = PVector::fromAngle(angle);
@@ -51,7 +58,9 @@ public:
 
 class CurvyTail : public Tail {
 public:
-  CurvyTail(Matrix* m) : Tail(m) {}
+  CurvyTail(Matrix* m) : Tail(m) {
+    type = "CurvyTail";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
     matrix->foreground->drawCircleArray(pos.x, pos.y, size*3, size/3, angle, CRGB(r, g, b));

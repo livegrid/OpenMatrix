@@ -1,22 +1,22 @@
-#ifndef AQUARIUMSETTINGS_H
-#define AQUARIUMSETTINGS_H
+#pragma once
 
 //GENERAL SETTINGS
 #define PHYSICS_SCALE 50
+#define AQUARIUM_SAVE_INTERVAL 30    //in minutes
+#define BORDER_BUFFER 0
+#define FOOD_TOUCH_THRESHOLD 100
 
 //AGE SETTINGS
 #define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
 #define FISH_LIFESPAN_VARIATION 0.2f  // Variation in lifespan (20% by default)
 
+const float HEALTH_REDUCTION_RATE_BAD = 0.2f / (3600 * 30);    // 20% per hour at 30 fps
+const float HEALTH_REDUCTION_RATE_REALBAD = 0.4f / (3600 * 30); // 40% per hour at 30 fps
+const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
-#define NUM_FISH_START 20
+#define NUM_FISH_START 5
 #define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 3
-#define NUM_ATTRACTORS 2
-
-#define BORDER_BUFFER 0
-
-//WATER SETTINGS
 
 //AGE THRESHOLDS
 #define AGE_EGG 0.1
@@ -32,8 +32,8 @@
 #define BOUNDARY_FORCE 0.2  //change to 0.2
 
 //EGG SETTINGS
-#define EGG_SIZE 1
-#define EGG_COLOR 200, 200, 200
+#define EGG_SIZE 2
+#define EGG_COLOR 0, 0, 200
 
 //FISH SETTINGS
 #define FISH_NUM_SEGMENTS 4, 12
@@ -67,7 +67,7 @@
 #define STAR_RAD 2, 4
 #define STAR_NUM_ARMS 5, 10
 
-#define STAR_MAX_SPEED 20
+#define STAR_MAX_SPEED 30
 #define STAR_MIN_SPEED 10
 #define STAR_MAX_FORCE 0.2
 #define STAR_SIN_AMPLITUDE 5
@@ -80,8 +80,8 @@
 #define TURTLE_LENGTH 4, 10
 #define TURTLE_WIDTH 2, 4
 
-#define TURTLE_MAX_SPEED 5
-#define TURTLE_MIN_SPEED 2
+#define TURTLE_MAX_SPEED 40
+#define TURTLE_MIN_SPEED 5
 #define TURTLE_MAX_FORCE 0.3
 #define TURTLE_SIN_AMPLITUDE 10
 #define TURTLE_SIN_FREQUENCY 0.001
@@ -102,5 +102,3 @@
 #define NUM_BOIDS 10, 20
 #define BOID_MAX_SPEED 5, 10
 #define BOID_MAX_FORCE 1, 2
-
-#endif

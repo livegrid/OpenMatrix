@@ -13,6 +13,7 @@ public:
       segmentPositions.push_back(PVector(0, 0));
     }
     colorPalette = new ColorPalette(numSegments);
+    type = "Snake";
   }
 
   void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b) {
@@ -25,7 +26,6 @@ public:
   }
 
   void display() override {
-    colorPalette->adjustColorbyAge(size);
     for(int8_t i=static_cast<int8_t>((segmentPositions.size()-2) * size); i > -1; i--) {
       drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b);
     }

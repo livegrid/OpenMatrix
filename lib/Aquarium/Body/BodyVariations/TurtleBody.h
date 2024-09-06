@@ -13,10 +13,10 @@ public:
     rad = random(TURTLE_WIDTH);
 
     colorPalette = new ColorPalette(rad);
+    type = "Turtle";
   }
 
   void display() override {
-    colorPalette->adjustColorbyAge(size);
     matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1+vel.mag()/20) * size, angle + PI/2, colorPalette->colors[0]);
   }
 };

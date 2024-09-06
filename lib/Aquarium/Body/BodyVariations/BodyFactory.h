@@ -2,22 +2,22 @@
 #define BODYFACTORY_H
 
 #include <Arduino.h>
-#include <Matrix.h>
-
-#include <functional>
-#include <random>
-#include <chrono>
-#include <vector>
-
 #include <Body/Body.h>
 #include <Body/Fin.h>
 #include <Body/Head.h>
 #include <Body/Tail.h>
+#include <Fish.h>
+#include <Matrix.h>
+
+#include <chrono>
+#include <functional>
+#include <random>
+#include <vector>
 
 #include "FishBody.h"
-#include "TurtleBody.h"
-#include "StarBody.h"
 #include "SnakeBody.h"
+#include "StarBody.h"
+#include "TurtleBody.h"
 
 class BodyFactory {
  private:
@@ -25,11 +25,20 @@ class BodyFactory {
   std::vector<std::function<Fin*(Matrix*)>> finConstructors;
   std::vector<std::function<Head*(Matrix*)>> headConstructors;
   std::vector<std::function<Tail*(Matrix*)>> tailConstructors;
-  std::vector<std::function<Body*(Matrix*, Head*, Tail*, Fin*)>> bodyConstructors;
+  std::vector<std::function<Body*(Matrix*, Head*, Tail*, Fin*)>>
+      bodyConstructors;
   std::mt19937 gen;
 
+  String bodyType;
+  String motionType;
+  String headType;
+  String finType;
+  String tailType;
+
  public:
-  BodyFactory(Matrix* m) : matrix(m), gen(std::chrono::system_clock::now().time_since_epoch().count()) {
+  BodyFactory(Matrix* m)
+      : matrix(m),
+        gen(std::chrono::system_clock::now().time_since_epoch().count()) {
     // Register fin types
     // registerFinType([](Matrix* m) -> Fin* { return new noFin(m); });
     registerFinType([](Matrix* m) -> Fin* { return new TriangleFin(m); });
@@ -71,7 +80,8 @@ class BodyFactory {
     tailConstructors.push_back(constructor);
   }
 
-  void registerBodyType(const std::function<Body*(Matrix*, Head*, Tail*, Fin*)>& constructor) {
+  void registerBodyType(
+      const std::function<Body*(Matrix*, Head*, Tail*, Fin*)>& constructor) {
     bodyConstructors.push_back(constructor);
   }
 
@@ -87,25 +97,90 @@ class BodyFactory {
     return createRandomComponent(tailConstructors);
   }
 
-  Body* createRandomBody() {
-    if (bodyConstructors.empty()) return nullptr;
-    std::uniform_int_distribution<> dis(0, bodyConstructors.size() - 1);
-    int index = dis(gen);
-    return bodyConstructors[index](matrix, createRandomHead(), createRandomTail(), createRandomFin());
+  Head* createHead(const String& type) {
+    if (type == "TriangleHead")
+      return new TriangleHead(matrix);
+    else if (type == "FrogHead")
+      return new FrogHead(matrix);
+    else if (type == "NeedleHead")
+      return new NeedleHead(matrix);
+    else
+      return nullptr;
   }
 
-  Body* createBody(const std::string& type) {
+  Tail* createTail(const String& type) {
+    if (type == "noTail") {
+      return new noTail(matrix);
+    } else if (type == "TriangleTail") {
+      return new TriangleTail(matrix);
+    } else if (type == "CurvyTail") {
+      return new CurvyTail(matrix);
+    } else {
+      return nullptr;
+    }
+  }
+
+  Fin* createFin(const String& type) {
+    if (type == "TriangleFin") {
+      return new TriangleFin(matrix);
+    } else if (type == "EllipseFin") {
+      return new EllipseFin(matrix);
+    } else if (type == "LegFin") {
+      return new LegFin(matrix);
+    } else if (type == "RoundFin") {
+      return new RoundFin(matrix);
+    }
+  }
+
+  Body* createBody(Head* head, Tail* tail, Fin* fin) {
+    return new FishBody(matrix, head, tail, fin);
+  }
+
+  Body* createRandomBody() {
+    if (bodyConstructors.empty())
+      return nullptr;
+    std::uniform_int_distribution<> dis(0, bodyConstructors.size() - 1);
+    int index = dis(gen);
+    return bodyConstructors[index](matrix, createRandomHead(),
+                                   createRandomTail(), createRandomFin());
+  }
+
+  Body* createBody(const String& type, const String& headType,
+                   const String& tailType, const String& finType) {
+    Head* head = createHead(headType);
+    Tail* tail = createTail(tailType);
+    Fin* fin = createFin(finType);
+
     if (type == "Fish") {
-      return new FishBody(matrix, createRandomHead(), createRandomTail(), createRandomFin());
+      return new FishBody(matrix, head, tail, fin);
+    } else if (type == "Turtle") {
+      return new TurtleBody(matrix, head, tail, fin);
+    } else if (type == "Star") {
+      return new StarBody(matrix, head, tail, fin);
+    } else if (type == "Snake") {
+      return new SnakeBody(matrix, head, tail, fin);
+    } else {
+      // If the type is not recognized, return nullptr or a default body type
+      delete head;
+      delete tail;
+      delete fin;
+      return nullptr;
     }
-    else if (type == "Turtle") {
-      return new TurtleBody(matrix, createRandomHead(), createRandomTail(), createRandomFin());
-    }
-    else if (type == "Star") {
-      return new StarBody(matrix, createRandomHead(), createRandomTail(), createRandomFin());
-    }
-    else if (type == "Snake") {
-      return new SnakeBody(matrix, createRandomHead(), createRandomTail(), createRandomFin());
+  }
+
+  Body* createBody(const String& type) {
+    if (type == "Fish") {
+      return new FishBody(matrix, createRandomHead(), createRandomTail(),
+                          createRandomFin());
+    } else if (type == "Turtle") {
+      return new TurtleBody(matrix, createRandomHead(), createRandomTail(),
+                            createRandomFin());
+    } else if (type == "Star") {
+      return new StarBody(matrix, createRandomHead(), createRandomTail(),
+                          createRandomFin());
+    } else if (type == "Snake") {
+      return new SnakeBody(matrix, createRandomHead(), createRandomTail(),
+                           createRandomFin());
     }
     // Add other body types
     else {
@@ -113,10 +188,9 @@ class BodyFactory {
     }
   }
 
-
-
   Body* testBody() {
-    return new TurtleBody(matrix, new FrogHead(matrix), new noTail(matrix), new LegFin(matrix));
+    return new TurtleBody(matrix, new FrogHead(matrix), new noTail(matrix),
+                          new LegFin(matrix));
   }
 
   Fin* createFin() {
@@ -131,14 +205,12 @@ class BodyFactory {
     return new TriangleTail(matrix);
   }
 
-  Body* createBody(Head* head, Tail* tail, Fin* fin) {
-    return new FishBody(matrix, head, tail, fin);
-  }
-
  private:
   template <typename T>
-  T* createRandomComponent(std::vector<std::function<T*(Matrix*)>>& constructors) {
-    if (constructors.empty()) return nullptr;
+  T* createRandomComponent(
+      std::vector<std::function<T*(Matrix*)>>& constructors) {
+    if (constructors.empty())
+      return nullptr;
     std::uniform_int_distribution<> dis(0, constructors.size() - 1);
     int index = dis(gen);
     return constructors[index](matrix);

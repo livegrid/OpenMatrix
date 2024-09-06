@@ -13,7 +13,6 @@ class Motion {
   float angle;
 
   int8_t maxForce;
-  float boundaryForce = BOUNDARY_FORCE;  // change to .2 later
   float foodForce;
   int8_t maxSpeed;
   int8_t minSpeed;
@@ -31,7 +30,9 @@ class Motion {
   long co2;
 
   uint16_t xResolution;
-  uint16_t yResolution; 
+  uint16_t yResolution;
+
+  PVector foodDirection; 
 
   bool followingFood = false;
 
@@ -59,22 +60,32 @@ class Motion {
 
   virtual void doMotion() = 0;
 
-  void update(float age = AGE_ADULT, long co2 = CO2_OK) {
+  void update(float age = AGE_ADULT, long co2 = CO2_OK, bool stayInside = false) {
     this->co2 = co2;
-    boundaryCheck();
+    if(stayInside) {
+      boundaryCheck(BOUNDARY_FORCE * 10);
+    }
+    else {
+      boundaryCheck(BOUNDARY_FORCE);
+    }
     if(age < AGE_EGG) {
       vel = PVector(0,0);
     }
     else if(age < AGE_TEEN) {
-      flock();
       noiseMotion();
     }
     else if(!followingFood){
       if(!outOfBoundary) {
         doMotion();
       }
-      followingFood = false;
     }
+
+    if (followingFood) {
+      PVector foodForce = foodDirection - pos;
+      foodForce.setMag(FOOD_FORCE);
+      applyForce(foodForce);
+    }
+    
 
     PVector desiredVel = vel;
     
@@ -94,6 +105,8 @@ class Motion {
     pos += vel;
     acc *= 0;
     angle = vel.heading();
+
+    followingFood = false;
   }
 
 protected:
@@ -101,7 +114,7 @@ protected:
     acc = acc + force;
   }
 
-  void boundaryCheck() {
+  void boundaryCheck(float boundaryForce = BOUNDARY_FORCE) {
     outOfBoundary = false;
     if (pos.x < BORDER_BUFFER) {
       applyForce(PVector(boundaryForce, 0));
@@ -139,14 +152,6 @@ protected:
     applyForce(sinusoidalForce);
   }
 
-  void shiver() {
-    float theta = vel.heading();
-    float jitterAngle = (millis() % 100) * PI / 50;  // Generates a rapid, jerky motion
-    float jitterStrength = 10;  // Strong, abrupt force
-    PVector jitterForce = PVector::fromAngle(theta + jitterAngle) * jitterStrength;
-    applyForce(jitterForce);
-  }
-
   void noiseMotion() {
     float noiseValue = noise.GetNoise(pos.x, pos.y);
     float noiseAngle = noiseValue * TWO_PI;  // Map noise to a full circle
@@ -155,23 +160,9 @@ protected:
     applyForce(noiseForce);
   }
 
-  void flock() {
-  }
-
-  void separate() {
-  }
-
-  void align() {
-  }
-
-  void cohere() {
-  }
-
 public:
-  void followFood(PVector foodDirection) {
-    PVector forceToApply = foodDirection - pos;
-    forceToApply.setMag(foodForce);
-    applyForce(forceToApply);
+  void followFood(PVector foodPos) {
+    foodDirection = foodPos;
     followingFood = true;
   }
 };

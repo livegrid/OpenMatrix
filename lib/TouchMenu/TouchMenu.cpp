@@ -96,7 +96,6 @@ void TouchMenu::handleSingleTap(uint8_t pin) {
 }
 
 void TouchMenu::displayMenu() {
-  log_i("Displaying menu");
   matrix->background->setFont(&Font4x5Fixed);
   matrix->background->setTextSize(1);
   matrix->background->clear();
