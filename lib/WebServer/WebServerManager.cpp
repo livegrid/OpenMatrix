@@ -244,6 +244,12 @@ void WebServerManager::setupInterface() {
     log_i("[*] Resetting network");
     nw.reset();
   });
+
+  interface.onFactoryReset([this]() {
+    log_i("[*] Resetting factory settings");
+    
+    // TODO: Reset factory settings
+  });
 }
 
 void WebServerManager::startServer() {

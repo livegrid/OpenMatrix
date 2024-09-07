@@ -7,11 +7,12 @@
   import DMXSettings from "@/components/DMXSettings.svelte";
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
-  import { state, resetNetwork } from "@/store";
-    import HassSettings from "@/components/HassSettings.svelte";
+  import { state, resetNetwork, resetFactory } from "@/store";
+  import HassSettings from "@/components/HassSettings.svelte";
 
   let loading = true;
-  let resetLoading = false;
+  let networkResetLoading = false;
+  let factoryResetLoading = false;
   let initialValues = null;
 
   const unsubscribe = state.subscribe((value) => {
@@ -21,20 +22,41 @@
     }
   });
 
-  const reset = async () => {
-    try {
-      resetLoading = true;
-      const response = await resetNetwork();
-      if (response.status === 200) {
-        alert("Network reset successful. Please connect to the device access point \"LiveGrid\" to configure it.");
-      } else {
+  const networkReset = async () => {
+    if (confirm('Please confirm if you would like to reset network settings')) {
+      try {
+        networkResetLoading = true;
+        const response = await resetNetwork();
+        if (response.status === 200) {
+          alert("Network reset successful. Please connect to the device access point \"LiveGrid\" to configure it.");
+        } else {
+          alert("Failed to reset network! Please try again.");
+        }
+      } catch (err) {
+        console.error(err);
         alert("Failed to reset network! Please try again.");
+      } finally {
+        networkResetLoading = false;
       }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to reset network! Please try again.");
-    } finally {
-      resetLoading = false;
+    }
+  }
+
+  const factoryReset = async () => {
+    if (confirm('Please confirm if you would like to factory reset your device. All settings will be erased.')) {
+      try {
+        factoryResetLoading = true;
+        const response = await resetFactory();
+        if (response.status === 200) {
+          alert("Factory reset successful. Please connect to the device access point \"LiveGrid\" to configure it.");
+        } else {
+          alert("Failed to factory reset! Please try again.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to factory reset! Please try again.");
+      } finally {
+        factoryResetLoading = false;
+      }
     }
   }
 
@@ -90,14 +112,35 @@
       <div class="flex flex-row items-center justify-between gap-y-2">
         <div class="truncate text-lg font-medium text-zinc-800 dark:text-zinc-300">
           Reset Network Settings
-          <div class="flex flex-row items-center gap-x-2 mt-2 text-xs text-red-500">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div class="flex flex-row items-center gap-x-2 mt-2 text-xs text-red-600">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
             Your device will be disconnected from current network.
           </div>
         </div>
         <div>
-          <button on:click={reset} disabled={resetLoading} class="text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-red-300 font-medium rounded-full text-sm px-5 py-2.5 text-center dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800">
-            {#if resetLoading}
+          <button on:click={networkReset} disabled={networkResetLoading} class="text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-red-300 font-medium rounded-full text-sm px-5 py-2.5 text-center dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800">
+            {#if networkResetLoading}
+              Resetting...
+            {:else}
+              Reset
+            {/if}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative flex flex-col gap-y-6 overflow-hidden col-span-2 rounded-md border border-zinc-200 dark:border-zinc-900 bg-white/30 dark:bg-black/30 px-4 py-3 sm:px-6 sm:py-6">
+      <div class="flex flex-row items-center justify-between gap-y-2">
+        <div class="truncate text-lg font-medium text-zinc-800 dark:text-zinc-300">
+          Factory Reset
+          <div class="flex flex-row items-center gap-x-2 mt-2 text-xs text-red-600">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            All existing settings and network configuration will be lost on a factory reset.
+          </div>
+        </div>
+        <div>
+          <button on:click={factoryReset} disabled={factoryResetLoading} class="text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-red-300 font-medium rounded-full text-sm px-5 py-2.5 text-center dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800">
+            {#if factoryResetLoading}
               Resetting...
             {:else}
               Reset

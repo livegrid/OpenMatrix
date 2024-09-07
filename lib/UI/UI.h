@@ -21,7 +21,7 @@ class UI {
         typedef std::function<void(const char* host, uint16_t port, const char* client_id, const char* username, const char* password, const char* co2_topic, const char* matrix_text_topic, bool show_text)> onMqttSettingsCallback;
         typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, bool start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
         typedef std::function<void(bool show_text)> onHomeAssistantSettingsCallback;
-        typedef std::function<void()> onNetworkResetCallback;
+        typedef std::function<void()> onResetCallback;
 
         UI(WebServer* server, StateManager* stateManager);
         void begin();
@@ -31,12 +31,13 @@ class UI {
         void onMode(onModeChangeCallback cb);
         void onEffect(onEffectChangeCallback cb);
         void onImage(onImageChangeCallback cb);
-        void onImagePreview(onImagePreviewCallback cb);
+        // void onImagePreview(onImagePreviewCallback cb);
         void onText(onTextChangeCallback cb);
         void onMqttSettings(onMqttSettingsCallback cb);
         void onDmxSettings(onDmxSettingsCallback cb);
         void onHomeAssistantSettings(onHomeAssistantSettingsCallback cb);
-        void onNetworkReset(onNetworkResetCallback cb);
+        void onNetworkReset(onResetCallback cb);
+        void onFactoryReset(onResetCallback cb);
         ~UI();
     
     private:
@@ -49,12 +50,16 @@ class UI {
         onModeChangeCallback _on_mode_cb;
         onEffectChangeCallback _on_effect_cb;
         onImageChangeCallback _on_image_cb;
-        onImagePreviewCallback _on_image_preview_cb;
+        // onImagePreviewCallback _on_image_preview_cb;
         onTextChangeCallback _on_text_cb;
         onMqttSettingsCallback _on_mqtt_settings_cb;
         onDmxSettingsCallback _on_dmx_settings_cb;
         onHomeAssistantSettingsCallback _on_home_assistant_settings_cb;
-        onNetworkResetCallback _on_network_reset_cb;
+        onResetCallback _on_network_reset_cb;
+        onResetCallback _on_factory_reset_cb;
+
+        const char* ok_response = "{\"message\":\"OK\"}";
+        const char* invalid_response = "{\"message\":\"Invalid JSON\"}";
 
         bool imageExists(const char* name);
 

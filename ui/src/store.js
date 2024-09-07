@@ -169,16 +169,16 @@ export const selectImage = async ({ name }) => {
     return response;
 }
 
-export const invokePreview = async ({ name }) => {
-    const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
-        method: 'PATCH',
-        timeout: 2000,
-        body: JSON.stringify({
-            name
-        })
-    });
-    return response;
-}
+// export const invokePreview = async ({ name }) => {
+//     const response = await fetchWithTimeout(`${API_URL}/openmatrix/image`, {
+//         method: 'PATCH',
+//         timeout: 2000,
+//         body: JSON.stringify({
+//             name
+//         })
+//     });
+//     return response;
+// }
 
 export const updateText = async ({ payload, size }) => {
     const response = await fetchWithTimeout(`${API_URL}/openmatrix/text`, {
@@ -258,6 +258,14 @@ export const updateHASSSettings = async (settings) => {
 
 export const resetNetwork = async () => {
     const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/network/reset`, {
+        method: 'POST',
+        timeout: 2000
+    });
+    return response;
+}
+
+export const resetFactory = async () => {
+    const response = await fetchWithTimeout(`${API_URL}/openmatrix/settings/factory/reset`, {
         method: 'POST',
         timeout: 2000
     });
