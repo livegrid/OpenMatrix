@@ -14,9 +14,9 @@ WebServerManager::WebServerManager(Matrix* matrix, EffectManager* effectManager,
 
 void WebServerManager::begin() {
   setupNetWizard();
-  // setupUniqueHostname();
   setupInterface();
   startServer();
+  setupUniqueHostname();
 }
 
 void WebServerManager::handleClient() {
@@ -27,7 +27,6 @@ void WebServerManager::handleClient() {
 
 void WebServerManager::setupNetWizard() {
   nw.setStrategy(NetWizardStrategy::NON_BLOCKING);
-  nw.setHostname("LiveGrid");
 
   nw.onConnectionStatus([this](NetWizardConnectionStatus status) {
     String status_str = "";
@@ -98,23 +97,19 @@ void WebServerManager::setupUniqueHostname() {
   String hostname = baseHostname;
   int suffix = 1;
 
-  while (true) {
+  while (suffix <= 5) {  // Increase max attempts to 5
     if (MDNS.begin(hostname.c_str())) {
       log_i("Hostname set to: %s", hostname.c_str());
-      MDNS.end();
-      WiFi.setHostname(hostname.c_str());
+      MDNS.addService("http", "tcp", 80);  // Add this line
       return;
     }
 
     // If setting the hostname fails, increment the suffix and try again
     hostname = String(baseHostname) + String(suffix);
     suffix++;
-
-    if (suffix > 5) {  // Arbitrary limit to prevent infinite loop
-      log_w("Failed to set unique hostname after 99 attempts. Using default.");
-      return;
-    }
   }
+
+  log_w("Failed to set unique hostname after 99 attempts. Using default.");
 }
 
 void WebServerManager::setupInterface() {

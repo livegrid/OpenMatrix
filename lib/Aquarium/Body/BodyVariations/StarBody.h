@@ -30,12 +30,12 @@ class StarBody : public Body {
     pt1.setMag(length * 2 * size);
 
     if (nodes) {
-      matrix->foreground->drawLine(pos.x, pos.y, pos.x + pt1.x, pos.y + pt1.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
-      matrix->foreground->fillCircle(pos.x + pt1.x, pos.y + pt1.y, rad / 2, CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g, colorPalette->colors[1].b));
-      for (int i = 1; i < arms; i++) {
-        pt1.rotate(2 * PI / arms);
-        matrix->foreground->drawLine(pos.x, pos.y, pos.x + pt1.x, pos.y + pt1.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
-        matrix->foreground->fillCircle(pos.x + pt1.x, pos.y + pt1.y, rad/2, CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g, colorPalette->colors[1].b));
+      for (int i = 0; i < arms; i++) {
+        PVector armPt = PVector(pt1.x, pt1.y);
+        armPt.rotate(2 * PI / arms * i);
+        PVector endPoint = pos + armPt;
+        matrix->foreground->drawLine(pos.x, pos.y, endPoint.x, endPoint.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
+        matrix->foreground->fillCircle(endPoint.x, endPoint.y, rad / 2, CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g, colorPalette->colors[1].b));
       }
       matrix->foreground->fillCircle(pos.x, pos.y, rad * size, CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g, colorPalette->colors[2].b));
     } else {
@@ -43,12 +43,18 @@ class StarBody : public Body {
       PVector pt3 = PVector::fromAngle(starAngle + PI / 2);
       pt2.setMag(rad * size);
       pt3.setMag(rad * size);
-      matrix->foreground->fillTriangle(pos.x + pt1.x, pos.y + pt1.y, pos.x + pt2.x, pos.y + pt2.y, pos.x + pt3.x, pos.y + pt3.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
-      for (int i = 1; i < arms; i++) {
-        pt1.rotate(2 * PI / arms);
-        pt2.rotate(2 * PI / arms);
-        pt3.rotate(2 * PI / arms);
-        matrix->foreground->fillTriangle(pos.x + pt1.x, pos.y + pt1.y, pos.x + pt2.x, pos.y + pt2.y, pos.x + pt3.x, pos.y + pt3.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
+      
+      for (int i = 0; i < arms; i++) {
+        PVector arm1 = PVector(pt1.x, pt1.y);
+        PVector arm2 = PVector(pt2.x, pt2.y);
+        PVector arm3 = PVector(pt3.x, pt3.y);
+        arm1.rotate(2 * PI / arms * i);
+        arm2.rotate(2 * PI / arms * i);
+        arm3.rotate(2 * PI / arms * i);
+        matrix->foreground->fillTriangle(pos.x + arm1.x, pos.y + arm1.y, 
+                                         pos.x + arm2.x, pos.y + arm2.y, 
+                                         pos.x + arm3.x, pos.y + arm3.y, 
+                                         CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
       }
       matrix->foreground->fillCircle(pos.x, pos.y, rad / 2 * size, CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g, colorPalette->colors[2].b));
     }

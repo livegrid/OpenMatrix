@@ -2,7 +2,7 @@
 #define AQUARIUM_H
 
 #include <Arduino.h>
-#include <Fonts\Font4x7Fixed.h>
+#include <Fonts/Font4x7Fixed.h>
 #include <Matrix.h>
 #include <scd40.h>
 
@@ -36,6 +36,7 @@ class Aquarium {
   float demoTemperature;
   float demoHumidity;
   float demoCO2;
+  bool demoFinished;
 
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
@@ -46,12 +47,17 @@ class Aquarium {
         water(matrix),
         boidManager(m),
         demoMode(false),
-        demoStep(0) {}
+        demoStep(0),
+        demoFinished(false) {}
 
   void begin() {
     loadState();
     initializePlants();
     boidManager.initializeBoids();
+  }
+
+  bool isDemoFinished() const {
+    return demoFinished;
   }
 
   void startDemo() {
@@ -148,17 +154,11 @@ class Aquarium {
       break;
      case 9:
       snprintf(buffer, sizeof(buffer), "CO2 affects\nfish behavior");
-      updateWater();
-      updateFish();
-      updatePlants();
       break;
     case 10:
       t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
       demoCO2 = 1200.0f + 800.0f * pausingSine(t, 0.2);
       snprintf(buffer, sizeof(buffer), "CO2:\n%.0f ppm", demoCO2);
-      updateWater();
-      updateFish();
-      updatePlants();
       break;
     case 11:
       snprintf(buffer, sizeof(buffer), "If your\nenvironment\nis good,\nthey will thrive");
@@ -174,10 +174,11 @@ class Aquarium {
       break;
     default:
       demoMode = false;
+      demoFinished = true;  // Set demoFinished to true when demo is complete
       return;
   }
 
-  if (demoStep < 5 || demoStep > 10) {
+  if (demoStep < 5 || demoStep > 8) {
     updateWater();
     boidManager.updateBoids(demoCO2);
     boidManager.renderBoids();

@@ -21,8 +21,9 @@ void BoidManager::initializeBoids() {
 }
 
 void BoidManager::updateBoids(long co2) {
-  float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 1.0f, 0.0f);
-  speedMultiplier = constrain(speedMultiplier, 0.0f, 1.0f);
+  float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
+  speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f);
+  speedMultiplier /= 100.0f;
   for (auto& group : boidGroups) {
     for (auto& boid : group) {
       boid.run(group.data(), group.size(),speedMultiplier);

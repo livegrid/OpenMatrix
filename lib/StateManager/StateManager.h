@@ -28,7 +28,7 @@ typedef enum {
 typedef enum {
     NONE = 0,
     SIMPLEX_NOISE,
-    CELLULAR_NOISE,
+    SNAKE,
     FLOCKING,
     GAMEOFLIFE,
     LSYSTEM,
@@ -60,10 +60,11 @@ typedef enum {
 } ConnectionStatus;
 
 struct State {
-    bool power = false;
-    bool autobrightness = false;
-    uint8_t brightness = 255;
-    OpenMatrixMode mode = AQUARIUM;
+    bool power;
+    bool autobrightness;
+    uint8_t brightness;
+    OpenMatrixMode mode;
+    bool firstBoot;
 
     // Environment
     struct {

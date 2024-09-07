@@ -17,7 +17,8 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   json["autobrightness"] = _state.autobrightness;
   json["brightness"] = _state.brightness;
   json["mode"] = _state.mode;
-
+  json["firstBoot"] = _state.firstBoot;
+  
   if (!settings_only) {
     JsonObject environment = json["environment"].to<JsonObject>();
 
@@ -144,6 +145,7 @@ void StateManager::restore() {
   _state.autobrightness = json["autobrightness"].as<bool>();
   _state.brightness = json["brightness"].as<uint8_t>();
   _state.mode = json["mode"].as<OpenMatrixMode>();
+  _state.firstBoot = json["firstBoot"].as<bool>();
 
   log_i("Restored power: %d", _state.power);
   log_i("Restored autobrightness: %d", _state.autobrightness);
@@ -241,6 +243,7 @@ void StateManager::setDefaultState() {
     _state.autobrightness = true;
     _state.brightness = 100;
     _state.mode = OpenMatrixMode::AQUARIUM;
+    _state.firstBoot = true;
 
     // Environment
     _state.environment.temperature.value = 0.0f;

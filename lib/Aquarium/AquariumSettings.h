@@ -6,6 +6,10 @@
 #define BORDER_BUFFER 0
 #define FOOD_TOUCH_THRESHOLD 100
 
+//PLANT LIFE SETTINGS
+#define PLANT_LIFECYCLE_DURATION 10000 // 1 day in milliseconds
+// #define PLANT_LIFECYCLE_DURATION 86400000 // 1 day in milliseconds
+
 //AGE SETTINGS
 #define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
 #define FISH_LIFESPAN_VARIATION 0.2f  // Variation in lifespan (20% by default)
@@ -15,7 +19,7 @@ const float HEALTH_REDUCTION_RATE_REALBAD = 0.4f / (3600 * 30); // 40% per hour 
 const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
 #define NUM_FISH_START 5
-#define NUM_FISH_IDEAL 20
+#define NUM_FISH_IDEAL 30
 #define NUM_PLANTS 3
 
 //AGE THRESHOLDS

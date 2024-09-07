@@ -7,6 +7,8 @@
 #include <vector>
 #include <string>
 #include <StateManager.h>
+#include <NetWizard.h>
+#include <WebServerManager.h>
 
 class TouchMenu {
  private:
@@ -47,15 +49,18 @@ class TouchMenu {
   void handleDoubleTap(uint8_t pin);
   void handleSingleTap(uint8_t pin);
   bool startDemo = false;
+  bool showWiFiInfo = false;
+  WebServerManager* webServerManager = nullptr;
+  void displayWiFiInfo();
+  void displayConfirmation(const char* message);
 
  public:
-  TouchMenu(Matrix* matrix, StateManager* stateManager, long touchThreshold = 10000);
+  TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, long touchThreshold = 10000);
   void setupInterrupts();
   void update();
   bool isMenuOpen();
   bool isDisplayOn();
   bool showSensorData();
-  bool showWiFiInfo();
   void displayMenu();
   bool shouldStartDemo();
 };

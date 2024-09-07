@@ -21,10 +21,11 @@ public:
     void begin();
     void handleClient();
     void setupUniqueHostname();
+    NetWizard nw;
+    void setupNetWizard();
     
 private:
     WebServer server;
-    NetWizard nw;
     UI interface;
     StateManager* stateManager;
     Matrix* matrix;
@@ -32,7 +33,6 @@ private:
     ImageDraw* imageDraw;
     TaskManager* taskManager;
     
-    void setupNetWizard();
     void setupInterface();
     void startServer();
     void handleModeChange();

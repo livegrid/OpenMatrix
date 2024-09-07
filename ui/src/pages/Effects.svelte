@@ -3,7 +3,7 @@
   // @ts-nocheck
   import ModePageLayout from "@/components/ModePageLayout.svelte";
   import EffectCard from "@/components/EffectCard.svelte";
-  import CellularNoise from "@/components/effects/CellularNoise.svelte";
+  import Snake from "@/components/effects/Snake.svelte";
   import SimplexNoise from "@/components/effects/SimplexNoise.svelte";
   import Flocking from "@/components/effects/Flocking.svelte";
   import GameOfLife from "@/components/effects/GameOfLife.svelte";
@@ -23,8 +23,8 @@
     },
     {
       id: 2,
-      name: 'Cellular Noise',
-      image: CellularNoise
+      name: 'Snake',
+      image: Snake
     },
     {
       id: 3,

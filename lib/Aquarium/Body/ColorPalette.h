@@ -55,14 +55,11 @@ class ColorPalette {
 
   void adjustColorbyAge(float age) {
     for (auto& hsvColor : colorsHSV) {
-      if (age < AGE_ADULT) {
-        float saturationFactor = (age - AGE_EGG) / (AGE_ADULT - AGE_EGG);
-        hsvColor.sat = static_cast<uint8_t>(130 * saturationFactor);
-      }
-
       if (age >= AGE_ADULT) {
         float fadeFactor = (age - AGE_ADULT) / (AGE_DEAD - AGE_ADULT);
-        hsvColor.val = static_cast<uint8_t>(255 * (1 - fadeFactor));
+        hsvColor.val = static_cast<uint8_t>(255 * (1 - fadeFactor * 0.5));  // Reduce fading effect
+      } else {
+        hsvColor.val = 255;  // Full brightness for young fish
       }
     }
     updateRGB();
@@ -70,7 +67,8 @@ class ColorPalette {
 
   void adjustColorbyHealth(float health) {
     for (auto& hsvColor : colorsHSV) {
-      hsvColor.val = static_cast<uint8_t>(255 * health);
+      hsvColor.sat = static_cast<uint8_t>(130 * health);  // Saturation ranges from 0 to 130
+      hsvColor.val = static_cast<uint8_t>(255 * (0.2 + health * 0.8));  // Value ranges from 51 to 255
     }
     updateRGB();
   }

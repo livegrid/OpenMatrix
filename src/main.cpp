@@ -47,11 +47,6 @@ AutoRotate autoRotate(&matrix);
 
 StateManager stateManager(STATE_SAVE_INTERVAL);
 
-#ifdef TOUCH_ENABLED
-#include "TouchMenu.h"
-TouchMenu touchMenu(&matrix, &stateManager);
-#endif
-
 #include "EffectManager.h"
 EffectManager effectManager(&matrix);
 
@@ -69,6 +64,11 @@ Edmx& dmx = Edmx::getInstance();
 #ifdef WIFI_ENABLED
 WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
                                   &stateManager, &taskManager);
+#endif
+
+#ifdef TOUCH_ENABLED
+#include "TouchMenu.h"
+TouchMenu touchMenu(&matrix, &stateManager, &webServerManager);
 #endif
 
 #ifndef SCD40_ENABLED
@@ -138,6 +138,11 @@ void displayTask(void* parameter) {
             textDraw.drawText(stateManager.getState()->text.payload);
             break;
         }
+      }
+      
+      if (stateManager.getState()->firstBoot && aquarium.isDemoFinished()) {
+        stateManager.getState()->firstBoot = false;
+        stateManager.save();
       }
 
       if (touchMenu.shouldStartDemo()) {
@@ -315,6 +320,9 @@ void setup(void) {
   stateManager.startPeriodicSave();
 
   aquarium.begin();
+  if(stateManager.getState()->firstBoot) {
+    aquarium.startDemo();
+  }
 
 #ifdef SCD40_ENABLED
   scd40.init();
@@ -343,7 +351,7 @@ void setup(void) {
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
 #endif
 
 #ifdef WIFI_ENABLED
@@ -365,14 +373,4 @@ void setup(void) {
 
 void loop(void) {
   vTaskDelete(NULL);  // Delete the task running the loop function
-}
-
-// Add this function near the top of the file
-void waitForWiFiConnection() {
-  log_i("Waiting for WiFi connection...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    log_i(".");
-  }
-  log_i("WiFi connected. IP address: %s", WiFi.localIP().toString().c_str());
 }
