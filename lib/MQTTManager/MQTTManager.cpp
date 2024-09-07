@@ -84,15 +84,18 @@ void MQTTManager::setupCallbacks() {
 void MQTTManager::onMqttConnect(bool sessionPresent) {
   log_i("Connected to MQTT. Session present: %d", sessionPresent);
   MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = CONNECTED;
+  MQTTManager::getInstance().stateManager->getState()->settings.home_assistant.status = CONNECTED;
   MQTTManager::getInstance().subscribeToTextTopic();
 }
 
 void MQTTManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   log_w("Disconnected from MQTT. Reason: %d", static_cast<int>(reason));
   MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = DISCONNECTED;
+  MQTTManager::getInstance().stateManager->getState()->settings.home_assistant.status = DISCONNECTED;
   if (WiFi.isConnected()) {
     xTimerStart(MQTTManager::getInstance().mqttReconnectTimer, 0);
     MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = RECONNECTING;
+    MQTTManager::getInstance().stateManager->getState()->settings.home_assistant.status = RECONNECTING;
   }
 }
 

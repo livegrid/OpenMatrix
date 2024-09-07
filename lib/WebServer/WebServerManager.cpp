@@ -168,11 +168,6 @@ void WebServerManager::setupInterface() {
     }
   });
 
-  interface.onImagePreview([this](String fileName) {
-    // TODO: Show image preview on matrix
-    log_i("Image preview changed to: %s", fileName.c_str());
-  });
-
   interface.onText([this](String payload, TextSize size) {
     stateManager->getState()->text.payload = payload;
     stateManager->getState()->text.size = size;
@@ -238,12 +233,15 @@ void WebServerManager::setupInterface() {
   interface.onNetworkReset([this]() {
     log_i("[*] Resetting network");
     nw.reset();
+    ESP.restart();
   });
 
   interface.onFactoryReset([this]() {
     log_i("[*] Resetting factory settings");
-    
-    // TODO: Reset factory settings
+    nw.reset();
+    LittleFS.remove("/aquarium_state.json");
+    LittleFS.remove("/state.json");
+    ESP.restart();
   });
 }
 

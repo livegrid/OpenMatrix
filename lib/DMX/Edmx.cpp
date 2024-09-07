@@ -84,7 +84,7 @@ void Edmx::onNewPacketReceived(void* packet, protocol_t protocol, void* userInfo
   if (!e131Packet) {
     return;  // Invalid packets
   }
-    newPacket = true;
+  newPacket = true;
   uint16_t universe = htons(e131Packet->universe);
   
   // Check if the received universe is within our range
