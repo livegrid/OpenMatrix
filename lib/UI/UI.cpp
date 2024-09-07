@@ -34,9 +34,9 @@ void UI::begin() {
             if (_on_mode_cb) {
                 _on_mode_cb(json["mode"].as<OpenMatrixMode>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -49,9 +49,9 @@ void UI::begin() {
             if (_on_power_cb) {
                 _on_power_cb(json["power"].as<bool>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -64,9 +64,9 @@ void UI::begin() {
             if (_on_autobrightness_cb) {
                 _on_autobrightness_cb(json["autobrightness"].as<bool>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -81,9 +81,9 @@ void UI::begin() {
                 _on_brightness_cb(brightness);
             }
 
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -95,9 +95,9 @@ void UI::begin() {
             if (_on_effect_cb) {
                 _on_effect_cb(json["effect"].as<Effects>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -182,27 +182,27 @@ void UI::begin() {
                     _on_image_cb(json["name"].as<const char*>());
                 }
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
-    // on image preview
-    _server->on("/openmatrix/image", HTTP_PATCH, [&]() {
-        JsonDocument json;
-        DeserializationError err = deserializeJson(json, _server->arg("plain"));
-        if (err == DeserializationError::Ok) {
-            if (imageExists(json["name"].as<const char*>())) {
-                if (_on_image_preview_cb) {
-                    _on_image_preview_cb(json["name"].as<const char*>());
-                }
-            }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
-        } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
-        }
-    });
+    // // on image preview
+    // _server->on("/openmatrix/image", HTTP_PATCH, [&]() {
+    //     JsonDocument json;
+    //     DeserializationError err = deserializeJson(json, _server->arg("plain"));
+    //     if (err == DeserializationError::Ok) {
+    //         if (imageExists(json["name"].as<const char*>())) {
+    //             if (_on_image_preview_cb) {
+    //                 _on_image_preview_cb(json["name"].as<const char*>());
+    //             }
+    //         }
+    //         return _server->send(200, "application/json", ok_response);
+    //     } else {
+    //         return _server->send(400, "application/json", invalid_response);
+    //     }
+    // });
 
     // on text change
     _server->on("/openmatrix/text", HTTP_POST, [&]() {
@@ -212,9 +212,9 @@ void UI::begin() {
             if (_on_text_cb) {
                 _on_text_cb(json["payload"].as<const char*>(), json["size"].as<TextSize>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -226,9 +226,9 @@ void UI::begin() {
             if (_on_mqtt_settings_cb) {
                 _on_mqtt_settings_cb(json["host"].as<const char*>(), json["port"].as<uint16_t>(), json["client_id"].as<const char*>(), json["username"].as<const char*>(), json["password"].as<const char*>(), json["co2_topic"].as<const char*>(), json["matrix_text_topic"].as<const char*>(), json["show_text"].as<bool>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -240,9 +240,9 @@ void UI::begin() {
             if (_on_dmx_settings_cb) {
                 _on_dmx_settings_cb(json["protocol"].as<eDmxProtocol>(), json["mode"].as<eDmxMode>(), json["multicast"].as<bool>(), json["start_universe"].as<bool>(), json["start_address"].as<uint16_t>(), json["timeout"].as<uint16_t>());
             }
-            return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+            return _server->send(200, "application/json", ok_response);
         } else {
-            return _server->send(400, "application/json", "{\"message\":\"Invalid JSON\"}");
+            return _server->send(400, "application/json", invalid_response);
         }
     });
 
@@ -251,7 +251,15 @@ void UI::begin() {
         if (_on_network_reset_cb) {
             _on_network_reset_cb();
         } 
-        return _server->send(200, "application/json", "{\"message\":\"OK\"}");
+        return _server->send(200, "application/json", ok_response);
+    });
+
+    // on factory reset
+    _server->on("/openmatrix/factory/reset", HTTP_POST, [&]() {
+        if (_on_factory_reset_cb) {
+            _on_factory_reset_cb();
+        } 
+        return _server->send(200, "application/json", ok_response);
     });
 }
 
@@ -279,9 +287,9 @@ void UI::onImage(onImageChangeCallback cb) {
     _on_image_cb = cb;
 }
 
-void UI::onImagePreview(onImagePreviewCallback cb) {
-    _on_image_preview_cb = cb;
-}
+// void UI::onImagePreview(onImagePreviewCallback cb) {
+//     _on_image_preview_cb = cb;
+// }
 
 void UI::onText(onTextChangeCallback cb) {
     _on_text_cb = cb;
@@ -299,8 +307,12 @@ void UI::onHomeAssistantSettings(onHomeAssistantSettingsCallback cb) {
     _on_home_assistant_settings_cb = cb;
 }
 
-void UI::onNetworkReset(onNetworkResetCallback cb) {
+void UI::onNetworkReset(onResetCallback cb) {
     _on_network_reset_cb = cb;
+}
+
+void UI::onFactoryReset(onResetCallback cb) {
+    _on_factory_reset_cb = cb;
 }
 
 bool UI::_onAPFilter(WebServer &server) {

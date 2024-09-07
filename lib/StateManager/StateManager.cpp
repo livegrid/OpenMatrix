@@ -67,6 +67,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   // Settings
   JsonObject settings = json["settings"].to<JsonObject>();
   // MQTT
+  settings["mqtt"]["status"] = _state.settings.mqtt.status;
   settings["mqtt"]["host"] = _state.settings.mqtt.host;
   settings["mqtt"]["port"] = _state.settings.mqtt.port;
   settings["mqtt"]["client_id"] = _state.settings.mqtt.client_id;
@@ -76,6 +77,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   settings["mqtt"]["matrix_text_topic"] = _state.settings.mqtt.matrix_text_topic;
   settings["mqtt"]["show_text"] = _state.settings.mqtt.show_text;
   // Home Assistant
+  settings["hass"]["status"] = _state.settings.home_assistant.status;
   settings["hass"]["show_text"] = _state.settings.home_assistant.show_text;
   // eDMX
   settings["edmx"]["protocol"] = _state.settings.edmx.protocol;
@@ -192,6 +194,7 @@ void StateManager::restore() {
   // Settings
   JsonObject settings = json["settings"];
   // MQTT
+  _state.settings.mqtt.status = ConnectionStatus::DISCONNECTED;
   _state.settings.mqtt.host = settings["mqtt"]["host"].as<const char*>();
   _state.settings.mqtt.port = settings["mqtt"]["port"].as<const char*>();
   _state.settings.mqtt.client_id = settings["mqtt"]["client_id"].as<const char*>();
@@ -212,6 +215,7 @@ void StateManager::restore() {
   log_i("  Show Text: %d", _state.settings.mqtt.show_text);
 
   // Home Assistant
+  _state.settings.home_assistant.status = ConnectionStatus::DISCONNECTED;
   _state.settings.home_assistant.show_text = settings["hass"]["show_text"].as<bool>();
   log_i("Restored Home Assistant show_text: %d", _state.settings.home_assistant.show_text);
 

@@ -281,5 +281,18 @@ export default [
                 }
             };
         }
+    },
+    {
+        url: '/openmatrix/settings/factory/reset',
+        method: 'post',
+        timeout: 1000,
+        response: () => {
+            return {
+                code: 200,
+                data: {
+                    message: 'OK'
+                }
+            };
+        }
     }
 ];
