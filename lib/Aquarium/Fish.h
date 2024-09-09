@@ -2,7 +2,7 @@
 #define FISH_H
 
 #include <Arduino.h>
-#include <Vector.h>
+#include <PVector.h>
 #include <Matrix.h>
 #include <Sprites.h>
 #include <random>

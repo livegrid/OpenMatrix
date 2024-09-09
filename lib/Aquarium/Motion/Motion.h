@@ -2,7 +2,7 @@
 #define MOTION_H
 
 #include <Arduino.h>
-#include <Vector.h>
+#include <PVector.h>
 #include <FastNoise.h>
 #include <AquariumSettings.h>
 #include <SCD40Settings.h>

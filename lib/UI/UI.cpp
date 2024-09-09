@@ -247,7 +247,7 @@ void UI::begin() {
     });
 
     // on network reset
-    _server->on("/openmatrix/network/reset", HTTP_POST, [&]() {
+    _server->on("/openmatrix/settings/network/reset", HTTP_POST, [&]() {
         if (_on_network_reset_cb) {
             _on_network_reset_cb();
         } 
@@ -255,7 +255,7 @@ void UI::begin() {
     });
 
     // on factory reset
-    _server->on("/openmatrix/factory/reset", HTTP_POST, [&]() {
+    _server->on("/openmatrix/settings/factory/reset", HTTP_POST, [&]() {
         if (_on_factory_reset_cb) {
             _on_factory_reset_cb();
         } 
