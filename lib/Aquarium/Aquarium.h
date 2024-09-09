@@ -85,7 +85,7 @@ class Aquarium {
     5000,  // 7 - Humidity affects plant growth
     15000, // 8 - show
     5000,  // 9 - CO2 affects fish behavior
-    20000, // 10 - show
+    30000, // 10 - show
     5000,  // 11 - If your environment is good, they will thrive
     5000,  // 12 - And soon you will have an amazing ecosystem
     5000,  // 13 - Take care of them by taking care of yourself
@@ -94,7 +94,7 @@ class Aquarium {
 
   // Calculate current step and time within step
   unsigned long totalDuration = 0;
-  for (demoStep = 0; demoStep < sizeof(stepDurations) / sizeof(stepDurations[0]); demoStep++) {
+  for (; demoStep < sizeof(stepDurations) / sizeof(stepDurations[0]); demoStep++) {
     if (elapsedTime < totalDuration + stepDurations[demoStep]) {
       break;
     }
@@ -157,7 +157,7 @@ class Aquarium {
       break;
     case 10:
       t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
-      demoCO2 = 1200.0f + 800.0f * pausingSine(t, 0.2);
+      demoCO2 = 400.0f + 1600.0f * (0.5f + 0.5f * pausingSine(t, 0.2));
       snprintf(buffer, sizeof(buffer), "CO2:\n%.0f ppm", demoCO2);
       break;
     case 11:

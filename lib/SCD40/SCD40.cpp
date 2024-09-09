@@ -56,11 +56,10 @@ void SCD40::runMeasurementTask() {
     log_i("SCD40 connected");
     sensorAvailable = true;  // Update sensor availability status
 
-      scd4x.setCalibrationMode(true);
     // Check if auto-calibration is enabled
-    if (scd4x.getCalibrationMode()) {
+    if (scd4x.getCalibrationMode() == false) {
       // Disable auto-calibration
-      scd4x.setCalibrationMode(false);
+      scd4x.setCalibrationMode(true);
 
       // Save the settings to EEPROM
       scd4x.saveSettings();

@@ -4,7 +4,7 @@
 #define FIRMWARE_VERSION_MINOR 0
 #define FIRMWARE_VERSION_PATCH 0
 
-// #define PANEL_UPCYCLED 1
+#define PANEL_UPCYCLED 1
 
 #define AQUARIUM_ENABLED 1
 #define SCD40_ENABLED 1
@@ -15,3 +15,4 @@
 #define WIFI_ENABLED 1
 
 #define STATE_SAVE_INTERVAL 30  //in minutes
+#define MATRIX_REFRESH_INTERVAL 300000  //in ms

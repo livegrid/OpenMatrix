@@ -192,7 +192,7 @@ void displayTask(void* parameter) {
 
       frameCount++;
 
-      if (millis() - lastLogTime >= 30000) {
+      if (millis() - lastLogTime >= MATRIX_REFRESH_INTERVAL) {
         float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
         // TaskManager::getInstance().printTaskInfo();
         lastLogTime = currentTime;
@@ -320,9 +320,9 @@ void setup(void) {
   stateManager.startPeriodicSave();
 
   aquarium.begin();
-  if(stateManager.getState()->firstBoot) {
-    aquarium.startDemo();
-  }
+  // if(stateManager.getState()->firstBoot) {
+  //   aquarium.startDemo();
+  // }
 
 #ifdef SCD40_ENABLED
   scd40.init();
