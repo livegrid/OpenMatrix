@@ -5,8 +5,11 @@
   import { images, fetchImages } from "@/store";
   import { get } from "svelte/store";
   import ImageRow from "@/components/ImageRow.svelte";
-  import { compressAndConvertToGif } from "@/imageProcessing.js";
+  import * as GIFModule from '@dhdbstjr98/gif.js'
+  
+  const GIF = GIFModule.default || GIFModule;
   let fileInput;
+  const GIF_SIZE = 78;
 
   const fetch = async () => {
     try {
@@ -24,45 +27,91 @@
     }
   })
 
-  function triggerFileInput() {
-    fileInput.click();
+  
+  async function compressAndConvertToGif(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const gif = new GIF({
+          workers: 2,
+          quality: 10,
+          width: GIF_SIZE,
+          height: GIF_SIZE
+        });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = GIF_SIZE;
+        canvas.height = GIF_SIZE;
+        ctx.drawImage(img, 0, 0, GIF_SIZE, GIF_SIZE);
+
+        gif.addFrame(ctx, {delay: 500});
+
+        gif.on('progress', (p) => {
+          console.log(`GIF encoding progress: ${Math.round(p * 100)}%`);
+        });
+
+        gif.on('finished', (blob) => {
+          console.log('GIF creation finished');
+          resolve(blob);
+        });
+
+        console.log('Starting GIF rendering');
+        gif.render();
+      };
+      img.onerror = (error) => {
+        console.error('Error loading image:', error);
+        reject(error);
+      };
+      img.src = URL.createObjectURL(file);
+    });
   }
 
   async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (file) {
-      try {
-        const processedGif = await compressAndConvertToGif(file);
-        
-        // Create a new File object with the processed GIF
-        const gifFile = new File([processedGif], file.name.replace(/\.[^/.]+$/, ".gif"), {
-          type: "image/gif"
-        });
-
-        // Create FormData and append the file
-        const formData = new FormData();
-        formData.append("file", gifFile);
-
-        // Send the file to the server
-        const response = await fetch("/upload", {
-          method: "POST",
-          body: formData
-        });
-
-        if (response.ok) {
-          console.log("File uploaded successfully");
-          // Refresh the image list
-          await fetch();
-        } else {
-          console.error("File upload failed");
-          // TODO: Show error message to user
+        try {
+            const processedGif = await compressAndConvertToGif(file);
+            
+            // Create a new File object with the processed GIF
+            const gifFile = new File([processedGif], file.name.replace(/\.[^/.]+$/, ".gif"), {
+                type: "image/gif"
+            });
+            // Create FormData and append the file
+            const formData = new FormData();
+            formData.append("file", gifFile, gifFile.name);
+            
+            // Send the file to the server
+            console.log("Uploading file:", gifFile.name, "Size:", gifFile.size);
+            try {
+                const response = await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                
+                if (response && response.ok) {
+                    console.log("File uploaded successfully");
+                    // Refresh the image list
+                    await fetch();
+                } else {
+                    console.error("File upload failed", response);
+                    // TODO: Show error message to user
+                }
+            } catch (fetchError) {
+                console.error("Fetch error:", fetchError);
+                // TODO: Show network error message to user
+            }
+        } catch (error) {
+            console.error("Error processing image:", error);
+            // TODO: Show error message to user
         }
-      } catch (error) {
-        console.error("Error processing image:", error);
-        // TODO: Show error message to user
-      }
     }
+}
+
+  function triggerFileInput() {
+    fileInput.click();
   }
+
 </script>
 
 <!-- ... rest of the component remains the same ... -->
