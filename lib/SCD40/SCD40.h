@@ -1,16 +1,17 @@
 #pragma once
 
 #include <Arduino.h>
-#include <scd4x.h>
+#include <SensirionI2CScd4x.h>
 #include <Wire.h>
 #include "StateManager.h"
 
 class SCD40 {
  private:
-  double temperature, humidity, co2;
+  float temperature, humidity;
+  uint16_t co2;
   uint16_t error;
   char errorMessage[256];
-  SCD4X scd4x;
+  SensirionI2CScd4x scd4x;
   bool sensorAvailable = false;  // Track if the sensor is operational
   bool firstReadingReceived = false;  // Flag to indicate if the first reading has been received
 
@@ -30,7 +31,7 @@ class SCD40 {
   void init();
   bool isFirstReadingReceived();
   bool isConnected();
-  long getTemperature();
-  long getHumidity();
-  long getCO2();
+  float getTemperature();
+  float getHumidity();
+  uint16_t getCO2();
 };

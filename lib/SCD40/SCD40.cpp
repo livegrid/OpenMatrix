@@ -50,22 +50,44 @@ void SCD40::shiftHistoryAndResetAverage(State* state) {
 
 void SCD40::runMeasurementTask() {
   Wire.begin();
+  uint16_t error;
+  char errorMessage[256];
   scd4x.begin(Wire);
 
-  if(scd4x.isConnected()) {
+  error = scd4x.stopPeriodicMeasurement();
+  if (error) {
+      log_e("Error trying to execute stopPeriodicMeasurement(): ");
+      errorToString(error, errorMessage, 256);
+      log_e("%s", errorMessage);
+  }
+
+  uint16_t sensorStatus;
+  error = scd4x.performSelfTest(sensorStatus);
+  log_i("Sensor status: %d", sensorStatus);
+  if (error) {
+    log_e("Error trying to execute performSelfTest(): ");
+    errorToString(error, errorMessage, 256);
+    log_e("%s", errorMessage);
+  }
+
+  error = scd4x.startPeriodicMeasurement();
+  if(error) {
+    log_e("Error trying to execute startPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, 256);
+    log_e("%s", errorMessage);
+  }
+  else {
     log_i("SCD40 connected");
     sensorAvailable = true;  // Update sensor availability status
 
-    // Check if auto-calibration is enabled
-    if (scd4x.getCalibrationMode() == false) {
-      // Disable auto-calibration
-      scd4x.setCalibrationMode(true);
-
-      // Save the settings to EEPROM
-      scd4x.saveSettings();
+    error = scd4x.setAutomaticSelfCalibration(true);
+    if (error) {
+      log_e("Error trying to execute setAutomaticSelfCalibration(): ");
+      errorToString(error, errorMessage, 256);
+      log_e("%s", errorMessage);
     }
 
-    scd4x.startPeriodicMeasurement();
+    error = scd4x.startPeriodicMeasurement();
 
     const TickType_t xFrequency = pdMS_TO_TICKS(5000);
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -73,8 +95,19 @@ void SCD40::runMeasurementTask() {
     extern StateManager stateManager; 
 
     for (;;) {
-      if (scd4x.isDataReady()) {
-        if (scd4x.readMeasurement(co2, temperature, humidity) == 0) {
+    bool isDataReady = false;
+      error = scd4x.getDataReadyFlag(isDataReady);
+      if (isDataReady) {
+        error = scd4x.readMeasurement(co2, temperature, humidity);
+        if(error) {
+          log_e("Error trying to execute readMeasurement(): ");
+          errorToString(error, errorMessage, 256);
+          log_e("%s", errorMessage);
+          log_e("SCD40 not connected");
+          sensorAvailable = false;
+          vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
+        }
+        else {
           uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
           State* state = stateManager.getState();
           state->environment.temperature.value = temperature;
@@ -105,11 +138,6 @@ void SCD40::runMeasurementTask() {
       vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
   }
-  else {
-    log_i("SCD40 not connected");
-    sensorAvailable = false;
-    vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
-  }
 }
 
 void SCD40::init() {
@@ -124,14 +152,14 @@ bool SCD40::isConnected() {
   return sensorAvailable;
 }
 
-long SCD40::getTemperature() {
+float SCD40::getTemperature() {
   return temperature;
 }
 
-long SCD40::getHumidity() {
+float SCD40::getHumidity() {
   return humidity;
 }
 
-long SCD40::getCO2() {
+uint16_t SCD40::getCO2() {
   return co2;
 }

@@ -94,7 +94,7 @@ class Aquarium {
 
   // Calculate current step and time within step
   unsigned long totalDuration = 0;
-  for (; demoStep < sizeof(stepDurations) / sizeof(stepDurations[0]); demoStep++) {
+  for (demoStep = 0; demoStep < sizeof(stepDurations) / sizeof(stepDurations[0]); demoStep++) {
     if (elapsedTime < totalDuration + stepDurations[demoStep]) {
       break;
     }

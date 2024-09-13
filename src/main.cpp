@@ -320,9 +320,9 @@ void setup(void) {
   stateManager.startPeriodicSave();
 
   aquarium.begin();
-  // if(stateManager.getState()->firstBoot) {
-  //   aquarium.startDemo();
-  // }
+  if(stateManager.getState()->firstBoot) {
+    aquarium.startDemo();
+  }
 
 #ifdef SCD40_ENABLED
   scd40.init();
