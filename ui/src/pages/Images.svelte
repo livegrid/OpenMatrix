@@ -89,7 +89,7 @@
                     body: formData
                 });
                 
-                if (response && response.ok) {
+                if (response.ok) {
                     console.log("File uploaded successfully");
                     // Refresh the image list
                     await fetch();
