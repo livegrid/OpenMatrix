@@ -323,24 +323,7 @@ class Aquarium {
     }
   }
 
-  // General update function that updates all components of the aquarium
-  void update() {
-    handleTouchInput();
-
-    if (demoMode) {
-      updateDemo();
-    } else {
-      updateWater();
-      boidManager.updateBoids(scd40->getCO2());  // Update Boids
-      boidManager.renderBoids();                 // Render Boids
-      updateFish();
-      updateFood();
-      updatePlants();
-      periodicSave();
-    }
-  }
-
-  void display(bool showSensorData) {
+  void updateSensorData(bool showSensorData) {
     if (showSensorData && !demoMode) {
       if (scd40->isFirstReadingReceived()) {
         float temperature = scd40->getTemperature();
@@ -359,9 +342,29 @@ class Aquarium {
                           CRGB(150, 150, 150));
       }
     }
+  }
 
+  // General update function that updates all components of the aquarium
+  void update(bool showSensorData = false) {
+    handleTouchInput();
+
+    if (demoMode) {
+      updateDemo();
+    } else {
+      updateWater();
+      // boidManager.updateBoids(scd40->getCO2());
+      // boidManager.renderBoids();
+      updateSensorData(showSensorData);
+      updateFish();
+      updateFood();
+      updatePlants();
+      periodicSave();
+    }
+  }
+
+  void display() {
     matrix->gfx_compositor->Stack(*matrix->background, *matrix->foreground);
-    matrix->foreground->reduceBrightness(20);
+    matrix->foreground->reduceBrightness(30);
     // matrix->gfx_compositor->Stack(*matrix->background, *matrix->foreground);
     matrix->foreground->clear();
   }

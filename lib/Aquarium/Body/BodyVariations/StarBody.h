@@ -30,15 +30,15 @@ class StarBody : public Body {
     pt1.setMag(length * 2 * size);
 
     if (nodes) {
-      for (int i = 0; i < arms; i++) {
-        PVector armPt = PVector(pt1.x, pt1.y);
-        armPt.rotate(2 * PI / arms * i);
-        PVector endPoint = pos + armPt;
-        matrix->foreground->drawLine(pos.x, pos.y, endPoint.x, endPoint.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
-        matrix->foreground->fillCircle(endPoint.x, endPoint.y, rad / 2, CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g, colorPalette->colors[1].b));
-      }
-      matrix->foreground->fillCircle(pos.x, pos.y, rad * size, CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g, colorPalette->colors[2].b));
-    } else {
+    for (int i = 0; i < arms; i++) {
+      PVector armPt = PVector(pt1.x, pt1.y);
+      armPt.rotate(2 * PI / arms * i);
+      PVector endPoint = pos + armPt;
+      matrix->foreground->drawLine(pos.x, pos.y, endPoint.x, endPoint.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
+      matrix->foreground->fillCircle(endPoint.x, endPoint.y, max(1, int(rad * 0.5 * size)), CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g, colorPalette->colors[1].b));
+    }
+    matrix->foreground->fillCircle(pos.x, pos.y, max(1, int(rad * size)), CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g, colorPalette->colors[2].b));
+  } else {
       PVector pt2 = PVector::fromAngle(starAngle - PI / 2);
       PVector pt3 = PVector::fromAngle(starAngle + PI / 2);
       pt2.setMag(rad * size);

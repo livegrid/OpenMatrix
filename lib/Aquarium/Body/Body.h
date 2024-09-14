@@ -54,8 +54,7 @@ public:
     this->vel = vel;
     this->size = age;
     this->health = health;
-    colorPalette->adjustColorbyHealth(this->health);
-    colorPalette->adjustColorbyAge(this->size);
+    colorPalette->adjustColorByAgeAndHealth(this->size, this->health);
 
   }
 

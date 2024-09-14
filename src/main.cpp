@@ -167,8 +167,8 @@ void displayTask(void* parameter) {
             matrix.background->display();
             break;
           case OpenMatrixMode::AQUARIUM:
-            aquarium.update();
-            aquarium.display(touchMenu.showSensorData());
+            aquarium.update(touchMenu.showSensorData());
+            aquarium.display();
             break;
           case OpenMatrixMode::DMX:
             dmx.update();

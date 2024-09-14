@@ -55,7 +55,7 @@ public:
       drawSegment(i+1, segmentPositions[i], colorPalette->colors[i].r, colorPalette->colors[i].g, colorPalette->colors[i].b, true);
     }
     drawSegment(0, pos, colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b, false);
-    head->display(pos, angle, segments[0], size, 255, 255, 255);
+    head->display(pos, angle, segments[0], static_cast<uint8_t>(size*segments[0]), colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b);
   }
 
 };

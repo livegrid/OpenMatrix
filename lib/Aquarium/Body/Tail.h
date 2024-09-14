@@ -63,7 +63,7 @@ public:
   }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
-    matrix->foreground->drawCircleArray(pos.x, pos.y, size*3, size/3, angle, CRGB(r, g, b));
+    matrix->foreground->drawCircleArray(pos.x, pos.y, size/3, size*3, angle, CRGB(r, g, b));
   }
 };
 

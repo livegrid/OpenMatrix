@@ -11,7 +11,7 @@ protected:
 public:
   Head(Matrix* m) : matrix(m) {}
   String type;
-  virtual void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) = 0;
+  virtual void display(PVector position, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) = 0;
 };
 
 class TriangleHead : public Head {
@@ -20,19 +20,24 @@ public:
     type = "TriangleHead";
   }
 
-  void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
+  void display(PVector position, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
+    // Calculate the shift amount (e.g., 1/4 of the size)
+    PVector shift = PVector::fromAngle(angle + PI);  // Opposite direction of heading
+    shift *= size * 0.25;  // Adjust this factor to control the shift amount
+    
+    // Apply the shift to the position
+    PVector shiftedPosition = position + shift;
+
     PVector pt1 = PVector::fromAngle(angle);
-    pt1 *= segmentSize * bodySize;
-    pt1 += position;
+    pt1 *= size;
+    pt1 += shiftedPosition;
     PVector pt2 = PVector::fromAngle(angle - PI / 2);
-    pt2 *= segmentSize * bodySize/2;
-    pt2 += position;
+    pt2 *= size/2;
+    pt2 += shiftedPosition;
     PVector pt3 = PVector::fromAngle(angle + PI / 2);
-    pt3 *= segmentSize * bodySize/2;
-    pt3 += position;
-    // matrix->drawRectangle(int8_t(pos.x/physicsScale), int8_t(pos.y/PHYSICS_SCALE), 5, 5, col.r, col.g, col.b);
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
-    // matrix->drawCircle(int8_t(pos.x/physicsScale), int8_t(pos.y/PHYSICS_SCALE), 3, true, col.r, col.g, col.b);
+    pt3 *= size/2;
+    pt3 += shiftedPosition;
+    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r,g,b));
   }
 };
 
@@ -42,19 +47,19 @@ public:
     type = "FrogHead";
   }
 
-  void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
+  void display(PVector position, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector heading = PVector::fromAngle(angle);
     heading *= 0.5;
     PVector pt = PVector::fromAngle(angle + PI/2);
-    pt.setMag(segmentSize);
+    pt.setMag(size);
     pt += heading;
     pt += position;
-    matrix->foreground->fillCircle(pt.x, pt.y, segmentSize/2 * bodySize, CRGB(b, g, r));
+    matrix->foreground->fillCircle(pt.x, pt.y, size/2, CRGB(b, g, r));
     pt = PVector::fromAngle(angle + PI/2);
-    pt.setMag(-segmentSize);
+    pt.setMag(-size);
     pt += heading;
     pt += position;
-    matrix->foreground->fillCircle(pt.x, pt.y, segmentSize/2 * bodySize, CRGB(b, g, r));
+    matrix->foreground->fillCircle(pt.x, pt.y, size/2, CRGB(b, g, r));
   }
 };
 
@@ -65,11 +70,11 @@ public:
     type = "NeedleHead";
   }
 
-  void display(PVector position, float angle, uint8_t segmentSize, uint8_t bodySize, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
+  void display(PVector position, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) override {
     PVector pt1 = PVector::fromAngle(angle);
-    pt1 *= segmentSize * bodySize * noseLengthMultiplier;
+    pt1 *= size * noseLengthMultiplier;
     pt1 += position;
-    matrix->foreground->drawLine(pt1.x, pt1.y, position.x, position.y, CRGB(r, g, b));
+    matrix->foreground->drawLine(pt1.x, pt1.y, position.x, position.y, CRGB(r,g,b));
   }
 };
 

@@ -17,7 +17,7 @@ class TouchMenu {
   StateManager* stateManager;
   long touchThreshold;
   bool menuOpen = false;
-  bool sensorDataVisible = true;
+  bool sensorDataVisible = false;
   bool turnOff = false;
   bool WiFiInfoVisible = false;
   bool WiFiConnected = false;
