@@ -1,7 +1,7 @@
 <script>
     import Button from "./Button.svelte";
 
-    export let selected, loading, absolute = false;
+    export let text, selected, loading, absolute = false;
 </script>
 
 {#if loading}
@@ -13,7 +13,7 @@
         </div>
     {:else}
         <Button loading={loading} on:click className={absolute ? 'absolute bottom-3 right-3' : ''}>
-            Select
+            {text}
         </Button>
     {/if}
 {/if}

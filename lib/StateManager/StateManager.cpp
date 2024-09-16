@@ -93,6 +93,11 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 }
 
 void StateManager::save() {
+  stateChanged = true;
+}
+
+void StateManager::saveState() {
+  stateChanged = false;
   log_i("[SAVE] Starting save operation...");
 
   String buffer;
@@ -325,14 +330,22 @@ void StateManager::saveTask(void* parameter) {
     const TickType_t xFrequency = pdMS_TO_TICKS(stateManager->SAVE_INTERVAL);
     log_i("Save task started");
     // Wait for 10 seconds before starting the periodic save task
-    vTaskDelay(pdMS_TO_TICKS(stateManager->SAVE_INTERVAL));
+    vTaskDelay(pdMS_TO_TICKS(10000));
 
     for (;;) {   
-        log_i("Saving state periodically");
-        stateManager->save();  // This will now save all state data
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        if (stateManager->stateChanged) {
+            log_i("State changed, saving immediately");
+            stateManager->saveState();
+            xLastWakeTime = xTaskGetTickCount();
+        } else if (xTaskGetTickCount() - xLastWakeTime >= xFrequency) {
+            log_i("Saving state periodically");
+            stateManager->saveState();
+            xLastWakeTime = xTaskGetTickCount();
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
     }
 }
+
 
 StateManager::~StateManager() {
     if (_saveTaskHandle != NULL) {

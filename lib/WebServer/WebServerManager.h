@@ -37,5 +37,5 @@ private:
     void startServer();
     void handleModeChange();
     void handleGetState();
-    void handleImageUpload();
+    void handleEffectSettings();
 };

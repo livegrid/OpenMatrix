@@ -1,15 +1,14 @@
 <script>
     // @ts-nocheck
-    import SelectButton from "@/components/SelectButton.svelte";
     import Button from "@/components/Button.svelte";
-    import { state, selectImage } from "@/store";
+    import { state, selectImage, deleteImage} from "@/store";
+    import TextButton from './TextButton.svelte';
 
     export let id, name, size;
 
     let select_loading = false;
-    let preview_loading = false;
+    let delete_loading = false;
 
-    // remove extension from name
     $: formattedName = name.split('.').length > 1 ? name.split('.').slice(0, -1).join('.') : name;
 
     function humanFileSize(bytes, si=true, dp=1) {
@@ -45,16 +44,18 @@
       }
     }
 
-    // const preview = async () => {
-    //     preview_loading = true;
-    //     try { 
-    //         await invokePreview({ name });
-    //     } catch (err) {
-    //         console.log(err);
-    //     } finally {
-    //         preview_loading = false;
-    //     }
-    // }
+    const deleteImg = async () => {
+      delete_loading = true;
+      try {
+        await deleteImage({ name });
+      } catch (err) {
+        console.log(err);
+      } finally {
+        delete_loading = false;
+      }
+    }
+
+    
 </script>
 
 <tr class="odd:bg-white/80 odd:dark:bg-zinc-950/50 even:bg-zinc-50/80 even:dark:bg-zinc-900/50">
@@ -65,11 +66,14 @@
       { humanFileSize(size) }
     </td>
     <td class="flex flex-row gap-x-3 px-6 py-6">
-      <SelectButton
+      <TextButton
         selected={$state.image.selected === id}
         loading={select_loading}
         absolute={false}
         on:click={select}
+        text="Select"
       />
+      <TextButton loading={delete_loading} selected={false} absolute={false} on:click={deleteImg} text="Delete"></TextButton>
+
     </td>
 </tr>

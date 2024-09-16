@@ -9,11 +9,23 @@
   import GameOfLife from "@/components/effects/GameOfLife.svelte";
   import LSystem from "@/components/effects/LSystem.svelte";
   import { onDestroy, onMount } from "svelte";
-  import { state, selectMode, selectEffect } from "@/store";
+  import { state, selectMode, selectEffect, updateEffectSettings } from "@/store";
   import { get } from 'svelte/store';
 
   let last_effect = null;
   let loading_effect_id = null;
+  
+  let showSettings = false;
+  let currentEffect = null;
+
+  function openSettings(effect) {
+    currentEffect = effect;
+    showSettings = true;
+  }
+
+  function closeSettings() {
+    showSettings = false;
+  }
 
   const effects = [
     {
@@ -57,6 +69,10 @@
   onDestroy(() => {
     unsubscribe();
   });
+  
+  function handleSettingsUpdate(effectId, settings) {
+    updateEffectSettings(effectId, settings);
+  }
 </script>
 
 <ModePageLayout name={'Effects'} id={1}>
@@ -73,14 +89,37 @@
             loading_effect_id = effect.id;
             selectEffect(effect.id);
           }}
+          on:settings={() => openSettings(effect)}
           name={effect.name}
           image={effect.image}
+          effectType={effect.name}
           loading={effect.id === loading_effect_id}
           selected={effect.id === $state?.effects?.selected}
           color={$state?.effects?.colors?.[effect.id] || '#ffffff'}
-          onColorChange={(color) => updateEffectColor(effect.id, color)}
-        />
+          onColorChange={(color) => handleSettingsUpdate(effect.id, { color })}
+          onSpeedChange={(speed) => handleSettingsUpdate(effect.id, { speed })}
+          onScaleChange={(scale) => handleSettingsUpdate(effect.id, { scale })}
+          onParticleCountChange={(particleCount) => handleSettingsUpdate(effect.id, { particleCount })}
+          onComplexityChange={(complexity) => handleSettingsUpdate(effect.id, { complexity })}
+         />
       {/if}
     {/each}
   </dl>
+  
+{#if showSettings && currentEffect}
+<EffectSettingsPopup
+  effectType={currentEffect.name}
+  color={$state?.effects?.colors?.[currentEffect.id] || '#ffffff'}
+  speed={$state?.effects?.speed?.[currentEffect.id] || 50}
+  scale={$state?.effects?.scale?.[currentEffect.id] || 50}
+  particleCount={$state?.effects?.particleCount?.[currentEffect.id] || 100}
+  complexity={$state?.effects?.complexity?.[currentEffect.id] || 3}
+  on:close={closeSettings}
+  on:colorChange={(e) => handleSettingsUpdate(currentEffect.id, { color: e.detail })}
+  on:speedChange={(e) => handleSettingsUpdate(currentEffect.id, { speed: e.detail })}
+  on:scaleChange={(e) => handleSettingsUpdate(currentEffect.id, { scale: e.detail })}
+  on:particleCountChange={(e) => handleSettingsUpdate(currentEffect.id, { particleCount: e.detail })}
+  on:complexityChange={(e) => handleSettingsUpdate(currentEffect.id, { complexity: e.detail })}
+/>
+{/if}
 </ModePageLayout>

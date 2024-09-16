@@ -15,6 +15,7 @@ class UI {
         typedef std::function<void(uint16_t value)> onBrightnessCallback;
         typedef std::function<void(OpenMatrixMode mode)> onModeChangeCallback;
         typedef std::function<void(Effects effect)> onEffectChangeCallback;
+        typedef std::function<void(Effects effect, JsonObject settings)> onEffectSettingsCallback;
         typedef std::function<void(const char* path)> onImageChangeCallback;
         typedef std::function<void(const char* path)> onImagePreviewCallback;
         typedef std::function<void(const char* payload, TextSize size)> onTextChangeCallback;
@@ -30,14 +31,16 @@ class UI {
         void onBrightness(onBrightnessCallback cb);
         void onMode(onModeChangeCallback cb);
         void onEffect(onEffectChangeCallback cb);
+        void onEffectSettings(onEffectSettingsCallback cb);
         void onImage(onImageChangeCallback cb);
-        // void onImagePreview(onImagePreviewCallback cb);
         void onText(onTextChangeCallback cb);
         void onMqttSettings(onMqttSettingsCallback cb);
         void onDmxSettings(onDmxSettingsCallback cb);
         void onHomeAssistantSettings(onHomeAssistantSettingsCallback cb);
         void onNetworkReset(onResetCallback cb);
         void onFactoryReset(onResetCallback cb);
+        void handleImageUpload();
+
         ~UI();
     
     private:
@@ -49,8 +52,8 @@ class UI {
         onBrightnessCallback _on_brightness_cb;
         onModeChangeCallback _on_mode_cb;
         onEffectChangeCallback _on_effect_cb;
+        onEffectSettingsCallback _on_effect_settings_cb;
         onImageChangeCallback _on_image_cb;
-        // onImagePreviewCallback _on_image_preview_cb;
         onTextChangeCallback _on_text_cb;
         onMqttSettingsCallback _on_mqtt_settings_cb;
         onDmxSettingsCallback _on_dmx_settings_cb;

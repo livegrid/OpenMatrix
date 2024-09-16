@@ -147,6 +147,7 @@ class StateManager {
         State* getState();
         void serialize(String& buffer, bool settings_only = false);
         void save();
+        bool stateChanged;
         void restore();
         void startPeriodicSave();
         ~StateManager();
@@ -156,5 +157,6 @@ class StateManager {
         static void saveTask(void* parameter);
                 
         void setDefaultState();
+        void saveState();
         unsigned long SAVE_INTERVAL;
 };

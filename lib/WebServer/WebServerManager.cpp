@@ -118,7 +118,6 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->power = state;
     stateManager->save();
     log_i("Power state changed to: %s", state ? "ON" : "OFF");
-    stateManager->save();
   });
 
   interface.onAutoBrightness([this](bool state) {
@@ -142,7 +141,6 @@ void WebServerManager::setupInterface() {
       stateManager->getState()->mode = mode;
       stateManager->save();
       log_i("Mode changed to: %d", static_cast<int>(mode));
-      stateManager->save();
     }
   });
 
@@ -156,7 +154,13 @@ void WebServerManager::setupInterface() {
       log_i("Effect changed to: %d", static_cast<int>(effect));
     }
   });
-
+  
+  interface.onEffectSettings([this](Effects effect, JsonObject settings) {
+      log_i("Updating settings for effect: %d", static_cast<int>(effect));
+      // effectManager->updateEffectSettings(effect - 1, settings);
+      // stateManager->save();
+  });
+  
   interface.onImage([this](String fileName) {
     if (imageDraw->openGIF(fileName.c_str())) {
       stateManager->getState()->image.selected = fileName;
@@ -243,46 +247,6 @@ void WebServerManager::setupInterface() {
     LittleFS.remove("/state.json");
     ESP.restart();
   });
-  
-  server.on("/upload", HTTP_POST, [this]() {
-      server.send(200, "text/plain", "File uploaded successfully");
-  }, [this]() {
-      handleImageUpload();
-  });
-}
-
-
-void WebServerManager::handleImageUpload() {
-    HTTPUpload& upload = server.upload();
-    if (upload.status == UPLOAD_FILE_START) {
-        String filename = upload.filename;
-        if (!filename.startsWith("/")) filename = "/" + filename;
-        if (!filename.endsWith(".gif")) filename += ".gif";
-        log_i("handleFileUpload Name: %s", filename.c_str());
-        
-        // Open the file for writing
-        File file = LittleFS.open("/img" + filename, "w");
-        if (!file) {
-            log_e("Failed to open file for writing");
-            return;
-        }
-        file.write(upload.buf, upload.currentSize);
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-        File file = LittleFS.open("/img/" + upload.filename, "a");
-        if (file) {
-            file.write(upload.buf, upload.currentSize);
-        }
-    } else if (upload.status == UPLOAD_FILE_END) {
-        File file = LittleFS.open("/img/" + upload.filename, "a");
-        if (file) {
-            file.close();
-        }
-        log_i("handleFileUpload Size: %d", upload.totalSize);
-        
-        // Update the state with the new image
-        stateManager->getState()->image.selected = "/img/" + upload.filename;
-        stateManager->save();
-    }
 }
 
 void WebServerManager::startServer() {

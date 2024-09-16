@@ -113,6 +113,8 @@
       </div>
     {/if}
   </form>
+  
+</div>
 </ModePageLayout>
   {#if showColorPicker}
     <div class="absolute right-0 top-full mt-2 z-50">
@@ -123,4 +125,3 @@
       />
     </div>
   {/if}
-</div>
