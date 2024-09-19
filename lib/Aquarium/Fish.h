@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <PVector.h>
 #include <Matrix.h>
-#include <Sprites.h>
 #include <random>
 #include <vector>
 #include <utility>
@@ -13,8 +12,6 @@
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
 #include "AquariumSettings.h"
-
-//Probably not a good idea to create a new BodyFactory for every fish
 
 class Fish {
   PVector pos;
@@ -78,6 +75,13 @@ public:
       {"Turtle", "Turtle", 0.2},
       {"Snake", "Snake", 0.3}
     };
+
+    // std::vector<BodyMotionType> types = {
+    //   {"Fish", "Fish", 0},
+    //   {"Star", "Star", 1},
+    //   {"Turtle", "Turtle", 0},
+    //   {"Snake", "Snake", 0}
+    // };
     
     auto selectedType = selectType(types);
 
@@ -143,7 +147,10 @@ public:
   }
 
   void display() {
-    body->display();
+    if(age < AGE_EGG)
+      body->displayEgg();
+    else
+      body->display();
   }
 
   float getAge() {

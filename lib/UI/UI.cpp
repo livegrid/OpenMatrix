@@ -43,8 +43,7 @@ void UI::begin() {
     DeserializationError err = deserializeJson(json, _server->arg("plain"));
     if (err == DeserializationError::Ok) {
       if (_on_mode_cb) {
-        // _on_mode_cb(json["mode"].as<OpenMatrixMode>());
-        log_i("Mode changed to: %s", json["mode"].as<const char*>());
+        _on_mode_cb(json["mode"].as<OpenMatrixMode>());
       }
       return _server->send(200, "application/json", ok_response);
     } else {
@@ -395,6 +394,7 @@ void UI::handleImageUpload() {
     if (file) {
       file.close();
     }
+    
     log_i("handleFileUpload Size: %d", upload.totalSize);
 
     // Update the state with the new image

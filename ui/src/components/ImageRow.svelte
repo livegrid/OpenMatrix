@@ -1,7 +1,7 @@
 <script>
     // @ts-nocheck
     import Button from "@/components/Button.svelte";
-    import { state, selectImage, deleteImage} from "@/store";
+    import { state, selectImage, deleteImage, images } from "@/store";
     import TextButton from './TextButton.svelte';
 
     export let id, name, size;
@@ -54,26 +54,30 @@
         delete_loading = false;
       }
     }
-
     
 </script>
 
 <tr class="odd:bg-white/80 odd:dark:bg-zinc-950/50 even:bg-zinc-50/80 even:dark:bg-zinc-900/50">
-    <th scope="row" class="px-6 py-6 font-medium text-zinc-900 whitespace-nowrap dark:text-zinc-200">
-      { formattedName }
-    </th>
-    <td class="px-6 py-6">
-      { humanFileSize(size) }
-    </td>
-    <td class="flex flex-row gap-x-3 px-6 py-6">
-      <TextButton
-        selected={$state.image.selected === id}
-        loading={select_loading}
-        absolute={false}
-        on:click={select}
-        text="Select"
-      />
-      <TextButton loading={delete_loading} selected={false} absolute={false} on:click={deleteImg} text="Delete"></TextButton>
-
-    </td>
+  <th scope="row" class="px-6 py-6 font-medium text-zinc-900 whitespace-nowrap dark:text-zinc-200">
+    { formattedName }
+  </th>
+  <td class="px-6 py-6">
+    { humanFileSize(size) }
+  </td>
+  <td class="flex flex-row gap-x-3 px-6 py-6">
+    <TextButton
+      selected={$state.image.selected === id}
+      loading={select_loading}
+      absolute={false}
+      on:click={select}
+      text="Select"
+    />
+    <TextButton 
+      loading={delete_loading} 
+      selected={false} 
+      absolute={false} 
+      on:click={deleteImg} 
+      text="Delete"
+    />
+  </td>
 </tr>

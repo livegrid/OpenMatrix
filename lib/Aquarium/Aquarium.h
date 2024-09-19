@@ -52,6 +52,7 @@ class Aquarium {
 
   void begin() {
     loadState();
+    // initializeFish();
     initializePlants();
     boidManager.initializeBoids();
   }
@@ -352,8 +353,8 @@ class Aquarium {
       updateDemo();
     } else {
       updateWater();
-      // boidManager.updateBoids(scd40->getCO2());
-      // boidManager.renderBoids();
+      boidManager.updateBoids(scd40->getCO2());
+      boidManager.renderBoids();
       updateSensorData(showSensorData);
       updateFish();
       updateFood();

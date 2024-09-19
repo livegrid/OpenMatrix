@@ -1,8 +1,9 @@
 import { get, writable } from "svelte/store";
 import { fetchWithTimeout } from "./helpers";
-import * as GIFModule from '@dhdbstjr98/gif.js'
-  
-const GIF = GIFModule.default || GIFModule;
+import { encode, decode, decodeFrames } from 'modern-gif';
+import workerUrl from 'modern-gif/worker?url';
+
+// const GIF = GIFModule.default || GIFModule;
 const GIF_SIZE = 78;
 
 const API_URL = `.`;
@@ -226,10 +227,11 @@ export const deleteImage = async ({ name }) => {
         selected: name,
       },
     });
+    // Refresh the image list after successful deletion
+    await fetchImages();
   }
   return response;
 };
-
 
 export const handleFileUpload = async (file) => {
   if (file) {
@@ -278,104 +280,103 @@ export const handleFileUpload = async (file) => {
   }
   
   async function resizeGif(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const arrayBuffer = e.target.result;
-        
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log("Starting GIF resize process");
+  
+        const arrayBuffer = await file.arrayBuffer();
         console.log("Original GIF loaded, size:", arrayBuffer.byteLength);
   
-        const gif = new GIF({
-          workers: 2,
-          quality: 10,
-          width: GIF_SIZE,
-          height: GIF_SIZE,
-          workerScript: '/path/to/gif.worker.js', // Make sure this path is correct
-          debug: true // Enable debug logging
-        });
+        const gif = decode(arrayBuffer);
+        console.log(`GIF dimensions: ${gif.width}x${gif.height}`);
   
-        const img = new Image();
-        img.onload = function() {
-          console.log("Image loaded, dimensions:", img.width, "x", img.height);
+        const frames = await decodeFrames(arrayBuffer, { workerUrl });
+        console.log(`Extracted ${frames.length} frames from the GIF`);
   
+        const resizedFrames = frames.map(frame => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           canvas.width = GIF_SIZE;
           canvas.height = GIF_SIZE;
   
-          // Draw the entire GIF onto the canvas
-          ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, GIF_SIZE, GIF_SIZE);
-          
-          console.log("Image resized and drawn to canvas");
+          // Create a temporary canvas to hold the original frame
+          const tempCanvas = document.createElement('canvas');
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCanvas.width = frame.width;
+          tempCanvas.height = frame.height;
+          tempCtx.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
   
-          // Add the resized frame to the new GIF
-          gif.addFrame(ctx, {delay: 200}); // You might want to adjust the delay
+          // Draw the frame onto the resized canvas
+          ctx.drawImage(tempCanvas, 0, 0, frame.width, frame.height, 0, 0, GIF_SIZE, GIF_SIZE);
   
-          console.log("Frame added to new GIF");
+          // Get the resized image data
+          const resizedImageData = ctx.getImageData(0, 0, GIF_SIZE, GIF_SIZE);
   
-          gif.on('progress', function(p) {
-            console.log("Rendering progress:", Math.round(p * 100) + "%");
-          });
+          return {
+            data: resizedImageData.data,
+            width: GIF_SIZE,
+            height: GIF_SIZE,
+            delay: frame.delay,
+          };
+        });
   
-          gif.on('finished', function(blob) {
-            console.log("GIF rendering finished, size:", blob.size);
-            resolve(blob);
-          });
-  
-          console.log("Starting GIF render");
-          gif.render();
-        };
-  
-        img.onerror = function(error) {
-          console.error("Error loading image:", error);
-          reject(error);
-        };
-  
-        img.src = URL.createObjectURL(new Blob([arrayBuffer], {type: 'image/gif'}));
-      };
-      reader.onerror = function(error) {
-        console.error("Error reading file:", error);
-        reject(error);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  }
-  
-  async function convertToGif(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const gif = new GIF({
-          workers: 2,
-          quality: 10,
+        const output = await encode({
+          workerUrl,
           width: GIF_SIZE,
-          height: GIF_SIZE
+          height: GIF_SIZE,
+          frames: resizedFrames,
+          maxColors: 256, // You can adjust this for compression
         });
   
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = GIF_SIZE;
-        canvas.height = GIF_SIZE;
-        ctx.drawImage(img, 0, 0, GIF_SIZE, GIF_SIZE);
-  
-        gif.addFrame(ctx, {delay: 500});
-  
-        gif.on('finished', (blob) => {
-          console.log('GIF creation finished');
-          resolve(blob);
-        });
-  
-        console.log('Starting GIF rendering');
-        gif.render();
-      };
-      img.onerror = (error) => {
-        console.error('Error loading image:', error);
+        console.log("GIF encoding finished, size:", output.byteLength);
+        resolve(new Blob([output], { type: 'image/gif' }));
+      } catch (error) {
+        console.error("Error processing GIF:", error);
         reject(error);
-      };
-      img.src = URL.createObjectURL(file);
+      }
     });
   }
-  
+
+async function convertToGif(file) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log("Starting image to GIF conversion");
+
+      const img = await createImageBitmap(file);
+      console.log(`Original image dimensions: ${img.width}x${img.height}`);
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = GIF_SIZE;
+      canvas.height = GIF_SIZE;
+
+      // Draw and resize the image
+      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, GIF_SIZE, GIF_SIZE);
+
+      const imageData = ctx.getImageData(0, 0, GIF_SIZE, GIF_SIZE);
+
+      const output = await encode({
+        workerUrl,
+        width: GIF_SIZE,
+        height: GIF_SIZE,
+        frames: [{
+          data: imageData.data,
+          width: GIF_SIZE,
+          height: GIF_SIZE,
+          delay: 100, // 100ms delay for static image
+        }],
+        maxColors: 256, // You can adjust this for compression
+      });
+
+      console.log("GIF encoding finished, size:", output.byteLength);
+      resolve(new Blob([output], { type: 'image/gif' }));
+    } catch (error) {
+      console.error("Error converting image to GIF:", error);
+      reject(error);
+    }
+  });
+}
+
 export const updateText = async ({ payload, size }) => {
   const response = await fetchWithTimeout(`${API_URL}/openmatrix/text`, {
     method: "POST",

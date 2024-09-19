@@ -5,9 +5,13 @@
   import { images, fetchImages, handleFileUpload } from "@/store";
   import { get } from "svelte/store";
   import ImageRow from "@/components/ImageRow.svelte";
+  import UploadPopup from "@/components/UploadPopup.svelte";
   $: isUploadDisabled = $images && $images.length >= 10;
 
   let fileInput;
+  let isUploading = false;
+  let errorMessage = '';
+  let showErrorPopup = false;
   
   const fetch = async () => {
     try {
@@ -30,13 +34,21 @@
     const file = event.target.files[0];
     if (file) {
       try {
+        isUploading = true;
         await handleFileUpload(file);
-        // Optionally, you can add user feedback here (e.g., success message)
+        isUploading = false;
       } catch (error) {
-        // Handle error (e.g., show error message to user)
         console.error("File upload failed:", error);
+        isUploading = false;
+        errorMessage = error.message || "File upload failed. Please try again.";
+        showErrorPopup = true;
       }
     }
+  }
+
+  function closeErrorPopup() {
+    showErrorPopup = false;
+    errorMessage = '';
   }
 
   function triggerFileInput() {
@@ -92,16 +104,27 @@
       on:change={handleFileInputChange}
       class="hidden"
       bind:this={fileInput}
-      disabled={isUploadDisabled}
+      disabled={isUploadDisabled || isUploading}
     />
     <button
       on:click={triggerFileInput}
       class="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-opacity-50"
-      class:opacity-50={isUploadDisabled}
-      class:cursor-not-allowed={isUploadDisabled}
-      disabled={isUploadDisabled}
+      class:opacity-50={isUploadDisabled || isUploading}
+      class:cursor-not-allowed={isUploadDisabled || isUploading}
+      disabled={isUploadDisabled || isUploading}
     > 
-      {isUploadDisabled ? 'Max Images Reached (10)' : 'Upload New Image'}
+      {#if isUploading}
+        Uploading...
+      {:else if isUploadDisabled}
+        Max Images Reached (10)
+      {:else}
+        Upload New Image
+      {/if}
     </button>
   </div>
+
+  
+  {#if showErrorPopup}
+    <UploadPopup message={errorMessage} onClose={closeErrorPopup} />
+  {/if}
 </ModePageLayout>

@@ -55,11 +55,10 @@ public:
     this->size = age;
     this->health = health;
     colorPalette->adjustColorByAgeAndHealth(this->size, this->health);
-
   }
 
   void displayEgg() {
-    matrix->foreground->fillCircle(pos.x, pos.y, EGG_SIZE, CRGB(EGG_COLOR));
+    matrix->foreground->drawPixel(pos.x, pos.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
   }
   
   void setColorPaletteHSV(const std::vector<CHSV>& palette) {

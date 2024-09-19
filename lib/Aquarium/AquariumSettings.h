@@ -40,7 +40,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define BOUNDARY_FORCE 0.2  //change to 0.2
 
 //EGG SETTINGS
-#define EGG_SIZE 2
+#define EGG_SIZE 1
 #define EGG_COLOR 0, 0, 200
 
 //FISH SETTINGS
