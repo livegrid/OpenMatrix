@@ -63,5 +63,5 @@
       on:particleCountChange={handleParticleCountChange}
       on:complexityChange={handleComplexityChange}
     />
-    {/if}
+  {/if}
 </div>
