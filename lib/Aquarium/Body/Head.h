@@ -10,6 +10,7 @@ protected:
 
 public:
   Head(Matrix* m) : matrix(m) {}
+  virtual ~Head() = default;
   String type;
   virtual void display(PVector position, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, int8_t xOffset = 0, int8_t yOffset = 0) = 0;
 };

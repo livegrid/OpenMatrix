@@ -14,10 +14,10 @@
 #include "AquariumSettings.h"
 
 class Fish {
+  Matrix* matrix = nullptr;
   PVector pos;
   float age;
   float health;
-  Matrix* matrix = nullptr;
   BodyFactory* bodyFactory = nullptr;
   uint8_t offspringCount = 0;
 
@@ -34,16 +34,16 @@ class Fish {
 
 public:
 
-  struct FishDefinition {
-    float age;
-    float health;
-    String bodyType;
-    String headType;
-    String tailType;
-    String finType;
-    String motionType;
-    std::vector<CHSV> colors;
-  };
+struct FishDefinition {
+  float age;
+  float health;
+  String bodyType;
+  String headType;
+  String tailType;
+  String finType;
+  String motionType;
+  std::vector<CHSV> colors;
+};
 
   FishDefinition fishDefinition;
   const std::vector<CHSV>& getColorsHSV() const { return body->getColorPaletteHSV(); }
@@ -63,11 +63,10 @@ public:
     fishDefinition = fishDef;
   }
 
-  Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, float health = 1)
+ Fish(Matrix* matrix, PVector pos = PVector(0,0), float age = 0, float health = 1)
   : matrix(matrix), pos(pos), age(age), health(health) {
     BodyFactory bodyFactory(matrix);
     initializeAgingRate();
-    // this->body = std::unique_ptr<Body>(bodyFactory.createRandomBody());
 
     std::vector<BodyMotionType> types = {
       {"Fish", "Fish", 0.5},
@@ -86,7 +85,22 @@ public:
     auto selectedType = selectType(types);
 
     this->body = std::unique_ptr<Body>(bodyFactory.createBody(selectedType.bodyType));
+    if (!this->body) {
+        // Fallback to a default body type if creation fails
+        this->body = std::unique_ptr<Body>(bodyFactory.createBody("Fish"));
+    }
+
+    // Ensure the motion is created successfully
     this->motion = MotionFactory::createMotion(selectedType.motionType, pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE);
+    if (!this->motion) {
+        // Fallback to a default motion type if creation fails
+        this->motion = MotionFactory::createMotion("Fish", pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE, matrix->getYResolution() * PHYSICS_SCALE);
+    }
+
+    // Initialize position to a random location if not provided
+    if (pos.x == 0 && pos.y == 0) {
+        this->pos = PVector(random(matrix->getXResolution()), random(matrix->getYResolution()));
+    }
 
     fishDefinition = {
       age,
@@ -95,7 +109,8 @@ public:
       this->body->getHeadType(),
       this->body->getTailType(),
       this->body->getFinType(),
-      selectedType.motionType
+      selectedType.motionType,
+      this->body->getColorPaletteHSV() 
     };
   }
   // ~Fish(); // Destructor

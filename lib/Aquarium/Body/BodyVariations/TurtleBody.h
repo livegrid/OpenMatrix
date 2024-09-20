@@ -17,7 +17,11 @@ public:
   }
 
   void display() override {
-    matrix->foreground->drawCircleArray(pos.x, pos.y, rad * size, length*(1+vel.mag()/20) * size, angle + PI/2, colorPalette->colors[0]);
+    uint8_t rad2draw = rad * size;
+    if(rad2draw < 1) rad2draw = 1;
+    uint8_t length2draw = length*(1+vel.mag()/20) * size;
+    if(length2draw < 1) length2draw = 1;
+    matrix->foreground->drawCircleArray(pos.x, pos.y, rad2draw, length2draw, angle + PI/2, colorPalette->colors[0]);
   }
 };
 

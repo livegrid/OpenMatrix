@@ -95,6 +95,7 @@ class BodyFactory {
 
   Tail* createRandomTail() {
     return createRandomComponent(tailConstructors);
+    // return new WavyTail(matrix);
   }
 
   Head* createHead(const String& type) {
@@ -129,6 +130,8 @@ class BodyFactory {
       return new LegFin(matrix);
     } else if (type == "RoundFin") {
       return new RoundFin(matrix);
+    } else {
+      return nullptr;
     }
   }
 

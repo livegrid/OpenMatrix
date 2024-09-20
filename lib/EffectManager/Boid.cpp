@@ -177,10 +177,10 @@ void Boid::wrapAroundBorders() {
 void Boid::avoidBorders() {
     PVector desired(velocity.x, velocity.y);
 
-    if (location.x < 8) desired.x = maxspeed;
-    if (location.x > limits.x - 8) desired.x = -maxspeed;
-    if (location.y < 8) desired.y = maxspeed;
-    if (location.y > limits.y - 8) desired.y = -maxspeed;
+    if (location.x < 0) desired.x = maxspeed;
+    if (location.x > limits.x - 0) desired.x = -maxspeed;
+    if (location.y < 0) desired.y = maxspeed;
+    if (location.y > limits.y - 0) desired.y = -maxspeed;
 
     if (desired != velocity) {
         PVector steer = desired - velocity;

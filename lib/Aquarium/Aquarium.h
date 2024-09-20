@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <Fonts/Font4x7Fixed.h>
+#include <Fonts/Font5x7Fixed.h>
 #include <Matrix.h>
 #include <scd40.h>
 
@@ -52,7 +53,6 @@ class Aquarium {
 
   void begin() {
     loadState();
-    // initializeFish();
     initializePlants();
     boidManager.initializeBoids();
   }
@@ -73,6 +73,7 @@ class Aquarium {
   void updateDemo() {
   unsigned long currentTime = millis();
   unsigned long elapsedTime = currentTime - demoStartTime;
+
 
   // Define step durations in milliseconds
   const unsigned long stepDurations[] = {
@@ -138,7 +139,7 @@ class Aquarium {
     case 6:
       t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
       demoTemperature = 25.0f + 25.0f * pausingSine(t, 0.2);
-      snprintf(buffer, sizeof(buffer), "Temperature:\n%.1f C", demoTemperature);
+      snprintf(buffer, sizeof(buffer), "Temperature:\n%.0f C", demoTemperature);
       updateWater();
       break;
     case 7:
@@ -162,6 +163,7 @@ class Aquarium {
       snprintf(buffer, sizeof(buffer), "CO2:\n%.0f ppm", demoCO2);
       break;
     case 11:
+      demoCO2 = 400;
       snprintf(buffer, sizeof(buffer), "If your\nenvironment\nis good,\nthey will thrive");
       break;
     case 12:
@@ -189,7 +191,7 @@ class Aquarium {
   }
 
   drawMultilineText(matrix->foreground, buffer, MIDDLE,
-                    TextAlignment::CENTER, &Font4x7Fixed,
+                    TextAlignment::CENTER, &Font5x7Fixed,
                     CRGB(150, 150, 150));
 }
 
@@ -334,11 +336,11 @@ class Aquarium {
         snprintf(buffer, sizeof(buffer),
                  "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
                  temperature, humidity, co2);
-        drawMultilineText(matrix->background, buffer, MIDDLE,
+        drawMultilineText(matrix->foreground, buffer, MIDDLE,
                           TextAlignment::CENTER, &Font4x7Fixed,
                           CRGB(150, 150, 150));
       } else {
-        drawMultilineText(matrix->background, "Sensors\nWarming Up...", MIDDLE,
+        drawMultilineText(matrix->foreground, "Sensors\nWarming Up...", MIDDLE,
                           TextAlignment::CENTER, &Font4x7Fixed,
                           CRGB(150, 150, 150));
       }
@@ -355,18 +357,16 @@ class Aquarium {
       updateWater();
       boidManager.updateBoids(scd40->getCO2());
       boidManager.renderBoids();
-      updateSensorData(showSensorData);
       updateFish();
       updateFood();
       updatePlants();
+      updateSensorData(showSensorData);
       periodicSave();
     }
   }
 
   void display() {
     matrix->gfx_compositor->Stack(*matrix->background, *matrix->foreground);
-    matrix->foreground->reduceBrightness(30);
-    // matrix->gfx_compositor->Stack(*matrix->background, *matrix->foreground);
     matrix->foreground->clear();
   }
 

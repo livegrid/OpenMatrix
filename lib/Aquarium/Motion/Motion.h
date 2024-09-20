@@ -62,7 +62,7 @@ class Motion {
 
   void update(float age = AGE_ADULT, long co2 = CO2_OK, bool stayInside = false) {
     this->co2 = co2;
-    if(stayInside) {
+    if(stayInside || co2 > CO2_BAD) {
       boundaryCheck(BOUNDARY_FORCE * 10);
     }
     else {

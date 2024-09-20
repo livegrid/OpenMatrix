@@ -1,5 +1,3 @@
-#pragma once
-
 #include "ImageDraw.h"
 
 ImageDraw* ImageDraw::currentInstance = nullptr;

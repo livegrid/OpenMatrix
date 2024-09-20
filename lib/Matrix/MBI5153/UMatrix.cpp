@@ -242,7 +242,7 @@ void UMatrix::refreshMatrixConfig() {
 
 void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
                             uint8_t _g_data, uint8_t _b_data) {
-  if (x >= PANEL_RES_X || y >= PANEL_RES_Y)
+  if (x >= PANEL_RES_X || x < 0 || y >= PANEL_RES_Y || y < 0)
     return;
 
   uint8_t r_data = CIE[_r_data];

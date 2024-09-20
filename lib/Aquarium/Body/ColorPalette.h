@@ -62,18 +62,18 @@ class ColorPalette {
       }
 
       // Health adjustment
-      float healthFactor = 0.2f + health * 0.8f;
+      float healthFactor = health;
 
       // Combine age and health effects
-      hsvColor.sat = static_cast<uint8_t>(110 * health);
-      hsvColor.val = static_cast<uint8_t>(255 * ageFactor * healthFactor);
+      hsvColor.sat = static_cast<uint8_t>(115 * healthFactor);  // Reduce saturation as health decreases
+      hsvColor.val = static_cast<uint8_t>(255 * ageFactor);  // Keep value high, only affected by age
     }
     updateRGB();
   }
 
  private:
   void applyStripes() {
-    int swapType = random(0, 3);
+    int swapType = random(0, 4);
     for (size_t i = 0; i < colorsHSV.size(); i++) {
       if (i % 2 == 1) {
         switch (swapType) {
@@ -82,9 +82,6 @@ class ColorPalette {
             break;
           case 1:
             colorsHSV[i].hue = (colorsHSV[i].hue + 170) % 256;  // Shift hue by 2/3
-            break;
-          case 2:
-            colorsHSV[i].sat = 255 - colorsHSV[i].sat;  // Invert saturation
             break;
         }
       }

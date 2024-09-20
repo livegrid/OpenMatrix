@@ -13,11 +13,11 @@ void AquariumStateManager::saveState(const std::vector<std::unique_ptr<Fish>>& f
 
     String buffer;
     
-    DynamicJsonDocument doc(16384);
-    JsonArray fishesJson = doc.createNestedArray("fishes");
+    JsonDocument doc;
+    JsonArray fishesJson = doc["fishes"].to<JsonArray>();
 
     for (const auto& fish : fishArray) {
-        JsonObject fishJson = fishesJson.createNestedObject();
+        JsonObject fishJson = fishesJson.add<JsonObject>();
         fishJson["age"] = fish->getAge();
         fishJson["health"] = fish->getHealth();
         fishJson["bodyType"] = fish->getBodyType();
@@ -26,9 +26,9 @@ void AquariumStateManager::saveState(const std::vector<std::unique_ptr<Fish>>& f
         fishJson["finType"] = fish->getFinType();
         fishJson["motionType"] = fish->getMotionType();
         
-        JsonArray colorsJson = fishJson.createNestedArray("colors");
+        JsonArray colorsJson = fishJson["colors"].to<JsonArray>();
         for (const auto& color : fish->getColorsHSV()) {
-            JsonObject colorJson = colorsJson.createNestedObject();
+            JsonObject colorJson = colorsJson.add<JsonObject>();
             colorJson["h"] = color.hue;
             colorJson["s"] = color.sat;
             colorJson["v"] = color.val;
@@ -70,7 +70,7 @@ bool AquariumStateManager::loadState(std::vector<std::unique_ptr<Fish>>& fishArr
         return false;
     }
     
-    DynamicJsonDocument doc(16384);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     
     // String jsonString;

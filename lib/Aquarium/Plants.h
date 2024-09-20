@@ -111,7 +111,6 @@ class Plants {
   void addOriginToNodes() {
     for (uint8_t i = 0; i < branches.size(); i++) {
       for (uint8_t j = 0; j < branches[i].nodes.size(); j++) {
-        PVector node = branches[i].nodes[j];
         branches[i].nodes[j] += pos;
       }
     }

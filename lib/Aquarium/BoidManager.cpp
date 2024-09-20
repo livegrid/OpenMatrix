@@ -27,7 +27,7 @@ void BoidManager::updateBoids(long co2) {
   for (auto& group : boidGroups) {
     for (auto& boid : group) {
       boid.run(group.data(), group.size(),speedMultiplier);
-      boid.wrapAroundBorders();
+      boid.avoidBorders();
     }
   }
 }
@@ -35,8 +35,7 @@ void BoidManager::updateBoids(long co2) {
 void BoidManager::renderBoids() {
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
-      matrix->foreground->setPixel(boid.location.x, boid.location.y, 255, 255,
-                                   255);
+      matrix->foreground->setPixel(boid.location.x, boid.location.y, 50, 200, 100);
     }
   }
 }

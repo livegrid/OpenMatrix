@@ -7,13 +7,13 @@
 class AutoBrightness {
 private:
   hp_BH1750 BH1750;
-  bool sensorWorking;
-  float lux;
+  Matrix* matrix;
   uint16_t minLux;
   uint16_t maxLux;
   uint8_t minBrightness;
   uint8_t maxBrightness;
-  Matrix* matrix;
+  float lux;
+  bool sensorWorking;
 
 public:
     AutoBrightness(Matrix* matrix, uint16_t minLux = 30, uint16_t maxLux = 600, uint8_t minBrightness = 30, uint8_t maxBrightness = 255);

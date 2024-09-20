@@ -40,7 +40,7 @@ void GameofLifeEffect::randomFillWorld() {
     for (int i = 0; i < WORLD_WIDTH; i++) {
         for (int j = 0; j < WORLD_HEIGHT; j++) {
             if (random(100) < density) {
-                world[i][j] = {true, true, static_cast<uint8_t>(random(64)), 255};
+                world[i][j] = {true, true, static_cast<uint8_t>(random(64)), 200};
             } else {
                 world[i][j] = {false, false, 0, 0};
             }

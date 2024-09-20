@@ -120,6 +120,7 @@ void displayTask(void* parameter) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
+      digitalWrite(2, LOW);
       if (currentMode != stateManager.getState()->mode) {
         if (currentMode == OpenMatrixMode::IMAGE) {
           imageDraw.closeGIF();
@@ -200,6 +201,7 @@ void displayTask(void* parameter) {
       }
     }
     else {
+      digitalWrite(2, HIGH);
       matrix.clearScreen();
       matrix.update();
     }
@@ -308,6 +310,9 @@ void setup(void) {
   log_i("Firmware Version: %u.%u.%u", FIRMWARE_VERSION_MAJOR,
         FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
   log_i("");
+
+  pinMode(2, OUTPUT);
+  digitalWrite(2, LOW);
 
   matrix.init();
 

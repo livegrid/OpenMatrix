@@ -20,9 +20,9 @@ protected:
 
   PVector vel;
 
-  Fin* fin;
   Head* head;
   Tail* tail;
+  Fin* fin;
   ColorPalette* colorPalette;
 
   float transitionFactor;
