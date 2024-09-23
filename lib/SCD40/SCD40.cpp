@@ -54,90 +54,74 @@ void SCD40::runMeasurementTask() {
   char errorMessage[256];
   scd4x.begin(Wire);
 
-  error = scd4x.stopPeriodicMeasurement();
-  if (error) {
-      log_e("Error trying to execute stopPeriodicMeasurement(): ");
-      errorToString(error, errorMessage, 256);
-      log_e("%s", errorMessage);
-  }
+  // error = scd4x.startPeriodicMeasurement();
+  // if(error) {
+  //   log_e("Error trying to execute startPeriodicMeasurement(): ");
+  //   errorToString(error, errorMessage, 256);
+  //   log_e("%s", errorMessage);
+  // }
+  // else {
+  //   log_i("SCD40 connected");
+  //   sensorAvailable = true;  // Update sensor availability status
 
-  uint16_t sensorStatus;
-  error = scd4x.performSelfTest(sensorStatus);
-  log_i("Sensor status: %d", sensorStatus);
-  if (error) {
-    log_e("Error trying to execute performSelfTest(): ");
-    errorToString(error, errorMessage, 256);
-    log_e("%s", errorMessage);
-  }
+  //   error = scd4x.setAutomaticSelfCalibration(false);
+  //   if (error) {
+  //     log_e("Error trying to execute setAutomaticSelfCalibration(): ");
+  //     errorToString(error, errorMessage, 256);
+  //     log_e("%s", errorMessage);
+  //   }
 
-  error = scd4x.startPeriodicMeasurement();
-  if(error) {
-    log_e("Error trying to execute startPeriodicMeasurement(): ");
-    errorToString(error, errorMessage, 256);
-    log_e("%s", errorMessage);
-  }
-  else {
-    log_i("SCD40 connected");
-    sensorAvailable = true;  // Update sensor availability status
+  //   error = scd4x.startPeriodicMeasurement();
 
-    error = scd4x.setAutomaticSelfCalibration(true);
-    if (error) {
-      log_e("Error trying to execute setAutomaticSelfCalibration(): ");
-      errorToString(error, errorMessage, 256);
-      log_e("%s", errorMessage);
-    }
+  //   const TickType_t xFrequency = pdMS_TO_TICKS(5000);
+  //   TickType_t xLastWakeTime = xTaskGetTickCount();
+  //   // char tempBuffer[4];
+  //   extern StateManager stateManager; 
 
-    error = scd4x.startPeriodicMeasurement();
+  //   for (;;) {
+  //   bool isDataReady = false;
+  //     error = scd4x.getDataReadyFlag(isDataReady);
+  //     if (isDataReady) {
+  //       error = scd4x.readMeasurement(co2, temperature, humidity);
+  //       if(error) {
+  //         log_e("Error trying to execute readMeasurement(): ");
+  //         errorToString(error, errorMessage, 256);
+  //         log_e("%s", errorMessage);
+  //         log_e("SCD40 not connected");
+  //         sensorAvailable = false;
+  //         vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
+  //       }
+  //       else {
+  //         uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
+  //         State* state = stateManager.getState();
+  //         state->environment.temperature.value = temperature;
+  //         state->environment.temperature.diff.type = DiffType::DISABLE;
+  //         state->environment.humidity.value = humidityValue;
+  //         state->environment.humidity.diff.type = DiffType::DISABLE;
+  //         state->environment.co2.value = co2;
+  //         state->environment.co2.diff.type = DiffType::DISABLE;
 
-    const TickType_t xFrequency = pdMS_TO_TICKS(5000);
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    // char tempBuffer[4];
-    extern StateManager stateManager; 
+  //         // Accumulate readings
+  //         tempSum += temperature;
+  //         humiditySum += humidityValue;
+  //         co2Sum += co2;
+  //         readingCount++;
 
-    for (;;) {
-    bool isDataReady = false;
-      error = scd4x.getDataReadyFlag(isDataReady);
-      if (isDataReady) {
-        error = scd4x.readMeasurement(co2, temperature, humidity);
-        if(error) {
-          log_e("Error trying to execute readMeasurement(): ");
-          errorToString(error, errorMessage, 256);
-          log_e("%s", errorMessage);
-          log_e("SCD40 not connected");
-          sensorAvailable = false;
-          vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
-        }
-        else {
-          uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
-          State* state = stateManager.getState();
-          state->environment.temperature.value = temperature;
-          state->environment.temperature.diff.type = DiffType::DISABLE;
-          state->environment.humidity.value = humidityValue;
-          state->environment.humidity.diff.type = DiffType::DISABLE;
-          state->environment.co2.value = co2;
-          state->environment.co2.diff.type = DiffType::DISABLE;
+  //         // Update running average
+  //         updateRunningAverage(state);
 
-          // Accumulate readings
-          tempSum += temperature;
-          humiditySum += humidityValue;
-          co2Sum += co2;
-          readingCount++;
+  //         // Check if we have collected an hour's worth of readings
+  //         if (readingCount >= READINGS_PER_HOUR) {
+  //           shiftHistoryAndResetAverage(state);
+  //         }
 
-          // Update running average
-          updateRunningAverage(state);
-
-          // Check if we have collected an hour's worth of readings
-          if (readingCount >= READINGS_PER_HOUR) {
-            shiftHistoryAndResetAverage(state);
-          }
-
-          firstReadingReceived = true;  // Set the first reading flag
-        }
-        sensorAvailable = true;
-      }
-      vTaskDelayUntil(&xLastWakeTime, xFrequency);
-    }
-  }
+  //         firstReadingReceived = true;  // Set the first reading flag
+  //       }
+  //       sensorAvailable = true;
+  //     }
+  //     vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  //   }
+  // }
 }
 
 void SCD40::init() {

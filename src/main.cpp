@@ -23,10 +23,8 @@ UMatrix matrix;
 OMatrix matrix;
 #endif
 
-#ifdef SCD40_ENABLED
 #include "SCD40.h"
 SCD40 scd40;
-#endif
 
 #include "Aquarium.h"
 Aquarium aquarium(&matrix, &scd40);
@@ -316,6 +314,28 @@ void setup(void) {
 
   matrix.init();
 
+#ifdef SCD40_ENABLED
+  delay(5);
+  scd40.init();
+#else
+  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
+#endif
+
+#ifdef ADXL345_ENABLED
+  delay(5);
+  autoRotate.init();
+#endif
+
+#ifdef BH1750_ENABLED
+  delay(5);
+  autoBrightness.init();
+#endif
+
+#ifdef TOUCH_ENABLED
+  delay(5);
+  touchMenu.setupInterrupts();
+#endif
+
   // Start LittleFS
   LittleFS.begin(true);
   // Restore State
@@ -328,25 +348,6 @@ void setup(void) {
   if(stateManager.getState()->firstBoot) {
     aquarium.startDemo();
   }
-
-#ifdef SCD40_ENABLED
-  scd40.init();
-#else
-  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
-#endif
-
-#ifdef ADXL345_ENABLED
-  autoRotate.init();
-#endif
-
-#ifdef BH1750_ENABLED
-  delay(5);
-  autoBrightness.init();
-#endif
-
-#ifdef TOUCH_ENABLED
-  touchMenu.setupInterrupts();
-#endif
 
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
 
