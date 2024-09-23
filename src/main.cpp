@@ -34,9 +34,9 @@ Aquarium aquarium(&matrix, &scd40);
 #ifdef BH1750_ENABLED
 #include "AutoBrightness.h"
 #ifdef PANEL_UPCYCLED
-AutoBrightness autoBrightness(&matrix, 30, 600, 100, 255);
+AutoBrightness autoBrightness(&matrix, 30, 600, 80, 255);
 #else
-AutoBrightness autoBrightness(&matrix);
+AutoBrightness autoBrightness(&matrix, 30, 600, 150, 255);
 #endif
 #endif
 

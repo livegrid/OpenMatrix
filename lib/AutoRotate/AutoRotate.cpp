@@ -79,11 +79,19 @@ uint8_t AutoRotate::calculateRotation() {
   float buffer = 2.02; // Adjust buffer value as needed
 
   if ((x > (10-buffer)) && (x < (10+buffer)) && (y > (-buffer)) && (y < buffer)) {
+    #ifdef PANEL_UPCYCLED
     newRotation = 1;
+    #else
+    newRotation = 3;
+    #endif
   } else if ((x > - buffer) && (x < buffer) && (y > (-10-buffer)) && (y < (-10+buffer))) {
     newRotation = 2;
   } else if ((x > (-10-buffer)) && (x < (-10+buffer)) && (y > -buffer) && (y < buffer)) {
+    #ifdef PANEL_UPCYCLED
     newRotation = 3;
+    #else
+    newRotation = 1;
+    #endif
   } else if ((x > -buffer) && (x < buffer) && (y > (10-buffer)) && (y < (10+buffer))) {
     newRotation = 0;
   }
