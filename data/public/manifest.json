@@ -6,14 +6,16 @@
 "theme_color": "#36b49f",
 "icons": [
     {
-    "src": "logo_192.png",
+    "src": "/public/logo_192.png",
     "sizes": "192x192",
     "type": "image/png"
     },
     {
-    "src": "logo_512.png",
+    "src": "/public/logo_512.png",
     "sizes": "512x512",
     "type": "image/png"
     }
-]
+],
+"start_url": "/",
+"scope": "/"
 }

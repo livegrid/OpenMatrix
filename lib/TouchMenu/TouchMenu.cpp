@@ -17,7 +17,7 @@ std::string TouchMenu::getSensorDataMenuText() const {
 }
 
 std::vector<std::string> TouchMenu::getItemList() const {
-  std::vector<std::string> baseList = {"Go Back","WiFi Info", getSensorDataMenuText(), "Start Demo", "Turn Off", "Factory Reset"};
+  std::vector<std::string> baseList = {"Go Back","WiFi Info", getSensorDataMenuText(), "Brightness", "Start Demo", "Turn Off", "Factory Reset"};
   return baseList;
 }
 
@@ -37,6 +37,9 @@ void TouchMenu::executeMenuItem(const std::string& selectedOption) {
   } else if (selectedOption == "WiFi Info") {
     showWiFiInfo = true;
     currentMenuItem = 0;
+  } else if (selectedOption == "Brightness") {
+    showBrightnessControl = true;
+    currentMenuItem = 0;
   }
 }
 
@@ -54,9 +57,28 @@ void TouchMenu::handleDoubleTap(uint8_t pin) {
 void TouchMenu::handleSingleTap(uint8_t pin) {
   if (!stateManager->getState()->power) {
     stateManager->getState()->power = true;
+    stateManager->save();
     return;
   }
-  if (menuOpen) {
+  if (menuOpen) {if (showBrightnessControl) {
+      if (pin == 11) { // Use pin 11 to adjust brightness
+        if (currentMenuItem == 1) { // Toggle between Auto and Manual
+          stateManager->getState()->autobrightness = !stateManager->getState()->autobrightness;
+          stateManager->save();
+        } else if (currentMenuItem == 2 && !stateManager->getState()->autobrightness) { // Only adjust brightness if brightness control is selected and in manual mode
+          int newBrightness = stateManager->getState()->brightness + 10;
+          if (newBrightness > 255) newBrightness = 50; // Wrap around to 50 when it reaches over 255
+          stateManager->getState()->brightness = newBrightness;
+          matrix->setBrightness(newBrightness);
+        } else if (currentMenuItem == 0) { // Go Back
+          showBrightnessControl = false;
+          currentMenuItem = 0;
+        }
+      } else if (pin == 13) { // Use pin 13 to scroll through the menu
+        currentMenuItem = (currentMenuItem + 1) % (stateManager->getState()->autobrightness ? 2 : 3); // Toggle between Go Back, Auto/Manual, and Adjust if in manual mode
+      }
+      return;
+    }
     if (showWiFiInfo) {
       if (confirmationRequired) {
         if (pin == 13) {
@@ -119,6 +141,8 @@ void TouchMenu::displayMenu() {
     } else {
       displayWiFiInfo();
     }
+  } else if (showBrightnessControl) {
+    displayBrightnessControl();
   } else if (confirmationRequired) {
     displayConfirmation("Factory Reset?");
   } else {
@@ -219,6 +243,34 @@ void TouchMenu::displayWiFiInfo() {
   matrix->background->println(">Reset WiFi");
 }
 
+void TouchMenu::displayBrightnessControl() {
+  matrix->background->setTextColor(inactiveColor);
+  matrix->background->println("Brightness:");
+  matrix->background->println("");
+
+  // Add Go Back option
+  matrix->background->setTextColor(currentMenuItem == 0 ? activeColor : inactiveColor);
+  matrix->background->print(">");
+  matrix->background->println("Go Back");
+
+  // Show either Auto or Manual based on the current state
+  const char* modeOption = stateManager->getState()->autobrightness ? "Auto" : "Manual";
+  matrix->background->setTextColor(currentMenuItem == 1 ? activeColor : inactiveColor);
+  matrix->background->print(">");
+  matrix->background->println(modeOption);
+
+  // Show brightness adjustment only if in manual mode
+  if (!stateManager->getState()->autobrightness) {
+    matrix->background->setTextColor(currentMenuItem == 2 ? activeColor : inactiveColor);
+    matrix->background->print(">");
+    matrix->background->println("Adjust");
+
+    int brightness = stateManager->getState()->brightness;
+    matrix->background->setTextColor(activeColor);
+    matrix->background->println("");
+    matrix->background->println(("Current: " + String(brightness) + "/255").c_str());
+  }
+}
 
 void TouchMenu::setupInterrupts() {
   touchAttachInterrupt(11, gotTouch1, touchThreshold);

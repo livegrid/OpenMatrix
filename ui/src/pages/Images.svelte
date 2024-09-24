@@ -8,6 +8,9 @@
   import UploadPopup from "@/components/UploadPopup.svelte";
   $: isUploadDisabled = $images && $images.length >= 10;
 
+  $: totalSize = $images ? $images.reduce((acc, img) => acc + img.size, 0) : 0;
+  $: isUploadDisabled = totalSize >= 1 * 1024 * 1024; // 1MB
+
   let fileInput;
   let isUploading = false;
   let errorMessage = '';
@@ -116,7 +119,7 @@
       {#if isUploading}
         Uploading...
       {:else if isUploadDisabled}
-        Max Images Reached (10)
+        Max Total Size Reached (1MB)
       {:else}
         Upload New Image
       {/if}

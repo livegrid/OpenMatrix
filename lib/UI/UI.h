@@ -40,6 +40,7 @@ class UI {
         void onNetworkReset(onResetCallback cb);
         void onFactoryReset(onResetCallback cb);
         void handleImageUpload();
+        String getContentType(String filename);
 
         ~UI();
     

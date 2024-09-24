@@ -6,7 +6,7 @@ class NoiseEffect : public Effect {
 private:
     uint16_t x = 0;
     uint16_t y = 0;
-    uint8_t scale = 3;
+    uint8_t scale = 15;
     float speed = 0.05;
 
 public:

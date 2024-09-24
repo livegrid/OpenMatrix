@@ -16,7 +16,7 @@ class Plants {
   PVector pos;
   std::vector<Branch> branches;
   uint8_t numBranches;
-  uint8_t branchSizeBase = 3;
+  uint8_t branchSizeBase = 4;
   uint8_t numNodes;
   std::vector<float> phaseOffsets;
 

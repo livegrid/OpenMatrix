@@ -126,8 +126,6 @@ void WebServerManager::setupInterface() {
     log_i("Autobrightness state changed to: %s", state ? "ON" : "OFF");
   });
 
-  
-
   interface.onBrightness([this](uint8_t value) {
     stateManager->getState()->brightness = value;
     stateManager->save();

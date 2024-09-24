@@ -1,0 +1,21 @@
+{
+"name": "LiveGrid",
+"short_name": "LiveGrid",
+"display": "standalone",
+"background_color": "#ffffff",
+"theme_color": "#36b49f",
+"icons": [
+    {
+    "src": "/public/logo_192.png",
+    "sizes": "192x192",
+    "type": "image/png"
+    },
+    {
+    "src": "/public/logo_512.png",
+    "sizes": "512x512",
+    "type": "image/png"
+    }
+],
+"start_url": "/",
+"scope": "/"
+}

@@ -70,9 +70,9 @@ struct FishDefinition {
 
     std::vector<BodyMotionType> types = {
       {"Fish", "Fish", 0.5},
-      {"Star", "Star", 0.3},
+      {"Star", "Star", 0.1},
       {"Turtle", "Turtle", 0.2},
-      {"Snake", "Snake", 0.3}
+      {"Snake", "Snake", 0.2}
     };
 
     // std::vector<BodyMotionType> types = {

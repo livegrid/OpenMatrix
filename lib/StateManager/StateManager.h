@@ -4,6 +4,7 @@
 #include "FS.h"
 #include "LittleFS.h"
 #include "ArduinoJson.h"
+#include "GeneralSettings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -105,6 +106,8 @@ struct State {
     // Image
     struct {
         String selected = "";
+        uint8_t width;
+        uint8_t height;
     } image;
 
     // Text

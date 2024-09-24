@@ -3,9 +3,6 @@ import { fetchWithTimeout } from "./helpers";
 import { encode, decode, decodeFrames } from 'modern-gif';
 import workerUrl from 'modern-gif/worker?url';
 
-// const GIF = GIFModule.default || GIFModule;
-const GIF_SIZE = 78;
-
 const API_URL = `.`;
 
 // Status
@@ -237,6 +234,11 @@ export const handleFileUpload = async (file) => {
   if (file) {
     try {
       const processedImage = await processImage(file);
+
+      // Check if the processed image size exceeds 200KB
+      if (processedImage.size > 200 * 1024) {
+        throw new Error("Compressed file size exceeds 200KB");
+      }
       
       // Create a new File object with the processed GIF
       const newFileName = file.name.endsWith('.gif') ? file.name : file.name.replace(/\.[^/.]+$/, ".gif");
@@ -272,14 +274,18 @@ export const handleFileUpload = async (file) => {
 };
 
   async function processImage(file) {
+    const currentState = get(state);
+    const width = currentState.image?.width || 64; // Default width if not set
+    const height = currentState.image?.height || 64; // Default height if not set
+  
     if (file.type === 'image/gif') {
-      return resizeGif(file);
+      return resizeGif(file, width, height);
     } else {
-      return convertToGif(file);
+      return convertToGif(file, width, height);
     }
   }
   
-  async function resizeGif(file) {
+  async function resizeGif(file, width, height) {
     return new Promise(async (resolve, reject) => {
       try {
         console.log("Starting GIF resize process");
@@ -296,8 +302,8 @@ export const handleFileUpload = async (file) => {
         const resizedFrames = frames.map(frame => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          canvas.width = GIF_SIZE;
-          canvas.height = GIF_SIZE;
+          canvas.width = width;
+          canvas.height = height;
   
           // Create a temporary canvas to hold the original frame
           const tempCanvas = document.createElement('canvas');
@@ -307,23 +313,23 @@ export const handleFileUpload = async (file) => {
           tempCtx.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
   
           // Draw the frame onto the resized canvas
-          ctx.drawImage(tempCanvas, 0, 0, frame.width, frame.height, 0, 0, GIF_SIZE, GIF_SIZE);
+          ctx.drawImage(tempCanvas, 0, 0, frame.width, frame.height, 0, 0, width, height);
   
           // Get the resized image data
-          const resizedImageData = ctx.getImageData(0, 0, GIF_SIZE, GIF_SIZE);
+          const resizedImageData = ctx.getImageData(0, 0, width, height);
   
           return {
             data: resizedImageData.data,
-            width: GIF_SIZE,
-            height: GIF_SIZE,
+            width: width,
+            height: height,
             delay: frame.delay,
           };
         });
   
         const output = await encode({
           workerUrl,
-          width: GIF_SIZE,
-          height: GIF_SIZE,
+          width: width,
+          height: height,
           frames: resizedFrames,
           maxColors: 256, // You can adjust this for compression
         });
@@ -337,7 +343,7 @@ export const handleFileUpload = async (file) => {
     });
   }
 
-async function convertToGif(file) {
+async function convertToGif(file, width, height) {
   return new Promise(async (resolve, reject) => {
     try {
       console.log("Starting image to GIF conversion");
@@ -347,22 +353,22 @@ async function convertToGif(file) {
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = GIF_SIZE;
-      canvas.height = GIF_SIZE;
+      canvas.width = width;
+      canvas.height = height;
 
       // Draw and resize the image
-      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, GIF_SIZE, GIF_SIZE);
+      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, width, height);
 
-      const imageData = ctx.getImageData(0, 0, GIF_SIZE, GIF_SIZE);
+      const imageData = ctx.getImageData(0, 0, width, height);
 
       const output = await encode({
         workerUrl,
-        width: GIF_SIZE,
-        height: GIF_SIZE,
+        width: width,
+        height: height,
         frames: [{
           data: imageData.data,
-          width: GIF_SIZE,
-          height: GIF_SIZE,
+          width: width,
+          height: height,
           delay: 100, // 100ms delay for static image
         }],
         maxColors: 256, // You can adjust this for compression

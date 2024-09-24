@@ -315,29 +315,30 @@ void setup(void) {
   matrix.init();
 
 #ifdef SCD40_ENABLED
-  delay(5);
+  delay(50);
   scd40.init();
 #else
   TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
 #endif
 
 #ifdef ADXL345_ENABLED
-  delay(5);
+  delay(50);
   autoRotate.init();
 #endif
 
-#ifdef BH1750_ENABLED
-  delay(5);
-  autoBrightness.init();
+#ifdef TOUCH_ENABLED
+  delay(50);
+  touchMenu.setupInterrupts();
 #endif
 
-#ifdef TOUCH_ENABLED
-  delay(5);
-  touchMenu.setupInterrupts();
+#ifdef BH1750_ENABLED
+  delay(50);
+  autoBrightness.init();
 #endif
 
   // Start LittleFS
   LittleFS.begin(true);
+  
   // Restore State
   stateManager.restore();
   matrix.setBrightness(stateManager.getState()->brightness);

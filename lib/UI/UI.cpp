@@ -37,6 +37,61 @@ void UI::begin() {
     return _server->send(200, "application/json", state);
   });
 
+  _server->on("/public/manifest.json", HTTP_GET, [this]() {
+    if (LittleFS.exists("/public/manifest.json")) {
+      File file = LittleFS.open("/public/manifest.json", "r");
+      _server->streamFile(file, "application/json");
+      file.close();
+    } else {
+      _server->send(404, "text/plain", "Manifest not found");
+    }
+  });
+
+  
+  // Direct route for logo_192.png
+  _server->on("/public/logo_32.png", HTTP_GET, [this]() {
+    if (LittleFS.exists("/public/logo_32.png")) {
+      File file = LittleFS.open("/public/logo_32.png", "r");
+      _server->streamFile(file, "image/png");
+      file.close();
+    } else {
+      _server->send(404, "text/plain", "Logo 32 not found");
+    }
+  });
+
+  // Direct route for logo_192.png
+  _server->on("/public/logo_192.png", HTTP_GET, [this]() {
+    if (LittleFS.exists("/public/logo_192.png")) {
+      File file = LittleFS.open("/public/logo_192.png", "r");
+      _server->streamFile(file, "image/png");
+      file.close();
+    } else {
+      _server->send(404, "text/plain", "Logo 192 not found");
+    }
+  });
+
+  // Direct route for logo_512.png
+  _server->on("/public/logo_512.png", HTTP_GET, [this]() {
+    if (LittleFS.exists("/public/logo_512.png")) {
+      File file = LittleFS.open("/public/logo_512.png", "r");
+      _server->streamFile(file, "image/png");
+      file.close();
+    } else {
+      _server->send(404, "text/plain", "Logo 512 not found");
+    }
+  });
+
+  // Route for service-worker.js
+  _server->on("/public/service-worker.js", HTTP_GET, [this]() {
+    if (LittleFS.exists("/public/service-worker.js")) {
+      File file = LittleFS.open("/public/service-worker.js", "r");
+      _server->streamFile(file, "application/javascript");
+      file.close();
+    } else {
+      _server->send(404, "text/plain", "Service worker not found");
+    }
+  });
+
   // OpenMatrix Switch Modes
   _server->on("/openmatrix/mode", HTTP_POST, [&]() {
     JsonDocument json;
@@ -366,6 +421,24 @@ void UI::onEffectSettings(onEffectSettingsCallback cb) {
 
 void UI::onImage(onImageChangeCallback cb) {
   _on_image_cb = cb;
+}
+
+String UI::getContentType(String filename) {
+  if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".css")) return "text/css";
+  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".json")) return "application/json";
+  else if (filename.endsWith(".png")) return "image/png";
+  else if (filename.endsWith(".jpg")) return "image/jpeg";
+  else if (filename.endsWith(".ico")) return "image/x-icon";
+  else if (filename.endsWith(".svg")) return "image/svg+xml";
+  else if (filename.endsWith(".webp")) return "image/webp";
+  else if (filename.endsWith(".woff")) return "font/woff";
+  else if (filename.endsWith(".woff2")) return "font/woff2";
+  else if (filename.endsWith(".ttf")) return "font/ttf";
+  else if (filename.endsWith(".manifest")) return "application/manifest+json";
+  else if (filename.endsWith(".gz")) return "application/x-gzip";
+  return "text/plain";
 }
 
 void UI::handleImageUpload() {

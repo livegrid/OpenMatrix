@@ -27,6 +27,9 @@ class TouchMenu {
   bool touch2detected = false;
   bool touch3detected = false;
 
+  bool showBrightnessControl = false;
+  bool manualBrightnessAdjustment = false;
+
   CRGB activeColor = CRGB(255, 255, 255);
   CRGB inactiveColor = CRGB(128, 128, 128);
   
@@ -53,6 +56,7 @@ class TouchMenu {
   WebServerManager* webServerManager = nullptr;
   void displayWiFiInfo();
   void displayConfirmation(const char* message);
+  void displayBrightnessControl();
 
  public:
   TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, long touchThreshold = 10000);

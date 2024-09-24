@@ -45,12 +45,12 @@
       </div>
     </div>
     <div class="flex justify-end items-center mt-auto">
-      <TextButton on:click={() => showSettingsPopup=!showSettingsPopup} loading={showSettingsPopup} text="Edit"/>
+      <!-- <TextButton on:click={() => showSettingsPopup=!showSettingsPopup} loading={showSettingsPopup} text="Edit"/> -->
       <TextButton on:click loading={loading} selected={selected} text="Select"/>
     </div>
   </div>
   
-  {#if showSettingsPopup}
+  <!-- {#if showSettingsPopup}
     <EffectSettingsPopup
       {color}
       {speed}
@@ -63,5 +63,5 @@
       on:particleCountChange={handleParticleCountChange}
       on:complexityChange={handleComplexityChange}
     />
-  {/if}
+  {/if} -->
 </div>

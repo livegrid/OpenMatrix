@@ -28,7 +28,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
     temperature["diff"]["type"] = _state.environment.temperature.diff.type;
     temperature["diff"]["value"] = _state.environment.temperature.diff.value;
     temperature["diff"]["inverse"] = _state.environment.temperature.diff.inverse;
-    JsonArray temperature_history = temperature.createNestedArray("history_24h");
+    JsonArray temperature_history = temperature["history_24h"].to<JsonArray>();
     for (int i = 0; i < 24; i++) {
       temperature_history.add(_state.environment.temperature.history_24h[i]);
     }
@@ -38,7 +38,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
     humidity["diff"]["type"] = _state.environment.humidity.diff.type;
     humidity["diff"]["value"] = _state.environment.humidity.diff.value;
     humidity["diff"]["inverse"] = _state.environment.humidity.diff.inverse;
-    JsonArray humidity_history = humidity.createNestedArray("history_24h");
+    JsonArray humidity_history = humidity["history_24h"].to<JsonArray>();
     for (int i = 0; i < 24; i++) {
       humidity_history.add(_state.environment.humidity.history_24h[i]);
     }
@@ -48,7 +48,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
     co2["diff"]["type"] = _state.environment.co2.diff.type;
     co2["diff"]["value"] = _state.environment.co2.diff.value;
     co2["diff"]["inverse"] = _state.environment.co2.diff.inverse;
-    JsonArray co2_history = co2.createNestedArray("history_24h");
+    JsonArray co2_history = co2["history_24h"].to<JsonArray>();
     for (int i = 0; i < 24; i++) {
       co2_history.add(_state.environment.co2.history_24h[i]);
     }
@@ -59,6 +59,8 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 
   // Image
   json["image"]["selected"] = _state.image.selected;
+  json["image"]["width"] = _state.image.width;
+  json["image"]["height"] = _state.image.height;
 
   // Text
   json["text"]["payload"] = _state.text.payload;
@@ -188,6 +190,8 @@ void StateManager::restore() {
 
   // Image
   _state.image.selected = json["image"]["selected"].as<const char*>();
+  _state.image.width = json["image"]["width"].as<uint8_t>();
+  _state.image.height = json["image"]["height"].as<uint8_t>();
   log_i("Restored selected image: %s", _state.image.selected);
 
   // Text
@@ -271,7 +275,14 @@ void StateManager::setDefaultState() {
 
     // Effects
     _state.effects.selected = Effects::SIMPLEX_NOISE;
-    _state.image.selected = "Airplane.gif";
+    _state.image.selected = "Hut.gif";
+    #ifdef PANEL_UPCYCLED
+    _state.image.width = 78;
+    _state.image.height = 78;
+    #else
+    _state.image.width = 64;
+    _state.image.height = 64;
+    #endif
     _state.text.payload = "Hello, World!";
     _state.text.size = TextSize::MEDIUM;
 
