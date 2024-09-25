@@ -1,10 +1,10 @@
 #ifndef MOTION_H
 #define MOTION_H
 
-#include <Arduino.h>
-#include <PVector.h>
-#include <FastNoise.h>
 #include <AquariumSettings.h>
+#include <Arduino.h>
+#include <FastNoise.h>
+#include <PVector.h>
 #include <SCD40Settings.h>
 
 class Motion {
@@ -32,7 +32,7 @@ class Motion {
   uint16_t xResolution;
   uint16_t yResolution;
 
-  PVector foodDirection; 
+  PVector foodDirection;
 
   bool followingFood = false;
 
@@ -40,7 +40,7 @@ class Motion {
   Motion(PVector pos, uint16_t xResolution, uint16_t yResolution)
       : pos(pos), xResolution(xResolution), yResolution(yResolution) {}
 
-  virtual ~Motion() {}                 // Virtual destructor for proper cleanup
+  virtual ~Motion() {}  // Virtual destructor for proper cleanup
 
   float lerp(float start, float end, float t) {
     return (1 - t) * start + t * end;
@@ -60,37 +60,36 @@ class Motion {
 
   virtual void doMotion() = 0;
 
-  void update(float age = AGE_ADULT, long co2 = CO2_OK, bool stayInside = false) {
+  void update(float age = AGE_ADULT, long co2 = CO2_OK,
+              bool stayInside = false) {
     this->co2 = co2;
-    if(stayInside || co2 > CO2_BAD) {
-      boundaryCheck(BOUNDARY_FORCE * 10);
-    }
-    else {
-      boundaryCheck(BOUNDARY_FORCE);
-    }
-    if(age < AGE_EGG) {
-      vel = PVector(0,0);
-    }
-    else if(age < AGE_TEEN) {
-      noiseMotion();
-    }
-    else if(!followingFood){
-      if(!outOfBoundary) {
-        doMotion();
-      }
+
+    if (age < AGE_EGG) {
+      vel = PVector(0, 0);
+      return;  // Exit early if it's an egg
     }
 
-    if (followingFood) {
+    if (stayInside || co2 > CO2_BAD) {
+      boundaryCheck(BOUNDARY_FORCE * 10);
+    } else {
+      boundaryCheck(BOUNDARY_FORCE);
+    }
+    if (!followingFood && !outOfBoundary) {
+      doMotion();
+    } else if (followingFood) {
+      PVector foodForce = foodDirection - pos;
+      foodForce.setMag(FOOD_FORCE);
+      applyForce(foodForce);
+    } else if (followingFood) {
       PVector foodForce = foodDirection - pos;
       foodForce.setMag(FOOD_FORCE);
       applyForce(foodForce);
     }
-    
 
     PVector desiredVel = vel;
-    
+
     desiredVel += acc;
-    if(desiredVel.mag() < minSpeed) {
+    if (desiredVel.mag() < minSpeed) {
       desiredVel.setMag(minSpeed);
     }
     float maxSpeedCO2 = map(co2, CO2_BAD, CO2_REALBAD, maxSpeed, 0);
@@ -109,7 +108,7 @@ class Motion {
     followingFood = false;
   }
 
-protected:
+ protected:
   void applyForce(PVector force) {
     acc = acc + force;
   }
@@ -156,11 +155,12 @@ protected:
     float noiseValue = noise.GetNoise(pos.x, pos.y);
     float noiseAngle = noiseValue * TWO_PI;  // Map noise to a full circle
     PVector noiseForce = PVector::fromAngle(noiseAngle);
-    noiseForce *= noiseAmplitude * noiseValue;  // Scale by noise strength and maxForce
+    noiseForce *=
+        noiseAmplitude * noiseValue;  // Scale by noise strength and maxForce
     applyForce(noiseForce);
   }
 
-public:
+ public:
   void followFood(PVector foodPos) {
     foodDirection = foodPos;
     followingFood = true;

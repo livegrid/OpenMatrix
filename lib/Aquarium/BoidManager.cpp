@@ -35,7 +35,13 @@ void BoidManager::updateBoids(long co2) {
 void BoidManager::renderBoids() {
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
-      matrix->foreground->setPixel(boid.location.x, boid.location.y, 50, 200, 100);
+      // Calculate the second point of the line
+      float angle = atan2(boid.velocity.y, boid.velocity.x);
+      int x2 = boid.location.x + cos(angle);
+      int y2 = boid.location.y + sin(angle);
+
+      // Draw the line
+      matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2, CRGB(50, 200, 100));
     }
   }
 }

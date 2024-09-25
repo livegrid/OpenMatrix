@@ -16,7 +16,7 @@ class Plants {
   PVector pos;
   std::vector<Branch> branches;
   uint8_t numBranches;
-  uint8_t branchSizeBase = 4;
+  uint8_t branchSizeBase = 3;
   uint8_t numNodes;
   std::vector<float> phaseOffsets;
 
@@ -26,7 +26,7 @@ class Plants {
   Plants(Matrix* m, uint8_t x, uint8_t y) : matrix(m) {
     pos = PVector(x, y);
     
-    numBranches = random(6,12);
+    numBranches = random(10,16);
     for (uint8_t i = 0; i < numBranches; i++) {
       PVector branchStart = PVector::fromAngle(random((PI)*1000, (TWO_PI)*1000)/1000.0);
       branchStart *= branchSizeBase;

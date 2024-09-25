@@ -18,6 +18,7 @@
 #include "SnakeBody.h"
 #include "StarBody.h"
 #include "TurtleBody.h"
+#include "OctopusBody.h"
 
 class BodyFactory {
  private:
@@ -53,6 +54,8 @@ class BodyFactory {
     // registerTailType([](Matrix* m) -> Tail* { return new noTail(m); });
     registerTailType([](Matrix* m) -> Tail* { return new TriangleTail(m); });
     registerTailType([](Matrix* m) -> Tail* { return new CurvyTail(m); });
+    registerTailType([](Matrix* m) -> Tail* { return new WavyTail(m); });
+    
     // Register body types
     registerBodyType([](Matrix* m, Head* h, Tail* t, Fin* f) -> Body* {
       return new FishBody(m, h, t, f);
@@ -65,6 +68,9 @@ class BodyFactory {
     });
     registerBodyType([](Matrix* m, Head* h, Tail* t, Fin* f) -> Body* {
       return new SnakeBody(m, h, t, f);
+    });
+    registerBodyType([](Matrix* m, Head* h, Tail* t, Fin* f) -> Body* {
+      return new OctopusBody(m, h, t, f);
     });
   }
 
@@ -95,7 +101,6 @@ class BodyFactory {
 
   Tail* createRandomTail() {
     return createRandomComponent(tailConstructors);
-    // return new WavyTail(matrix);
   }
 
   Head* createHead(const String& type) {
@@ -116,8 +121,10 @@ class BodyFactory {
       return new TriangleTail(matrix);
     } else if (type == "CurvyTail") {
       return new CurvyTail(matrix);
+    } else if (type == "WavyTail") {
+      return new WavyTail(matrix);
     } else {
-      return nullptr;
+      return nullptr; 
     }
   }
 
@@ -162,6 +169,8 @@ class BodyFactory {
       return new StarBody(matrix, head, tail, fin);
     } else if (type == "Snake") {
       return new SnakeBody(matrix, head, tail, fin);
+    } else if (type == "Octopus") {
+      return new OctopusBody(matrix, head, tail, fin);
     } else {
       // If the type is not recognized, return nullptr or a default body type
       delete head;
@@ -184,8 +193,10 @@ class BodyFactory {
     } else if (type == "Snake") {
       return new SnakeBody(matrix, createRandomHead(), createRandomTail(),
                            createRandomFin());
+    } else if (type == "Octopus") {
+      return new OctopusBody(matrix, createRandomHead(), createRandomTail(),
+                             createRandomFin());
     }
-    // Add other body types
     else {
       return nullptr;
     }

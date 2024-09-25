@@ -47,95 +47,119 @@ void SCD40::shiftHistoryAndResetAverage(State* state) {
   tempSum = humiditySum = co2Sum = 0;
   readingCount = 0;
 }
-
 void SCD40::runMeasurementTask() {
-  Wire.begin();
+  const int MAX_RETRIES = 5;
+  int retries = 0;
   uint16_t error;
-  char errorMessage[256];
-  scd4x.begin(Wire);
-error = scd4x.stopPeriodicMeasurement();
-  if (error) {
-      log_e("Error trying to execute stopPeriodicMeasurement(): ");
-      errorToString(error, errorMessage, 256);
-      log_e("%s", errorMessage);
-  }
 
-  uint16_t sensorStatus;
-  error = scd4x.performSelfTest(sensorStatus);
-  log_i("Sensor status: %d", sensorStatus);
-  if (error) {
-    log_e("Error trying to execute performSelfTest(): ");
-    errorToString(error, errorMessage, 256);
-    log_e("%s", errorMessage);
-  }
+  Wire.begin();
+  
+  while (retries < MAX_RETRIES) {
+    log_i("Attempting to initialize SCD40 sensor (attempt %d of %d)", retries + 1, MAX_RETRIES);
 
-  error = scd4x.startPeriodicMeasurement();
-  if(error) {
-    log_e("Error trying to execute startPeriodicMeasurement(): ");
-    errorToString(error, errorMessage, 256);
-    log_e("%s", errorMessage);
-  }
-  else {
-    log_i("SCD40 connected");
-    sensorAvailable = true;  // Update sensor availability status
-
-    error = scd4x.setAutomaticSelfCalibration(true);
+    scd4x.begin(Wire);
+    
+    // Stop any ongoing measurement
+    error = scd4x.stopPeriodicMeasurement();
     if (error) {
-      log_e("Error trying to execute setAutomaticSelfCalibration(): ");
-      errorToString(error, errorMessage, 256);
-      log_e("%s", errorMessage);
+      log_e("Error stopping periodic measurement: %u", error);
+      retries++;
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
     }
 
+    // Perform self-test
+    uint16_t sensorStatus;
+    error = scd4x.performSelfTest(sensorStatus);
+    if (error) {
+      log_e("Error performing self-test: %u", error);
+      retries++;
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+    log_i("Sensor status: %d", sensorStatus);
+
+    // Start periodic measurement
     error = scd4x.startPeriodicMeasurement();
-
-    const TickType_t xFrequency = pdMS_TO_TICKS(5000);
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    // char tempBuffer[4];
-    extern StateManager stateManager; 
-
-    for (;;) {
-    bool isDataReady = false;
-      error = scd4x.getDataReadyFlag(isDataReady);
-      if (isDataReady) {
-        error = scd4x.readMeasurement(co2, temperature, humidity);
-        if(error) {
-          log_e("Error trying to execute readMeasurement(): ");
-          errorToString(error, errorMessage, 256);
-          log_e("%s", errorMessage);
-          log_e("SCD40 not connected");
-          sensorAvailable = false;
-          vTaskDelete(NULL);  // Terminate this task as the sensor is not connected
-        }
-        else {
-          uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
-          State* state = stateManager.getState();
-          state->environment.temperature.value = temperature;
-          state->environment.temperature.diff.type = DiffType::DISABLE;
-          state->environment.humidity.value = humidityValue;
-          state->environment.humidity.diff.type = DiffType::DISABLE;
-          state->environment.co2.value = co2;
-          state->environment.co2.diff.type = DiffType::DISABLE;
-
-          // Accumulate readings
-          tempSum += temperature;
-          humiditySum += humidityValue;
-          co2Sum += co2;
-          readingCount++;
-
-          // Update running average
-          updateRunningAverage(state);
-
-          // Check if we have collected an hour's worth of readings
-          if (readingCount >= READINGS_PER_HOUR) {
-            shiftHistoryAndResetAverage(state);
-          }
-
-          firstReadingReceived = true;  // Set the first reading flag
-        }
-        sensorAvailable = true;
-      }
-      vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    if (error) {
+      log_e("Error starting periodic measurement: %u", error);
+      retries++;
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
     }
+
+    // If we've reached here, initialization was successful
+    log_i("SCD40 sensor initialized successfully");
+    sensorAvailable = true;
+    break;
+  }
+
+  if (retries == MAX_RETRIES) {
+    log_e("Failed to initialize SCD40 sensor after %d attempts", MAX_RETRIES);
+    sensorAvailable = false;
+    vTaskDelete(NULL);  // Terminate the task
+    return;
+  }
+
+  // Set automatic self-calibration
+  error = scd4x.setAutomaticSelfCalibration(true);
+  if (error) {
+    log_w("Error setting automatic self-calibration: %u", error);
+  }
+
+  const TickType_t xFrequency = pdMS_TO_TICKS(5000);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  extern StateManager stateManager;
+
+  // Main measurement loop
+  for (;;) {
+    bool isDataReady = false;
+    error = scd4x.getDataReadyFlag(isDataReady);
+    if (error) {
+      log_e("Error checking data ready flag: %u", error);
+      sensorAvailable = false;
+      vTaskDelay(xFrequency);
+      continue;
+    }
+
+    if (isDataReady) {
+      error = scd4x.readMeasurement(co2, temperature, humidity);
+      if (error) {
+        log_e("Error reading measurement: %u", error);
+        sensorAvailable = false;
+        vTaskDelay(xFrequency);
+        continue;
+      }
+
+      sensorAvailable = true;
+      uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
+      
+      State* state = stateManager.getState();
+      state->environment.temperature.value = temperature;
+      state->environment.temperature.diff.type = DiffType::DISABLE;
+      state->environment.humidity.value = humidityValue;
+      state->environment.humidity.diff.type = DiffType::DISABLE;
+      state->environment.co2.value = co2;
+      state->environment.co2.diff.type = DiffType::DISABLE;
+
+      // Accumulate readings
+      tempSum += temperature;
+      humiditySum += humidityValue;
+      co2Sum += co2;
+      readingCount++;
+
+      // Update running average
+      updateRunningAverage(state);
+
+      // Check if we have collected an hour's worth of readings
+      if (readingCount >= READINGS_PER_HOUR) {
+        shiftHistoryAndResetAverage(state);
+      }
+
+      firstReadingReceived = true;
+    }
+
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 

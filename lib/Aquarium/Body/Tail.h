@@ -64,51 +64,41 @@ public:
   }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
-    matrix->foreground->drawCircleArray(pos.x, pos.y, size/3, size*3, angle, CRGB(r, g, b));
+    matrix->foreground->drawCircleArray(pos.x, pos.y, size/3, size*3, angle+PI/2, CRGB(r, g, b));
   }
 };
 
+// ... existing code ...
+
 class WavyTail : public Tail {
 private:
-  std::vector<std::vector<PVector>> segments;
-  int numStrands;
-  int segmentsPerStrand;
+    std::vector<PVector> segmentPositions;
+
 public:
-   WavyTail(Matrix* m) : Tail(m) {
-    type = "WavyTail";
-    numStrands = 5; // Adjust this for more or fewer strands
-    segmentsPerStrand = 8; // Adjust this for longer or shorter strands
-    segments.resize(numStrands, std::vector<PVector>(segmentsPerStrand, PVector(0, 0)));
-  }
+    WavyTail(Matrix* m) : Tail(m) {
+        type = "WavyTail";
+        int numSegments = random(5, 15);  // Adjust range as needed
 
-  void drawSegment(PVector& pos, PVector& prevPos, uint8_t r, uint8_t g, uint8_t b) {
-    PVector dv = pos - prevPos;
-    float segmentAngle = dv.heading();
-
-    pos.x = prevPos.x - cos(segmentAngle);
-    pos.y = prevPos.y - sin(segmentAngle);
-    matrix->foreground->drawPixel(pos.x, pos.y, CRGB(r, g, b));
-  }
-
-  void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) override {
-    PVector perpendicular = PVector::fromAngle(angle + HALF_PI);
-    perpendicular.setMag(size);
-
-    for (int i = 0; i < numStrands; i++) {
-      float t = (float)i / (numStrands - 1) - 0.5;
-      PVector strandStart = pos + perpendicular * t;
-
-      PVector prevPos = strandStart;
-      for (int j = 0; j < segmentsPerStrand; j++) {
-        float waveAngle = angle + sin(j * 0.5 + i * 0.2) * 0.5; // Create a wavy pattern
-        PVector waveVector = PVector::fromAngle(waveAngle);
-        waveVector.setMag(size * 0.5);
-
-        drawSegment(segments[i][j], prevPos, r, g, b);
-        prevPos = segments[i][j];
-      }
+        for (int i = 0; i < numSegments; ++i) {
+            segmentPositions.push_back(PVector(0, 0));
+        }
     }
-  }
+
+    void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b) {
+        PVector dv = vin - segmentPositions[i];
+        float segmentAngle = dv.heading();
+
+        segmentPositions[i].x = vin.x - cos(segmentAngle);
+        segmentPositions[i].y = vin.y - sin(segmentAngle);
+        matrix->foreground->drawPixel(segmentPositions[i].x, segmentPositions[i].y, CRGB(r, g, b));
+    }
+
+    void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) override {
+        for(int8_t i = static_cast<int8_t>((segmentPositions.size()-2) * size); i > -1; i--) {
+            drawSegment(i+1, segmentPositions[i], r, g, b);
+        }
+        drawSegment(0, pos, r, g, b);
+    }
 };
 
 #endif // TAIL_H

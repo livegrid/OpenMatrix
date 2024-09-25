@@ -24,10 +24,13 @@ void AutoBrightness::updateSensorValues() {
 }
 
 float AutoBrightness::getLux() {
-  return lux;
+  return sensorWorking ? lux : 0;
 }
 
 uint8_t AutoBrightness::matrixBrightness() {
+  if (!sensorWorking) {
+    return minBrightness;  // or some default value
+  }
   long matrixBrightness = map(lux, minLux, maxLux, minBrightness, maxBrightness);
   matrixBrightness = constrain(matrixBrightness, minBrightness, maxBrightness);
   return uint8_t(matrixBrightness);

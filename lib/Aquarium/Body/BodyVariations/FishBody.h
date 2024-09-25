@@ -23,34 +23,41 @@ public:
     colorPalette = new ColorPalette(numSegments, true);
     type = "Fish";
   }
+void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b, bool drawExtras = false) {
+    // Check if the segment index is valid
+    if (i >= segments.size() || i >= segmentPositions.size()) {
+        return;  // Exit the function if the index is out of bounds
+    }
 
-  void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b, bool drawExtras = false) {
     PVector dv = vin - segmentPositions[i];
     float segmentAngle = dv.heading();
 
     // Use updated size for each segment
     float currentSegmentSize = segments[i] * size;
 
-    if(i == 0) {
+    if (i == 0) {
         segmentPositions[i].x = vin.x - cos(segmentAngle) * currentSegmentSize;
         segmentPositions[i].y = vin.y - sin(segmentAngle) * currentSegmentSize;
-    } else {
+    } else if (i > 0 && i < segments.size()) {  // Add bounds check for i-1
         float maxSegmentSize = std::max(segments[i-1], segments[i]) * size * gapBetweenSegments;
         segmentPositions[i].x = vin.x - cos(segmentAngle) * maxSegmentSize;
         segmentPositions[i].y = vin.y - sin(segmentAngle) * maxSegmentSize;
     }
 
-    if(drawExtras && (i == 1 || i == 3)) {
-      fin->display(segmentPositions[i], segmentAngle, currentSegmentSize, r, g, b);
+    // Add null checks for fin and tail pointers
+    if (drawExtras && (i == 1 || i == 3) && fin != nullptr) {
+        fin->display(segmentPositions[i], segmentAngle, currentSegmentSize, r, g, b);
     }
 
-    if(drawExtras && i == segments.size()-1) {
-      tail->display(segmentPositions[i], segmentAngle, currentSegmentSize * 2, r, g, b);
+    if (drawExtras && i == segments.size() - 1 && tail != nullptr) {
+        tail->display(segmentPositions[i], segmentAngle, currentSegmentSize * 2, r, g, b);
+    } else {
+        // Add null check for matrix pointer
+        if (matrix != nullptr && matrix->foreground != nullptr) {
+            matrix->foreground->fillCircle(segmentPositions[i].x, segmentPositions[i].y, currentSegmentSize, CRGB(r, g, b));
+        }
     }
-    else {
-      matrix->foreground->fillCircle(segmentPositions[i].x, segmentPositions[i].y, currentSegmentSize, CRGB(r, g, b));
-    }
-  }
+}
 
   void display() override {
     for(int8_t i = segments.size() - 2; i >= 0; i--) {

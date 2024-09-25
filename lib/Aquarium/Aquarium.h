@@ -224,7 +224,7 @@ class Aquarium {
           std::make_unique<Fish>(matrix,
                                  PVector(random(0, matrix->getXResolution()),
                                          random(0, matrix->getYResolution())),
-                                 0.5));
+                                 0.5f));
     }
   }
 

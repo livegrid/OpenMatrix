@@ -8,7 +8,7 @@
 
 //AGE SETTINGS
 #define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
-#define FISH_LIFESPAN_VARIATION 0.2f  // Variation in lifespan (20% by default)
+#define FISH_LIFESPAN_VARIATION 1.0f  // Variation in lifespan (20% by default)
 
 const float HEALTH_REDUCTION_RATE_BAD = 0.1f;    // 10% per second
 const float HEALTH_REDUCTION_RATE_REALBAD = 0.2f; // 20% per second
@@ -19,7 +19,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
 #define NUM_FISH_START 5
-#define NUM_FISH_IDEAL 30
+#define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 3
 
 //PLANT SETTINGS
@@ -36,7 +36,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 //GENERAL FORCE SETTINGS
 #define MAX_FORCE 3
 #define FOOD_FORCE MAX_FORCE * 2
-#define BOUNDARY_FORCE 0.2  //change to 0.2
+#define BOUNDARY_FORCE 0.2 
 
 //EGG SETTINGS
 #define EGG_SIZE 1
@@ -45,7 +45,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 //FISH SETTINGS
 #define FISH_NUM_SEGMENTS 4, 12
 #define FISH_MIN_SEGMENT_SIZE 2.0
-#define FISH_MAX_SEGMENT_SIZE 2, 8
+#define FISH_MAX_SEGMENT_SIZE 2, 6
 #define FISH_GAP_BETWEEN_SEGMENTS 70, 100
 
 #define FISH_MAX_SPEED 30
@@ -81,7 +81,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define STAR_SIN_FREQUENCY 0.005
 #define STAR_NOISE_AMPLITUDE 2
 #define STAR_NOISE_FREQUENCY 0.01
-#define STAR_ROTATION_SPEED 1, 10
+#define STAR_ROTATION_SPEED 5, 10
 
 //TURTLE SETTINGS
 #define TURTLE_LENGTH 4, 10
@@ -95,6 +95,21 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define TURTLE_NOISE_AMPLITUDE 1
 #define TURTLE_NOISE_FREQUENCY 0.01
 
+//OCTOPUS SETTINGS
+#define OCTOPUS_SIZE 10, 20
+#define OCTOPUS_MIN_TENTACLES 6
+#define OCTOPUS_MAX_TENTACLES 10
+#define OCTOPUS_TENTACLE_SEGMENTS 6
+#define OCTOPUS_TENTACLE_LENGTH 10, 25
+
+#define OCTOPUS_MAX_SPEED 35
+#define OCTOPUS_MIN_SPEED 5
+#define OCTOPUS_MAX_FORCE 0.25
+#define OCTOPUS_SIN_AMPLITUDE 8
+#define OCTOPUS_SIN_FREQUENCY 0.002
+#define OCTOPUS_NOISE_AMPLITUDE .1
+#define OCTOPUS_NOISE_FREQUENCY 0.01
+
 //FLOCKING SETTINGS
 #define FLOCK_MAX_FORCE 0.8
 #define SEPARATION_DISTANCE 20
@@ -105,7 +120,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define COHESION_WEIGHT .2
 
 //ATTRACTOR SETTINGS
-#define BOID_GROUPS 3
+#define BOID_GROUPS 2
 #define NUM_BOIDS 10, 20
 #define BOID_MAX_SPEED 5, 10
 #define BOID_MAX_FORCE 1, 2
