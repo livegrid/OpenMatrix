@@ -130,7 +130,7 @@ class Aquarium {
       snprintf(buffer, sizeof(buffer), "They will\nslowly grow,\nand reproduce");
       break;
     case 4:
-      snprintf(buffer, sizeof(buffer), "But they are\naffected by the\nenvironment");
+      snprintf(buffer, sizeof(buffer), "But they are\naffected by\nthe\nenvironment");
       break;
     case 5:
       snprintf(buffer, sizeof(buffer), "Temperature\naffects\nwater color");
@@ -164,7 +164,7 @@ class Aquarium {
       break;
     case 11:
       demoCO2 = 400;
-      snprintf(buffer, sizeof(buffer), "If your\nenvironment\nis good,\nthey will thrive");
+      snprintf(buffer, sizeof(buffer), "If your\nenvironment\nis good,\nthey will\nthrive");
       break;
     case 12:
       snprintf(buffer, sizeof(buffer), "And soon you\nwill have an\namazing\necosystem");
@@ -173,11 +173,12 @@ class Aquarium {
       snprintf(buffer, sizeof(buffer), "Take care of\nthem by taking\ncare of\nyourself");
       break;
     case 14:
-      snprintf(buffer, sizeof(buffer), "Enjoy");
+      snprintf(buffer, sizeof(buffer), "Enjoy !");
       break;
     default:
       demoMode = false;
       demoFinished = true;  // Set demoFinished to true when demo is complete
+      saveState();
       return;
   }
 

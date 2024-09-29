@@ -346,9 +346,12 @@ void setup(void) {
   stateManager.startPeriodicSave();
 
   aquarium.begin();
+  
+  #ifdef RUN_DEMO
   if(stateManager.getState()->firstBoot) {
     aquarium.startDemo();
   }
+  #endif
 
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
 
