@@ -61,7 +61,7 @@ const state = {
         edmx: {
             protocol: 0,
             multicast: true,
-            start_universe: true,
+            start_universe: 1,
             start_address: 1,
             mode: 0,
             timeout: 5000

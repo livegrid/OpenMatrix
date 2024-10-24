@@ -20,7 +20,7 @@ class UI {
         typedef std::function<void(const char* path)> onImagePreviewCallback;
         typedef std::function<void(const char* payload, TextSize size)> onTextChangeCallback;
         typedef std::function<void(const char* host, uint16_t port, const char* client_id, const char* username, const char* password, const char* co2_topic, const char* matrix_text_topic, bool show_text)> onMqttSettingsCallback;
-        typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, bool start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
+        typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, uint16_t start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
         typedef std::function<void(bool show_text)> onHomeAssistantSettingsCallback;
         typedef std::function<void()> onResetCallback;
 

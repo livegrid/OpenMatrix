@@ -363,8 +363,10 @@ void UI::begin() {
     if (err == DeserializationError::Ok) {
       if (_on_dmx_settings_cb) {
         _on_dmx_settings_cb(
-            json["protocol"].as<eDmxProtocol>(), json["mode"].as<eDmxMode>(),
-            json["multicast"].as<bool>(), json["start_universe"].as<bool>(),
+            json["protocol"].as<eDmxProtocol>(),
+            json["mode"].as<eDmxMode>(),
+            json["multicast"].as<bool>(),
+            json["start_universe"].as<uint16_t>(),
             json["start_address"].as<uint16_t>(),
             json["timeout"].as<uint16_t>());
         log_i("DMX settings updated.");

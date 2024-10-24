@@ -173,15 +173,28 @@ void MQTTManager::publishHomeAssistantConfig() {
 }
 
 void MQTTManager::publishSensorData(float temperature, float humidity, int co2, const char* topic) {
-  JsonObject doc;
-  doc["temperature"] = String(temperature, 2); // Limit to 2 decimal places
-  doc["humidity"] = humidity;
-  doc["co2"] = co2;
-
-  char payload[128];
-  serializeJson(doc, payload);
-
-  publish(topic, 0, false, payload);
+  DynamicJsonDocument doc(128);
+  
+  // Check if values are valid before adding them to the JSON document
+  if (!isnan(temperature)) {
+    doc["temperature"] = String(temperature, 2); // Limit to 1 decimal place
+  }
+  if (!isnan(humidity) && humidity >= 0 && humidity <= 100) {
+    doc["humidity"] = round(humidity); // Round to nearest integer
+  }
+  if (co2 > 0) {
+    doc["co2"] = co2;
+  }
+  
+// Only publish if we have at least one valid value
+  if (!doc.isNull()) {
+    char payload[128];
+    serializeJson(doc, payload);
+    publish(topic, 0, false, payload);
+    log_i("Published sensor data: %s", payload);
+  } else {
+    log_w("No valid sensor data to publish");
+  }
 }
 
 void MQTTManager::checkSettingsAndReconnect() {

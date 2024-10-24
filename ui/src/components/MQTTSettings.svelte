@@ -119,7 +119,7 @@
   </div>
   <div class="flex flex-row items-center gap-x-3 justify-between">
     <div class="truncate text-sm font-medium text-zinc-800 dark:text-zinc-300">
-      CO2 Topic
+      Environment Topic
     </div>
     <div>
       <input on:keyup={evaluate} bind:value={data.co2_topic} type="text" class={`bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:border-blue-500 block w-full px-2.5 py-1.5 dark:bg-zinc-900 dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white dark:focus:border-blue-500 ${ $state?.settings?.mqtt?.co2_topic !== data.co2_topic ? "!border-yellow-500" : "" }`}>

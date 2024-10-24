@@ -58,12 +58,23 @@ void Edmx::applySettings() {
   isRGBMode = stateManager->getState()->settings.edmx.mode == eDmxMode::DMX_MODE_RGB;
   uint32_t totalChannels = totalPixels * (isRGBMode ? 3 : 1);
   numUniverses = (totalChannels + channelsPerUniverse - 1) / channelsPerUniverse;
+  
+  // Ensure we have at least one universe
+  if(numUniverses < 1) {
+    numUniverses = 1;
+  }
+
   rawDataBuffer = new uint8_t[totalChannels];
   packetDelay = stateManager->getState()->settings.edmx.timeout;
 
-  log_i("Applying settings: RGB mode: %s, Total pixels: %d, Total channels: %d, Num universes: %d",
-        isRGBMode ? "true" : "false", totalPixels, totalChannels, numUniverses);
+  log_i("Applying settings: RGB mode: %s, Total pixels: %d, Total channels: %d, Num universes: %d, Start universe: %d, Start address: %d",
+        isRGBMode ? "true" : "false", totalPixels, totalChannels, numUniverses,
+        stateManager->getState()->settings.edmx.start_universe,
+        stateManager->getState()->settings.edmx.start_address);
+  startE131();
+}
 
+void Edmx::startE131() {
   int retryCount = 0;
   const int maxRetries = 5;
 
@@ -82,7 +93,6 @@ void Edmx::applySettings() {
       log_i("%s initialization successful", 
             stateManager->getState()->settings.edmx.protocol == eDmxProtocol::S_ACN ? "E1.31" : "Art-Net");
       
-      // Re-register the callback
       _e131.registerCallback(
         [this](void* packet, protocol_t protocol, void* userInfo) {
           this->onNewPacketReceived(packet, protocol, userInfo);
@@ -96,8 +106,6 @@ void Edmx::applySettings() {
             WiFi.status());
       retryCount++;
     }
-
-    delay(1000);  // Wait a bit before retrying
   }
 
   log_e("%s initialization failed after %d attempts", 
@@ -106,10 +114,6 @@ void Edmx::applySettings() {
 }
 
 void Edmx::onNewPacketReceived(void* packet, protocol_t protocol, void* userInfo) {
-  if (protocol != PROTOCOL_E131 && protocol != PROTOCOL_ARTNET) {
-    return;  // Ignore non-E131/ArtNet packets
-  }
-
   newPacket = true;
   uint16_t universe;
   uint8_t* data;
@@ -118,35 +122,39 @@ void Edmx::onNewPacketReceived(void* packet, protocol_t protocol, void* userInfo
   if (protocol == PROTOCOL_E131) {
     e131_packet_t* e131Packet = reinterpret_cast<e131_packet_t*>(packet);
     if (!e131Packet) {
-      return;  // Invalid E1.31 packet
+      return;
     }
-    universe = htons(e131Packet->universe);
+    universe = ntohs(e131Packet->universe);
     data = e131Packet->property_values + 1;
-    dataSize = htons(e131Packet->property_value_count) - 1;
-  } else {  // PROTOCOL_ARTNET
+    dataSize = ntohs(e131Packet->property_value_count) - 1;
+
+  } else if (protocol == PROTOCOL_ARTNET) {
     artnet_dmx_packet_t* artnetPacket = reinterpret_cast<artnet_dmx_packet_t*>(packet);
     if (!artnetPacket) {
-      return;  // Invalid Art-Net packet
+      return;
     }
-    // Convert Art-Net universe to 1-based universe
-    uint16_t artnetUniverse = htons(artnetPacket->universe) & 0x7FFF;
-    universe = (artnetUniverse / 256) + 1;  // Map every 256 Art-Net universes to one of our universes
+    uint16_t artnetUniverse = ntohs(artnetPacket->universe) & 0x7FFF;
+    universe = (artnetUniverse / 256) + 1;
     data = artnetPacket->dmx;
-    dataSize = htons(artnetPacket->length);
+    dataSize = ntohs(artnetPacket->length);
+  } else {
+    return;
   }
 
-  // Check if the received universe is within our range
   if (universe < stateManager->getState()->settings.edmx.start_universe || 
       universe >= stateManager->getState()->settings.edmx.start_universe + numUniverses) {
-    return;  // Ignore packets outside our universe range
+    return;
   }
 
   uint16_t universeIndex = universe - stateManager->getState()->settings.edmx.start_universe;
   uint16_t startChannel = universeIndex * channelsPerUniverse;
+  uint16_t startAddress = stateManager->getState()->settings.edmx.start_address - 1;
+  
+  startChannel = max(0, startChannel - startAddress);
+  
   uint16_t endChannel = min(startChannel + dataSize, totalPixels * (isRGBMode ? 3 : 1));
 
-  // Copy data to the correct position in rawDataBuffer
-  memcpy(rawDataBuffer + startChannel, data, endChannel - startChannel);
+  memcpy(rawDataBuffer + startChannel, data + startAddress, endChannel - startChannel);
 
   if (stateManager->getState()->mode != OpenMatrixMode::DMX) {
     prevMode = stateManager->getState()->mode;

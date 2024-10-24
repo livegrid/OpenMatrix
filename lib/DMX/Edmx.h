@@ -19,6 +19,7 @@ class Edmx {
   ~Edmx() {}
   Edmx(const Edmx&) = delete;
   Edmx& operator=(const Edmx&) = delete;
+  void startE131(); 
 
   Matrix* matrix;
   StateManager* stateManager;

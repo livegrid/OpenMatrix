@@ -23,8 +23,10 @@ UMatrix matrix;
 OMatrix matrix;
 #endif
 
+#ifdef SCD40_ENABLED
 #include "SCD40.h"
 SCD40 scd40;
+#endif
 
 #include "Aquarium.h"
 Aquarium aquarium(&matrix, &scd40);
@@ -34,7 +36,7 @@ Aquarium aquarium(&matrix, &scd40);
 #ifdef PANEL_UPCYCLED
 AutoBrightness autoBrightness(&matrix, 30, 600, 100, 255);
 #else
-AutoBrightness autoBrightness(&matrix, 30, 600, 150, 255);
+AutoBrightness autoBrightness(&matrix);
 #endif
 #endif
 
@@ -54,15 +56,15 @@ ImageDraw imageDraw(&matrix);
 #include "TextDraw.h"
 TextDraw textDraw(&matrix);
 
-#ifdef WIFI_ENABLED
-WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
-                                  &stateManager, &taskManager);
-#endif
-
 #include "Edmx.h"
 Edmx& dmx = Edmx::getInstance();
 
 #include "MQTTManager.h"
+
+#ifdef WIFI_ENABLED
+WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
+                                  &stateManager, &taskManager);
+#endif
 
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
@@ -113,95 +115,48 @@ void displayTask(void* parameter) {
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  uint8_t colNow = 0;
 
   for (;;) {
     unsigned long currentTime = millis();
-
-    if (stateManager.getState()->power) {
-      digitalWrite(2, LOW);
-      if (currentMode != stateManager.getState()->mode) {
-        if (currentMode == OpenMatrixMode::IMAGE) {
-          imageDraw.closeGIF();
-        }
-        currentMode = stateManager.getState()->mode;
-        switch (currentMode) {
-          case OpenMatrixMode::EFFECT:
-            effectManager.setEffect(stateManager.getState()->effects.selected -
-                                    1);
-            break;
-          case OpenMatrixMode::IMAGE:
-            imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
-            break;
-          case OpenMatrixMode::TEXT:
-            textDraw.setSize(stateManager.getState()->text.size);
-            textDraw.drawText(stateManager.getState()->text.payload);
-            break;
-        }
-      }
-      
-      if (stateManager.getState()->firstBoot && aquarium.isDemoFinished()) {
-        stateManager.getState()->firstBoot = false;
-        stateManager.save();
-      }
-
-      if (touchMenu.shouldStartDemo()) {
-        aquarium.startDemo();
-      }
-
-      if (touchMenu.isMenuOpen()) {
-        touchMenu.displayMenu();
-      } else {
-        switch (stateManager.getState()->mode) {
-          case OpenMatrixMode::EFFECT:
-            effectManager.updateCurrentEffect();
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::IMAGE:
-            imageDraw.showGIF();
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::TEXT:
-            textDraw.setSize(stateManager.getState()->text.size);
-            textDraw.drawText(stateManager.getState()->text.payload);
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::AQUARIUM:
-            aquarium.update(touchMenu.showSensorData());
-            aquarium.display();
-            break;
-          case OpenMatrixMode::DMX:
-            dmx.update();
-            break;
-          default:
-            break;
-        }
-      }
-
-#ifdef PANEL_UPCYCLED
-      if (currentTime - lastRefreshTime >= refreshInterval) {
-        log_i("Refreshing Matrix Config");
-        matrix.refreshMatrixConfig();
-        lastRefreshTime = currentTime;
-      } else {
-        matrix.update();
-      }
-#else
-      matrix.update();
-#endif
-
-      frameCount++;
-
-      if (millis() - lastLogTime >= MATRIX_REFRESH_INTERVAL) {
-        float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
-        // TaskManager::getInstance().printTaskInfo();
-        lastLogTime = currentTime;
-        frameCount = 0;
-      }
+    matrix.setBrightness(200);
+    switch (colNow) {
+      case 0:
+        matrix.background->fillScreen(CRGB(255, 0, 0));
+        break;
+      case 1:
+        matrix.background->fillScreen(CRGB(0, 255, 0));
+        break;
+      case 2:
+        matrix.background->fillScreen(CRGB(0, 0, 255));
+        break;
     }
-    else {
-      digitalWrite(2, HIGH);
-      matrix.clearScreen();
+    matrix.background->display();
+
+    #ifdef PANEL_UPCYCLED
+    if (currentTime - lastRefreshTime >= refreshInterval) {
+      log_i("Refreshing Matrix Config");
+      matrix.refreshMatrixConfig();
+      lastRefreshTime = currentTime;
+    } else {
       matrix.update();
+    }
+    #else
+    matrix.update();
+    #endif
+
+    frameCount++;
+
+    if (currentTime - lastLogTime >= 5000) {
+      colNow++;
+      if (colNow > 2) {
+        colNow = 0;
+      }
+      log_i("color: %d", colNow);
+      float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
+      // TaskManager::getInstance().printTaskInfo();
+      lastLogTime = currentTime;
+      frameCount = 0;
     }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -259,9 +214,6 @@ void mqttTask(void* parameter) {
       int co2 = stateManager.getState()->environment.co2.value;
 
       mqttManager.publishSensorData(temperature, humidity, co2);
-      mqttManager.publishSensorData(
-          temperature, humidity, co2,
-          stateManager.getState()->settings.mqtt.co2_topic.c_str());
       log_v("MQTT: Sent sensor data to Home Assistant");
     } else {
       log_v("MQTT: Not connected, skipping message");
@@ -278,9 +230,7 @@ void sensorTask(void* parameter) {
   for (;;) {
 #ifdef BH1750_ENABLED
     autoBrightness.updateSensorValues();
-    if (stateManager.getState()->autobrightness) {
-      matrix.setBrightness(autoBrightness.matrixBrightness());
-    }
+    matrix.setBrightness(autoBrightness.matrixBrightness());
 #endif
     vTaskDelay(pdMS_TO_TICKS(5));  // 5 milliseconds delay
 
@@ -309,49 +259,34 @@ void setup(void) {
         FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
   log_i("");
 
-  pinMode(2, OUTPUT);
-  digitalWrite(2, LOW);
-
   matrix.init();
-
-#ifdef SCD40_ENABLED
-  delay(50);
-  scd40.init();
-#else
-  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
-#endif
-
-#ifdef ADXL345_ENABLED
-  delay(50);
-  autoRotate.init();
-#endif
-
-#ifdef TOUCH_ENABLED
-  delay(50);
-  touchMenu.setupInterrupts();
-#endif
-
-#ifdef BH1750_ENABLED
-  delay(50);
-  autoBrightness.init();
-#endif
 
   // Start LittleFS
   LittleFS.begin(true);
-  
   // Restore State
   stateManager.restore();
   matrix.setBrightness(stateManager.getState()->brightness);
   // Start periodic save task
   stateManager.startPeriodicSave();
 
-  aquarium.begin();
-  
-  #ifdef RUN_DEMO
-  if(stateManager.getState()->firstBoot) {
-    aquarium.startDemo();
-  }
-  #endif
+#ifdef SCD40_ENABLED
+  scd40.init();
+#else
+  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
+#endif
+
+#ifdef ADXL345_ENABLED
+  autoRotate.init();
+#endif
+
+#ifdef BH1750_ENABLED
+  delay(5);
+  autoBrightness.init();
+#endif
+
+#ifdef TOUCH_ENABLED
+  touchMenu.setupInterrupts();
+#endif
 
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
 
@@ -361,7 +296,7 @@ void setup(void) {
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
 #endif
 
 #ifdef WIFI_ENABLED
