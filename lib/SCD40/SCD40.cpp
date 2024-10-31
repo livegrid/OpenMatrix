@@ -25,11 +25,13 @@ void SCD40::measurementTaskFunction(void* parameter) {
 
 void SCD40::updateRunningAverage(State* state) {
   float tempAvg = tempSum / readingCount;
+  float tempFahrenheitAvg = (tempAvg * 9.0/5.0) + 32.0;  // Convert to Fahrenheit
   float humidityAvg = humiditySum / readingCount;
   float co2Avg = co2Sum / readingCount;
   
   // Update the last element with current running average
   state->environment.temperature.history_24h[23] = tempAvg;
+  state->environment.temperature_fahrenheit.history_24h[23] = tempFahrenheitAvg;
   state->environment.humidity.history_24h[23] = round(humidityAvg);
   state->environment.co2.history_24h[23] = round(co2Avg);
 }
@@ -39,6 +41,7 @@ void SCD40::shiftHistoryAndResetAverage(State* state) {
   // Shift history values
   for (int i = 0; i < 23; i++) {
     state->environment.temperature.history_24h[i] = state->environment.temperature.history_24h[i+1];
+    state->environment.temperature_fahrenheit.history_24h[i] = state->environment.temperature_fahrenheit.history_24h[i+1];
     state->environment.humidity.history_24h[i] = state->environment.humidity.history_24h[i+1];
     state->environment.co2.history_24h[i] = state->environment.co2.history_24h[i+1];
   }
@@ -137,6 +140,8 @@ void SCD40::runMeasurementTask() {
       State* state = stateManager.getState();
       state->environment.temperature.value = temperature;
       state->environment.temperature.diff.type = DiffType::DISABLE;
+      state->environment.temperature_fahrenheit.value = (temperature * 9.0/5.0) + 32.0;  // Convert to Fahrenheit
+      state->environment.temperature_fahrenheit.diff.type = DiffType::DISABLE;
       state->environment.humidity.value = humidityValue;
       state->environment.humidity.diff.type = DiffType::DISABLE;
       state->environment.co2.value = co2;
@@ -177,6 +182,10 @@ bool SCD40::isConnected() {
 
 float SCD40::getTemperature() {
   return temperature;
+}
+
+float SCD40::getTemperatureFahrenheit() {
+  return (temperature * 9.0/5.0) + 32.0;
 }
 
 float SCD40::getHumidity() {

@@ -7,6 +7,7 @@
 #include "GeneralSettings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "StateDefaults.h"
 
 // Diff Type
 typedef enum {
@@ -24,6 +25,11 @@ typedef enum {
     DMX,
     STARTUP
 } OpenMatrixMode;
+
+typedef enum {
+    CELSIUS = 0,
+    FAHRENHEIT
+} TemperatureUnit;
 
 // Effects
 typedef enum {
@@ -66,6 +72,7 @@ struct State {
     uint8_t brightness;
     OpenMatrixMode mode;
     bool firstBoot;
+    TemperatureUnit temperatureUnit;
 
     // Environment
     struct {
@@ -78,6 +85,15 @@ struct State {
             } diff;
             float history_24h[24];
         } temperature;
+        struct {
+            float value;
+            struct {
+                DiffType type;
+                String value;
+                bool inverse;
+            } diff;
+            float history_24h[24];
+        } temperature_fahrenheit;
         struct {
             float value;
             struct {

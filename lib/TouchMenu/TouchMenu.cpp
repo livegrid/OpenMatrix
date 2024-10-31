@@ -16,8 +16,14 @@ std::string TouchMenu::getSensorDataMenuText() const {
   return sensorDataVisible ? "Hide SensorData" : "Show SensorData";
 }
 
+std::string TouchMenu::getTemperatureUnitText() const {
+  TemperatureUnit currentUnit = stateManager->getState()->temperatureUnit;
+  log_i("Getting temperature unit text. Current unit: %d", (int)currentUnit);
+  return currentUnit == TemperatureUnit::CELSIUS ? "Temp> Celsius" : "Temp> Fahrenheit";
+}
+
 std::vector<std::string> TouchMenu::getItemList() const {
-  std::vector<std::string> baseList = {"Go Back","WiFi Info", getSensorDataMenuText(), "Brightness", "Start Demo", "Turn Off", "Factory Reset"};
+  std::vector<std::string> baseList = {"Go Back","WiFi Info", getSensorDataMenuText(), getTemperatureUnitText(), "Brightness", "Start Demo", "Turn Off", "Factory Reset"};
   return baseList;
 }
 
@@ -26,6 +32,13 @@ void TouchMenu::executeMenuItem(const std::string& selectedOption) {
     menuOpen = false;
   } else if (selectedOption == "Show SensorData" || selectedOption == "Hide SensorData") {
     sensorDataVisible = !sensorDataVisible;
+  } else if (selectedOption == "Temp> Celsius" || selectedOption == "Temp> Fahrenheit") {
+    // Log current state
+    log_i("Current temperature unit: %d", (int)stateManager->getState()->temperatureUnit);
+    TemperatureUnit newUnit = (selectedOption == "Temp> Fahrenheit") ? TemperatureUnit::CELSIUS : TemperatureUnit::FAHRENHEIT;
+    stateManager->getState()->temperatureUnit = newUnit;
+    stateManager->save();
+    log_i("New temperature unit set to: %d", (int)stateManager->getState()->temperatureUnit);
   } else if (selectedOption == "Start Demo") {
     menuOpen = false;
     startDemo = true;
@@ -60,7 +73,8 @@ void TouchMenu::handleSingleTap(uint8_t pin) {
     stateManager->save();
     return;
   }
-  if (menuOpen) {if (showBrightnessControl) {
+  if (menuOpen) {
+    if (showBrightnessControl) {
       if (pin == 11) { // Use pin 11 to adjust brightness
         if (currentMenuItem == 1) { // Toggle between Auto and Manual
           stateManager->getState()->autobrightness = !stateManager->getState()->autobrightness;

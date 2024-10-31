@@ -16,17 +16,19 @@
 #include "Food.h"
 #include "Plants.h"
 #include "Water.h"
+#include "StateManager.h"
 
 class Aquarium {
  private:
   Matrix* matrix;
   SCD40* scd40;
+  StateManager* stateManager;
   Water water;
   std::vector<std::unique_ptr<Fish>> fishArray;
   std::vector<std::unique_ptr<Plants>> plantArray;
   std::vector<std::unique_ptr<Food>> foodArray;
   BoidManager boidManager;
-  AquariumStateManager stateManager;
+  AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
 
@@ -42,9 +44,10 @@ class Aquarium {
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
  public:
-  Aquarium(Matrix* m, SCD40* s)
+  Aquarium(Matrix* m, SCD40* s, StateManager* stateManager)
       : matrix(m),
         scd40(s),
+        stateManager(stateManager),
         water(matrix),
         boidManager(m),
         demoMode(false),
@@ -197,21 +200,21 @@ class Aquarium {
 }
 
   void loadState() {
-    if (!stateManager.loadState(fishArray, matrix)) {
+    if (!aquariumStateManager.loadState(fishArray, matrix)) {
       log_w("Failed to load aquarium state, initializing with default values");
       initializeFish();
     }
   }
 
   void saveState() {
-    stateManager.saveState(fishArray);
+    aquariumStateManager.saveState(fishArray);
     log_i("Aquarium state saved");
   }
 
   void periodicSave() {
     unsigned long currentTime = millis();
     if (currentTime - lastSaveTime >= AQUARIUM_SAVE_INTERVAL*60000) {
-      stateManager.saveState(fishArray);
+      aquariumStateManager.saveState(fishArray);
       lastSaveTime = currentTime;
     }
   }
@@ -334,9 +337,18 @@ class Aquarium {
         float humidity = scd40->getHumidity();
         float co2 = scd40->getCO2();
 
-        snprintf(buffer, sizeof(buffer),
-                 "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
-                 temperature, humidity, co2);
+        if (stateManager->getState()->temperatureUnit == TemperatureUnit::FAHRENHEIT) {
+            // Convert to Fahrenheit
+              temperature = stateManager->getState()->environment.temperature_fahrenheit.value;
+              snprintf(buffer, sizeof(buffer),
+                  "%s\nTemp: %.1f F\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
+                  temperature, humidity, co2);
+          } else {
+              snprintf(buffer, sizeof(buffer),
+                  "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
+                  temperature, humidity, co2);
+          }
+        
         drawMultilineText(matrix->foreground, buffer, MIDDLE,
                           TextAlignment::CENTER, &Font4x7Fixed,
                           CRGB(150, 150, 150));

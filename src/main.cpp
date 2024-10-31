@@ -23,11 +23,13 @@ UMatrix matrix;
 OMatrix matrix;
 #endif
 
+StateManager stateManager(STATE_SAVE_INTERVAL);
+
 #include "SCD40.h"
 SCD40 scd40;
 
 #include "Aquarium.h"
-Aquarium aquarium(&matrix, &scd40);
+Aquarium aquarium(&matrix, &scd40, &stateManager);
 
 #ifdef BH1750_ENABLED
 #include "AutoBrightness.h"
@@ -42,8 +44,6 @@ AutoBrightness autoBrightness(&matrix, 30, 600, 150, 255);
 #include "AutoRotate.h"
 AutoRotate autoRotate(&matrix);
 #endif
-
-StateManager stateManager(STATE_SAVE_INTERVAL);
 
 #include "EffectManager.h"
 EffectManager effectManager(&matrix);

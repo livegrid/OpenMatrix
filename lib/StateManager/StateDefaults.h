@@ -1,0 +1,55 @@
+#define DEFAULT_POWER true
+#define DEFAULT_AUTOBRIGHTNESS true
+#define DEFAULT_BRIGHTNESS 100
+#define DEFAULT_MODE OpenMatrixMode::AQUARIUM
+#define DEFAULT_FIRST_BOOT true
+#define DEFAULT_TEMPERATURE_UNIT TemperatureUnit::CELSIUS
+
+// Environment Defaults
+#define DEFAULT_TEMPERATURE_VALUE 0.0f
+#define DEFAULT_TEMPERATURE_DIFF_TYPE DiffType::DISABLE
+#define DEFAULT_TEMPERATURE_DIFF_VALUE ""
+#define DEFAULT_TEMPERATURE_DIFF_INVERSE false
+
+#define DEFAULT_HUMIDITY_VALUE 0.0f
+#define DEFAULT_HUMIDITY_DIFF_TYPE DiffType::DISABLE
+#define DEFAULT_HUMIDITY_DIFF_VALUE ""
+#define DEFAULT_HUMIDITY_DIFF_INVERSE false
+
+#define DEFAULT_CO2_VALUE 0.0f
+#define DEFAULT_CO2_DIFF_TYPE DiffType::DISABLE
+#define DEFAULT_CO2_DIFF_VALUE ""
+#define DEFAULT_CO2_DIFF_INVERSE false
+
+// Effects Defaults
+#define DEFAULT_EFFECTS_SELECTED Effects::SIMPLEX_NOISE
+
+// Image Defaults
+#define DEFAULT_IMAGE_SELECTED "Hut.gif"
+
+// Text Defaults
+#define DEFAULT_TEXT_PAYLOAD "Hello, World!"
+#define DEFAULT_TEXT_SIZE TextSize::MEDIUM
+
+// MQTT Defaults
+#define DEFAULT_MQTT_STATUS ConnectionStatus::DISCONNECTED
+#define DEFAULT_MQTT_HOST ""
+#define DEFAULT_MQTT_PORT "1883"
+#define DEFAULT_MQTT_CLIENT_ID "livegrid"
+#define DEFAULT_MQTT_USERNAME ""
+#define DEFAULT_MQTT_PASSWORD ""
+#define DEFAULT_MQTT_CO2_TOPIC "livegrid/sensors"
+#define DEFAULT_MQTT_MATRIX_TEXT_TOPIC "livegrid/text"
+#define DEFAULT_MQTT_SHOW_TEXT false
+
+// Home Assistant Defaults
+#define DEFAULT_HA_STATUS ConnectionStatus::DISCONNECTED
+#define DEFAULT_HA_SHOW_TEXT false
+
+// eDMX Defaults
+#define DEFAULT_EDMX_PROTOCOL eDmxProtocol::S_ACN
+#define DEFAULT_EDMX_MULTICAST true
+#define DEFAULT_EDMX_START_UNIVERSE 1
+#define DEFAULT_EDMX_START_ADDRESS 1
+#define DEFAULT_EDMX_MODE eDmxMode::DMX_MODE_RGB
+#define DEFAULT_EDMX_TIMEOUT 5000

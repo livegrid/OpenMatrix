@@ -32,6 +32,7 @@ class SCD40 {
   bool isFirstReadingReceived();
   bool isConnected();
   float getTemperature();
+  float getTemperatureFahrenheit();
   float getHumidity();
   uint16_t getCO2();
 };

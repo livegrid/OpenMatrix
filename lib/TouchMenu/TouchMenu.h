@@ -47,6 +47,7 @@ class TouchMenu {
   static void gotTouch3();
 
   std::string getSensorDataMenuText() const;
+  std::string getTemperatureUnitText() const;
   std::vector<std::string> getItemList() const;
   void executeMenuItem(const std::string& selectedOption);
   void handleDoubleTap(uint8_t pin);
