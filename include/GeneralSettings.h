@@ -4,7 +4,7 @@
 #define FIRMWARE_VERSION_MINOR 1
 #define FIRMWARE_VERSION_PATCH 2
 
-// #define PANEL_UPCYCLED 1
+#define PANEL_UPCYCLED 1
 
 #define RUN_DEMO 1
 

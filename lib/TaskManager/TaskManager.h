@@ -9,6 +9,8 @@
 #include <string>
 
 class TaskManager {
+
+friend class DebugMonitor;
  public:
   enum class TaskState { RUNNING, SUSPENDED, STOPPED };
 

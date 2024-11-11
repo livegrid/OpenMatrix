@@ -13,6 +13,8 @@
 #include "WebServerManager.h"
 #endif
 
+#include <DebugMonitor.h>
+
 TaskManager& taskManager = TaskManager::getInstance();
 
 #ifdef PANEL_UPCYCLED
@@ -353,11 +355,11 @@ void setup(void) {
   }
   #endif
 
-  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
 
 #ifdef WIFI_ENABLED
   // Start server task
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
 #endif
 
 #ifdef TOUCH_ENABLED
@@ -377,8 +379,10 @@ void setup(void) {
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
-  TaskManager::getInstance().createTask("SensorTask", sensorTask, 2048, 1, 0);
+  TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
 #endif
+
+  // DebugMonitor::init(); // Initialize the debug monitor
 }
 
 void loop(void) {
