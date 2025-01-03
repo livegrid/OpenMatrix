@@ -1,7 +1,14 @@
 #pragma once
 
+#include "GeneralSettings.h"
+
 //GENERAL SETTINGS
-#define PHYSICS_SCALE 50
+#if defined(PANEL_UPCYCLED)
+    #define PHYSICS_SCALE 50
+#else
+    #define PHYSICS_SCALE 80
+#endif
+
 #define AQUARIUM_SAVE_INTERVAL 30    //in minutes
 #define BORDER_BUFFER 0
 #define FOOD_TOUCH_THRESHOLD 100
@@ -122,5 +129,9 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 //ATTRACTOR SETTINGS
 #define BOID_GROUPS 2
 #define NUM_BOIDS 10, 20
-#define BOID_MAX_SPEED 5, 10
+#if defined(PANEL_UPCYCLED)
+    #define BOID_MAX_SPEED 5, 10
+#else
+    #define BOID_MAX_SPEED 4, 8
+#endif
 #define BOID_MAX_FORCE 1, 2
