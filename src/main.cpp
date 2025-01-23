@@ -115,8 +115,10 @@ void displayTask(void* parameter) {
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  esp_task_wdt_add(NULL);
 
   for (;;) {
+    esp_task_wdt_reset();
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
@@ -294,6 +296,24 @@ void sensorTask(void* parameter) {
   }
 }
 
+void restartTask(void* parameter) {
+  const unsigned long RESTART_INTERVAL = 11UL * 60UL * 60UL * 1000UL; // 23 hours in milliseconds
+  // const unsigned long RESTART_INTERVAL = 5UL * 60UL * 1000UL; // 23 hours in milliseconds
+  const TickType_t xFrequency = pdMS_TO_TICKS(60000); // Check every minute
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+
+  for (;;) {
+    if (millis() >= RESTART_INTERVAL) {
+      log_i("Scheduled restart triggered after 23 hours");
+      stateManager.save(); // Save state before restart
+      delay(100); // Small delay to ensure state is saved
+      ESP.restart();
+    }
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+
+
 void setup(void) {
   // Serial.begin(115200);
   log_i("\n");
@@ -315,6 +335,17 @@ void setup(void) {
   digitalWrite(2, LOW);
 
   matrix.init();
+
+  esp_task_wdt_config_t config = {
+      .timeout_ms = 30000, // Set timeout to 5 seconds (5000 ms)
+      .idle_core_mask = 0, // No specific core mask (0 means all cores)
+      .trigger_panic = true // Trigger panic on timeout
+  };
+
+  esp_err_t err = esp_task_wdt_init(&config);
+  if (err != ESP_OK) {
+    log_e("Failed to initialize task watchdog timer: %s", esp_err_to_string(err));
+  }
 
 #ifdef SCD40_ENABLED
   delay(50);
@@ -382,6 +413,8 @@ void setup(void) {
   TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
 #endif
 
+  // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);
+  
   // DebugMonitor::init(); // Initialize the debug monitor
 }
 
