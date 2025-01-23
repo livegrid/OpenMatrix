@@ -337,7 +337,7 @@ void setup(void) {
   matrix.init();
 
   esp_task_wdt_config_t config = {
-      .timeout_ms = 30000, // Set timeout to 5 seconds (5000 ms)
+      .timeout_ms = 5000, // Set timeout to 5 seconds (5000 ms)
       .idle_core_mask = 0, // No specific core mask (0 means all cores)
       .trigger_panic = true // Trigger panic on timeout
   };
