@@ -15,6 +15,8 @@
 
 #include <DebugMonitor.h>
 
+#include <esp_task_wdt.h>
+
 TaskManager& taskManager = TaskManager::getInstance();
 
 #ifdef PANEL_UPCYCLED
