@@ -7,13 +7,12 @@ WebServerManager::WebServerManager(Matrix* matrix, EffectManager* effectManager,
       effectManager(effectManager),
       imageDraw(imageDraw),
       server(80),
-      nw(&server),
       interface(&server, stateManager),
       stateManager(stateManager),
       taskManager(taskManager) {}
 
 void WebServerManager::begin() {
-  setupNetWizard();
+  connectToWiFi();
   setupInterface();
   startServer();
   setupUniqueHostname();
@@ -21,76 +20,31 @@ void WebServerManager::begin() {
 
 void WebServerManager::handleClient() {
   server.handleClient();
-  ElegantOTA.loop();
-  nw.loop();
+  // ElegantOTA.loop();
 }
 
-void WebServerManager::setupNetWizard() {
-  nw.setStrategy(NetWizardStrategy::NON_BLOCKING);
+void WebServerManager::connectToWiFi() {
+  log_i("[*] Connecting to WiFi");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  nw.onConnectionStatus([this](NetWizardConnectionStatus status) {
-    String status_str = "";
-    switch (status) {
-      case NetWizardConnectionStatus::DISCONNECTED:
-        status_str = "Disconnected";
-        break;
-      case NetWizardConnectionStatus::CONNECTING:
-        status_str = "Connecting";
-        break;
-      case NetWizardConnectionStatus::CONNECTED:
-        status_str = "Connected";
-        break;
-      case NetWizardConnectionStatus::CONNECTION_FAILED:
-        status_str = "Connection Failed";
-        break;
-      case NetWizardConnectionStatus::CONNECTION_LOST:
-        status_str = "Connection Lost";
-        break;
-      case NetWizardConnectionStatus::NOT_FOUND:
-        status_str = "Not Found";
-        break;
-      default:
-        status_str = "Unknown";
-    }
-    log_i("[NW] Connection status changed to: %s", status_str.c_str());
-    if (status == NetWizardConnectionStatus::CONNECTED) {
-      log_i("[NW] Local IP: %s", WiFi.localIP().toString().c_str());
-      log_i("[NW] Gateway IP: %s", WiFi.gatewayIP().toString().c_str());
-      log_i("[NW] Subnet mask: %s", WiFi.subnetMask().toString().c_str());
-    }
-  });
+  // Wait for connection with timeout
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    log_i(".");
+    attempts++;
+  }
 
-  nw.onPortalState([](NetWizardPortalState state) {
-    String state_str = "";
-    switch (state) {
-      case NetWizardPortalState::IDLE:
-        state_str = "Idle";
-        break;
-      case NetWizardPortalState::CONNECTING_WIFI:
-        state_str = "Connecting to WiFi";
-        break;
-      case NetWizardPortalState::WAITING_FOR_CONNECTION:
-        state_str = "Waiting for Connection";
-        break;
-      case NetWizardPortalState::SUCCESS:
-        state_str = "Success";
-        break;
-      case NetWizardPortalState::FAILED:
-        state_str = "Failed";
-        break;
-      case NetWizardPortalState::TIMEOUT:
-        state_str = "Timeout";
-        break;
-      default:
-        state_str = "Unknown";
-    }
-    log_i("[NW] Portal state changed to: %s", state_str.c_str());
-  });
-
-  log_i("[*] Starting NetWizard");
-  nw.autoConnect("LiveGrid", "");
+  if (WiFi.status() == WL_CONNECTED) {
+    log_i("[WiFi] Connected successfully");
+    log_i("[WiFi] IP address: %s", WiFi.localIP().toString().c_str());
+    log_i("[WiFi] Gateway IP: %s", WiFi.gatewayIP().toString().c_str());
+    log_i("[WiFi] Subnet mask: %s", WiFi.subnetMask().toString().c_str());
+  } else {
+    log_e("[WiFi] Failed to connect");
+  }
 }
-
 
 void WebServerManager::setupUniqueHostname() {
   const char* baseHostname = "livegrid";
@@ -234,13 +188,11 @@ void WebServerManager::setupInterface() {
 
   interface.onNetworkReset([this]() {
     log_i("[*] Resetting network");
-    nw.reset();
     ESP.restart();
   });
 
   interface.onFactoryReset([this]() {
     log_i("[*] Resetting factory settings");
-    nw.reset();
     LittleFS.remove("/aquarium_state.json");
     LittleFS.remove("/state.json");
     ESP.restart();
@@ -248,12 +200,12 @@ void WebServerManager::setupInterface() {
 }
 
 void WebServerManager::startServer() {
-  log_i("[*] Attaching ElegantOTA");
-  ElegantOTA.begin(&server);
+  // log_i("[*] Attaching ElegantOTA");
+  // ElegantOTA.begin(&server);
 
   server.begin();
 
-  if (nw.isConfigured()) {
+  if (WiFi.status() == WL_CONNECTED) {
     log_i("OpenMatrix is configured!");
   } else {
     log_w("OpenMatrix is not configured yet! Please connect to LiveGrid AP and setup your device.");

@@ -178,12 +178,12 @@ void TouchMenu::displayMenu() {
     if (confirmationRequired) {
       if (currentMenuItem == 2) { // Yes is now the middle option
         if (itemToConfirm == "Factory Reset") {
-          webServerManager->nw.reset();
+          // webServerManager->nw.reset();
           LittleFS.remove("/aquarium_state.json");
           LittleFS.remove("/state.json");
           ESP.restart();
         } else if (itemToConfirm == "Reset WiFi Settings?") {
-          webServerManager->nw.reset();
+          // webServerManager->nw.reset();
           ESP.restart();
         }
       }
@@ -222,33 +222,33 @@ void TouchMenu::displayWiFiInfo() {
   matrix->background->println("WiFi Info:");
   
   // Get WiFi information from NetWizard
-  NetWizard* nw = &webServerManager->nw;
-  NetWizardConnectionStatus status = nw->getConnectionStatus();
+  // NetWizard* nw = &webServerManager->nw;
+  // NetWizardConnectionStatus status = nw->getConnectionStatus();
   
-  switch (status) {
-    case NetWizardConnectionStatus::CONNECTED:
-      matrix->background->setTextColor(activeColor);
-      matrix->background->println("Status: Connected");
-      matrix->background->println(("IP: " + nw->localIP().toString()).c_str());
-      matrix->background->setTextColor(inactiveColor);
-      matrix->background->println(("SSID: " + String(nw->getSSID())).c_str());
-      break;
-    case NetWizardConnectionStatus::DISCONNECTED:
-      matrix->background->setTextColor(activeColor);
-      matrix->background->println("Status: Disconnected");
-      matrix->background->setTextColor(inactiveColor);
-      break;
-    case NetWizardConnectionStatus::CONNECTING:
-      matrix->background->setTextColor(activeColor);
-      matrix->background->println("Status: Connecting...");
-      matrix->background->setTextColor(inactiveColor);
-      break;
-    default:
-      matrix->background->setTextColor(activeColor);
-      matrix->background->println("Status: Unknown");
-      matrix->background->setTextColor(inactiveColor);
-      break;
-  }
+  // switch (status) {
+  //   case NetWizardConnectionStatus::CONNECTED:
+  //     matrix->background->setTextColor(activeColor);
+  //     matrix->background->println("Status: Connected");
+  //     matrix->background->println(("IP: " + nw->localIP().toString()).c_str());
+  //     matrix->background->setTextColor(inactiveColor);
+  //     matrix->background->println(("SSID: " + String(nw->getSSID())).c_str());
+  //     break;
+  //   case NetWizardConnectionStatus::DISCONNECTED:
+  //     matrix->background->setTextColor(activeColor);
+  //     matrix->background->println("Status: Disconnected");
+  //     matrix->background->setTextColor(inactiveColor);
+  //     break;
+  //   case NetWizardConnectionStatus::CONNECTING:
+  //     matrix->background->setTextColor(activeColor);
+  //     matrix->background->println("Status: Connecting...");
+  //     matrix->background->setTextColor(inactiveColor);
+  //     break;
+  //   default:
+  //     matrix->background->setTextColor(activeColor);
+  //     matrix->background->println("Status: Unknown");
+  //     matrix->background->setTextColor(inactiveColor);
+  //     break;
+  // }
   
   matrix->background->println("");
   matrix->background->setTextColor(currentMenuItem == 0 ? activeColor : inactiveColor);

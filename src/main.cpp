@@ -4,16 +4,16 @@
 
 #ifdef WIFI_ENABLED
 #include <Edmx.h>
-#include <ElegantOTA.h>
-#include <NetWizard.h>
+// #include <ElegantOTA.h>
+// #include <NetWizard.h>
 #include <WebServer.h>
 
-#include "MQTTManager.h"
+// #include "MQTTManager.h"
 #include "UI.h"
 #include "WebServerManager.h"
 #endif
 
-#include <DebugMonitor.h>
+// #include <DebugMonitor.h>
 
 TaskManager& taskManager = TaskManager::getInstance();
 
@@ -97,6 +97,15 @@ void demoTask(void* parameter) {
 #endif
 
 void displayTask(void* parameter) {
+  // Give some time for system to stabilize after boot
+  vTaskDelay(pdMS_TO_TICKS(1000));
+  
+  // Initialize matrix
+  log_i("Initializing matrix display...");
+  matrix.init();
+  matrix.setRotation(2);
+  matrix.setBrightness(250);
+  
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -115,6 +124,8 @@ void displayTask(void* parameter) {
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+
+  aquarium.begin();
 
   for (;;) {
     unsigned long currentTime = millis();
@@ -223,6 +234,16 @@ void touchTask(void* parameter) {
 #endif
 
 void serverTask(void* parameter) {
+  // Give some time for system to stabilize after boot
+  vTaskDelay(pdMS_TO_TICKS(2000));
+  
+  // Initialize web server and related services
+  webServerManager.begin();
+  
+  // Initialize DMX after web server is ready
+  dmx.begin(&matrix, &stateManager);
+  
+  // Main server loop
   for (;;) {
     webServerManager.handleClient();
     vTaskDelay(1);  // Small delay to prevent watchdog timer issues
@@ -294,6 +315,24 @@ void sensorTask(void* parameter) {
   }
 }
 
+
+void restartTask(void* parameter) {
+  const unsigned long RESTART_INTERVAL = 23UL * 60UL * 60UL * 1000UL; // 23 hours in milliseconds
+  const TickType_t xFrequency = pdMS_TO_TICKS(60000); // Check every minute
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+
+  for (;;) {
+    if (millis() >= RESTART_INTERVAL) {
+      log_i("Scheduled restart triggered after 23 hours");
+      stateManager.save(); // Save state before restart
+      aquarium.saveState();
+      delay(100); // Small delay to ensure state is saved
+      ESP.restart();
+    }
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+
 void setup(void) {
   // Serial.begin(115200);
   log_i("\n");
@@ -313,8 +352,6 @@ void setup(void) {
 
   pinMode(2, OUTPUT);
   digitalWrite(2, LOW);
-
-  matrix.init();
 
 #ifdef SCD40_ENABLED
   delay(50);
@@ -343,44 +380,34 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
-  matrix.setBrightness(stateManager.getState()->brightness);
-  // Start periodic save task
-  stateManager.startPeriodicSave();
+  // stateManager.startPeriodicSave();
 
-  aquarium.begin();
   
-  #ifdef RUN_DEMO
+#ifdef RUN_DEMO
   if(stateManager.getState()->firstBoot) {
     aquarium.startDemo();
   }
-  #endif
+#endif
 
+  // Create tasks with adjusted stack sizes
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
 
 #ifdef WIFI_ENABLED
-  // Start server task
+  // Increase server task stack size for larger displays
   TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
 #endif
 
-#ifdef WIFI_ENABLED
-  webServerManager.begin();
-  dmx.begin(&matrix,
-            &stateManager);  // Initialize E1.31 after WiFi is connected
-#endif
-
-  // Initialize MQTT
-  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
-  stateManager.getState()->settings.mqtt.matrix_text_topic =
-      "homeassistant/text/livegrid/matrix_text/set";
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
-  TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("SensorTask", sensorTask, 2056, 1, 0);
 #endif
+
+  // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);
 
   // DebugMonitor::init(); // Initialize the debug monitor
 }

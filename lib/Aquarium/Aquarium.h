@@ -12,6 +12,7 @@
 #include "AquariumSettings.h"
 #include "AquariumStateManager.h"
 #include "BoidManager.h"
+#include "CarbonEmission.h"
 #include "Fish.h"
 #include "Food.h"
 #include "Plants.h"
@@ -23,6 +24,7 @@ class Aquarium {
   Matrix* matrix;
   SCD40* scd40;
   StateManager* stateManager;
+  CarbonEmission carbonEmission;
   Water water;
   std::vector<std::unique_ptr<Fish>> fishArray;
   std::vector<std::unique_ptr<Plants>> plantArray;
@@ -58,6 +60,7 @@ class Aquarium {
     loadState();
     initializePlants();
     boidManager.initializeBoids();
+    carbonEmission.begin();
   }
 
   bool isDemoFinished() const {
@@ -286,9 +289,19 @@ class Aquarium {
 
   // Update all fish in the aquarium
   void updateFish() {
-    float co2 = demoMode
-                    ? demoCO2
-                    : (scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
+    float co2;
+    
+    if (demoMode) {
+      co2 = demoCO2;
+    } else {
+      // Prioritize carbon emission data if available, otherwise fall back to SCD40 sensor
+      if (carbonEmission.isDataValid()) {
+        co2 = carbonEmission.getCO2Equivalent();
+      } else {
+        co2 = scd40->isFirstReadingReceived() ? scd40->getCO2() : 400;
+      }
+    }
+    
     for (auto it = fishArray.begin(); it != fishArray.end();) {
       bool destroy = (*it)->update(co2, demoMode);
       if (destroy) {
@@ -335,18 +348,28 @@ class Aquarium {
       if (scd40->isFirstReadingReceived()) {
         float temperature = scd40->getTemperature();
         float humidity = scd40->getHumidity();
-        float co2 = scd40->getCO2();
+        float co2;
+        
+        // Prioritize carbon emission data if available
+        if (carbonEmission.isDataValid()) {
+          co2 = carbonEmission.getCO2Equivalent();
+        } else {
+          co2 = scd40->getCO2();
+        }
 
+        // Calculate renewable percentage
+        float renewablePerc = carbonEmission.isDataValid() ? carbonEmission.getRenewablePercentage() : 0;
+        
         if (stateManager->getState()->temperatureUnit == TemperatureUnit::FAHRENHEIT) {
             // Convert to Fahrenheit
               temperature = stateManager->getState()->environment.temperature_fahrenheit.value;
               snprintf(buffer, sizeof(buffer),
-                  "%s\nTemp: %.1f F\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
-                  temperature, humidity, co2);
+                  "%s\nTemp: %.1f F\nHumidity: %.0f %%\nCO2: %.0f ppm\nRenewable: %.0f%%", "",
+                  temperature, humidity, co2, renewablePerc);
           } else {
               snprintf(buffer, sizeof(buffer),
-                  "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm", "",
-                  temperature, humidity, co2);
+                  "%s\nTemp: %.1f C\nHumidity: %.0f %%\nCO2: %.0f ppm\nRenewable: %.0f%%", "",
+                  temperature, humidity, co2, renewablePerc);
           }
         
         drawMultilineText(matrix->foreground, buffer, MIDDLE,
@@ -367,8 +390,13 @@ class Aquarium {
     if (demoMode) {
       updateDemo();
     } else {
+      // Update carbon emission data
+      carbonEmission.update();
+      
       updateWater();
-      boidManager.updateBoids(scd40->getCO2());
+      boidManager.updateBoids(carbonEmission.isDataValid() ? 
+                             carbonEmission.getCO2Equivalent() : 
+                             scd40->getCO2());
       boidManager.renderBoids();
       updateFish();
       updateFood();
