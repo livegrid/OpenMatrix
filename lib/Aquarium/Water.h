@@ -56,8 +56,8 @@ class Water {
       return;
     }
 
-    uint8_t limitTemperature = constrain(temperature, 0, 50);
-    uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 245);
+    uint8_t limitTemperature = constrain(temperature, 10, 35);
+    uint8_t colorIndex = map(limitTemperature, 10, 35, 0, 255);
     simplexColor = ColorFromPalette(palette, colorIndex);
     
     // Update a portion of the buffer
