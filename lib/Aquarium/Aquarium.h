@@ -41,6 +41,11 @@ class Aquarium {
   float demoCO2;
   bool demoFinished;
 
+  // Touch input  
+  bool touchActive = false;
+  unsigned long lastFoodTime = 0;
+  const unsigned long FOOD_INTERVAL = 200; // Add food every 200ms while touched
+
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
  public:
@@ -68,7 +73,7 @@ class Aquarium {
     demoMode = true;
     demoStep = 0;
     demoStartTime = millis();
-    demoTemperature = 25.0f;
+    demoTemperature = 21.0f;
     demoHumidity = 50.0f;
     demoCO2 = 400.0f;
   }
@@ -141,7 +146,8 @@ class Aquarium {
       break;
     case 6:
       t = 2 * PI * stepElapsedTime / stepDurations[demoStep];
-      demoTemperature = 25.0f + 25.0f * pausingSine(t, 0.2);
+      // Oscillate strictly within 10–35°C for realistic indoor range
+      demoTemperature = 22.5f + 12.5f * pausingSine(t, 0.2);  // 10..35°C
       snprintf(buffer, sizeof(buffer), "Temperature:\n%.0f C", demoTemperature);
       updateWater();
       break;
@@ -325,9 +331,28 @@ class Aquarium {
   }
 
   void handleTouchInput() {
-    if (touchRead(13) / 1000 > FOOD_TOUCH_THRESHOLD) {
-      addFood();
+    // Continue adding food while touch is active
+    if (touchActive) {
+      unsigned long currentTime = millis();
+      if (currentTime - lastFoodTime >= FOOD_INTERVAL) {
+        addFood();
+        lastFoodTime = currentTime;
+      }
     }
+  }
+
+  // Called externally when touch is detected on pin 13 (and menu is not open)
+  void onTouchStarted() {
+    if (!touchActive) {
+      touchActive = true;
+      addFood();
+      lastFoodTime = millis();
+    }
+  }
+
+  // Called externally when touch is released on pin 13
+  void onTouchReleased() {
+    touchActive = false;
   }
 
   void updateSensorData(bool showSensorData) {
@@ -451,5 +476,7 @@ class Aquarium {
     }
   }
 };
+
+
 
 #endif  // AQUARIUM_H

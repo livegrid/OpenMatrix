@@ -11,7 +11,6 @@
 
 #define AQUARIUM_SAVE_INTERVAL 30    //in minutes
 #define BORDER_BUFFER 0
-#define FOOD_TOUCH_THRESHOLD 100
 
 //AGE SETTINGS
 #define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days

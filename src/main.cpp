@@ -70,7 +70,7 @@ Edmx& dmx = Edmx::getInstance();
 
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
-TouchMenu touchMenu(&matrix, &stateManager, &webServerManager);
+TouchMenu touchMenu(&matrix, &stateManager, &webServerManager, &aquarium);
 #endif
 
 #ifndef SCD40_ENABLED

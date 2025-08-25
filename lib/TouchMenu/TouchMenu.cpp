@@ -1,4 +1,5 @@
 #include "TouchMenu.h"
+#include "Aquarium.h"
 
 TouchMenu* TouchMenu::instance = nullptr;
 
@@ -7,8 +8,8 @@ TouchMenu* TouchMenu::getInstance() { return instance; }
 void TouchMenu::gotTouch1() { getInstance()->touch1detected = true; }
 void TouchMenu::gotTouch2() { getInstance()->touch2detected = true; }
 
-TouchMenu::TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, long touchThreshold)
-    : matrix(matrix), stateManager(stateManager), webServerManager(webServerManager), touchThreshold(touchThreshold) {
+TouchMenu::TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, Aquarium* aquarium, long touchThreshold)
+    : matrix(matrix), stateManager(stateManager), webServerManager(webServerManager), aquarium(aquarium), touchThreshold(touchThreshold) {
   instance = this;
 }
 
@@ -308,10 +309,20 @@ void TouchMenu::update() {
       if (touchInterruptGetLastStatus(pin)) {
         log_i(" --- T%d Touched", i + 1);
         
-        handleSingleTap(pin);
+        // Handle food functionality for pin 13 when menu is not open
+        if (pin == 13 && !menuOpen && aquarium) {
+          aquarium->onTouchStarted();
+        } else {
+          handleSingleTap(pin);
+        }
         lastTapTime[i] = now;
       } else {
         log_i(" --- T%d Released", i + 1);
+        
+        // Handle food release for pin 13 when menu is not open
+        if (pin == 13 && !menuOpen && aquarium) {
+          aquarium->onTouchReleased();
+        }
       }
     }
   }

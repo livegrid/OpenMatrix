@@ -10,11 +10,15 @@
 #include <NetWizard.h>
 #include <WebServerManager.h>
 
+// Forward declaration
+class Aquarium;
+
 class TouchMenu {
  private:
   Matrix* matrix;
   TaskManager* taskManager;
   StateManager* stateManager;
+  Aquarium* aquarium;
   long touchThreshold;
   bool menuOpen = false;
   bool sensorDataVisible = false;
@@ -60,7 +64,7 @@ class TouchMenu {
   void displayBrightnessControl();
 
  public:
-  TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, long touchThreshold = 10000);
+  TouchMenu(Matrix* matrix, StateManager* stateManager, WebServerManager* webServerManager, Aquarium* aquarium = nullptr, long touchThreshold = 10000);
   void setupInterrupts();
   void update();
   bool isMenuOpen();
