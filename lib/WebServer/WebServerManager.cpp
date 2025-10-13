@@ -192,7 +192,10 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.mqtt.port = port;
     stateManager->getState()->settings.mqtt.client_id = client_id;
     stateManager->getState()->settings.mqtt.username = username;
-    stateManager->getState()->settings.mqtt.password = password;
+    // Preserve existing password if none provided
+    if (password != nullptr && strlen(password) > 0) {
+      stateManager->getState()->settings.mqtt.password = password;
+    }
     stateManager->getState()->settings.mqtt.co2_topic = co2_topic;
     stateManager->getState()->settings.mqtt.matrix_text_topic = matrix_text_topic;
     stateManager->getState()->settings.mqtt.show_text = show_text;
@@ -230,6 +233,20 @@ void WebServerManager::setupInterface() {
     stateManager->save();
 
     // TODO: Do something with these Home Assistant settings
+  });
+
+  // Scheduler settings
+  interface.onSchedulerSettings([this](
+    bool enableDarkAutoPower,
+    float darkThresholdLux,
+    float darkHysteresisLux,
+    uint16_t darkStabilitySeconds
+  ) {
+    stateManager->getState()->settings.scheduler.enableDarkAutoPower = enableDarkAutoPower;
+    stateManager->getState()->settings.scheduler.darkThresholdLux = darkThresholdLux;
+    stateManager->getState()->settings.scheduler.darkHysteresisLux = darkHysteresisLux;
+    stateManager->getState()->settings.scheduler.darkStabilitySeconds = darkStabilitySeconds;
+    stateManager->save();
   });
 
   interface.onNetworkReset([this]() {

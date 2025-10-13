@@ -9,6 +9,7 @@
   import { get } from "svelte/store";
   import { state, resetNetwork, resetFactory } from "@/store";
   import HassSettings from "@/components/HassSettings.svelte";
+  import SchedulerSettings from "@/components/SchedulerSettings.svelte";
 
   let loading = true;
   let networkResetLoading = false;
@@ -78,7 +79,7 @@
   </div>
 </div>
 {#if loading}
-  <div class="grid grid-col-1 sm:grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div role="status" class="animate-pulse">
       <div class="bg-gray-300/50 rounded dark:bg-zinc-700/50 w-full h-[600px]"></div>
     </div>
@@ -87,10 +88,13 @@
     </div>
   </div>
 {:else}
-  <div class="grid grid-col-1 sm:grid-cols-2 gap-4">
+  <div class="flex flex-col gap-4">
     <MQTTSettings initialValues={initialValues?.mqtt} />
     <DMXSettings initialValues={initialValues?.edmx} />
     <HassSettings initialValues={initialValues?.hass} />
+    <SchedulerSettings initialValues={initialValues?.scheduler} />
+
+    <!-- Scheduler settings will be added here in a separate component -->
 
     <div class="relative flex flex-col gap-y-6 overflow-hidden col-span-2 rounded-md border border-zinc-200 dark:border-zinc-900 bg-white/30 dark:bg-black/30 px-4 py-3 sm:px-6 sm:py-6">
       <!-- <h3 class="text-base font-semibold leading-6 text-zinc-900 dark:text-zinc-300">Last 7 days</h3> -->

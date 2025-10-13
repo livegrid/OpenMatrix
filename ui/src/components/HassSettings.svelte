@@ -69,7 +69,7 @@
 </script>
 
 <SettingsCard on:submit={submitForm} on:click={submitForm} name={"Home Assistant"} className={'col-span-2'} loading={loading} isDirty={dirty}>
-  <div class="flex flex-row gap-x-3 justify-between">
+  <div class="flex flex-row gap-x-3 justify-between" title="Show text overlay when using Home Assistant text control.">
     <div class="truncate text-sm font-medium text-zinc-800 dark:text-zinc-300">
       Status
     </div>

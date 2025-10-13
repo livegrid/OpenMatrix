@@ -16,6 +16,7 @@
 #include <DebugMonitor.h>
 
 #include <esp_task_wdt.h>
+#include <esp_err.h>
 
 TaskManager& taskManager = TaskManager::getInstance();
 
@@ -112,6 +113,7 @@ void displayTask(void* parameter) {
 
   uint8_t currentMode =
       99;  // make sure currentMode is not the same as OpenMatrixMode
+  uint8_t lastAppliedBrightness = 255;
 
   // Initialize components
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
@@ -203,6 +205,15 @@ void displayTask(void* parameter) {
         lastLogTime = currentTime;
         frameCount = 0;
       }
+
+      // Apply manual brightness changes when autobrightness is disabled
+      if (!stateManager.getState()->autobrightness) {
+        uint8_t desired = stateManager.getState()->brightness;
+        if (desired != lastAppliedBrightness) {
+          matrix.setBrightness(desired);
+          lastAppliedBrightness = desired;
+        }
+      }
     }
     else {
       digitalWrite(2, HIGH);
@@ -254,10 +265,8 @@ void mqttTask(void* parameter) {
   for (;;) {
     if (mqttManager.isConnected()) {
       if (!configPublished) {
-        // Publish Home Assistant discovery messages
-        mqttManager.publishHomeAssistantConfig();
+        // Discovery and availability handled on connect now
         configPublished = true;
-        log_i("MQTT: Published Home Assistant discovery config");
       }
       float temperature =
           stateManager.getState()->environment.temperature.value;
@@ -265,9 +274,7 @@ void mqttTask(void* parameter) {
       int co2 = stateManager.getState()->environment.co2.value;
 
       mqttManager.publishSensorData(temperature, humidity, co2);
-      mqttManager.publishSensorData(
-          temperature, humidity, co2,
-          stateManager.getState()->settings.mqtt.co2_topic.c_str());
+      mqttManager.publishSensorData(temperature, humidity, co2);
       log_v("MQTT: Sent sensor data to Home Assistant");
     } else {
       log_v("MQTT: Not connected, skipping message");
@@ -280,12 +287,45 @@ void mqttTask(void* parameter) {
 void sensorTask(void* parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(1000);  // 1 second
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  unsigned long belowSinceMs = 0;
+  bool lastScheduledOff = false;
 
   for (;;) {
 #ifdef BH1750_ENABLED
     autoBrightness.updateSensorValues();
     if (stateManager.getState()->autobrightness) {
       matrix.setBrightness(autoBrightness.matrixBrightness());
+    }
+
+    // Dark-threshold scheduler
+    if (stateManager.getState()->settings.scheduler.enableDarkAutoPower) {
+      const float lux = autoBrightness.getLux();
+      const float threshold = stateManager.getState()->settings.scheduler.darkThresholdLux;
+      const float hysteresis = stateManager.getState()->settings.scheduler.darkHysteresisLux;
+      const uint16_t stability = stateManager.getState()->settings.scheduler.darkStabilitySeconds;
+      const bool isCurrentlyOff = !stateManager.getState()->power;
+
+      const unsigned long nowMs = millis();
+      const bool below = lux <= threshold;
+      const bool above = lux >= (threshold + hysteresis);
+
+      if (below) {
+        if (belowSinceMs == 0) belowSinceMs = nowMs;
+        if ((nowMs - belowSinceMs) >= (stability * 1000UL)) {
+          if (!isCurrentlyOff) {
+            stateManager.getState()->power = false; // display off only
+            stateManager.save();
+            lastScheduledOff = true;
+          }
+        }
+      } else if (above) {
+        belowSinceMs = 0;
+        if (isCurrentlyOff && lastScheduledOff) {
+          stateManager.getState()->power = true;
+          stateManager.save();
+          lastScheduledOff = false;
+        }
+      }
     }
 #endif
     vTaskDelay(pdMS_TO_TICKS(5));  // 5 milliseconds delay
@@ -346,7 +386,7 @@ void setup(void) {
 
   esp_err_t err = esp_task_wdt_init(&config);
   if (err != ESP_OK) {
-    log_e("Failed to initialize task watchdog timer: %s", esp_err_to_string(err));
+    log_e("Failed to initialize task watchdog timer: %s", esp_err_to_name(err));
   }
 
 #ifdef SCD40_ENABLED
@@ -407,8 +447,7 @@ void setup(void) {
 
   // Initialize MQTT
   TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
-  stateManager.getState()->settings.mqtt.matrix_text_topic =
-      "homeassistant/text/livegrid/matrix_text/set";
+  // text topic will default to device-scoped topic if not customized
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)

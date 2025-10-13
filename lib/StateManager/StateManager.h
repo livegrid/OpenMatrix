@@ -157,6 +157,12 @@ struct State {
             eDmxMode mode = eDmxMode::DMX_MODE_RGB;
             uint16_t timeout = 5000;
         } edmx;
+        struct {
+            bool enableDarkAutoPower = false;
+            float darkThresholdLux = 2.0f;
+            float darkHysteresisLux = 0.5f;
+            uint16_t darkStabilitySeconds = 15;
+        } scheduler;
     } settings;
 };
 

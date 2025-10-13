@@ -1,7 +1,7 @@
 <script>
   import StatSkeleton from '@/components/StatSkeleton.svelte';
   import Icon from "./Icon.svelte";
-  export let title, value, symbol, icon, diff, trendInverse = false;
+  export let title, value, symbol, icon, diff;
 
   let trendColor;
 

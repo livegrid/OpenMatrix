@@ -103,6 +103,12 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   settings["edmx"]["mode"] = _state.settings.edmx.mode;
   settings["edmx"]["timeout"] = _state.settings.edmx.timeout;
 
+  // Scheduler
+  settings["scheduler"]["enableDarkAutoPower"] = _state.settings.scheduler.enableDarkAutoPower;
+  settings["scheduler"]["darkThresholdLux"] = _state.settings.scheduler.darkThresholdLux;
+  settings["scheduler"]["darkHysteresisLux"] = _state.settings.scheduler.darkHysteresisLux;
+  settings["scheduler"]["darkStabilitySeconds"] = _state.settings.scheduler.darkStabilitySeconds;
+
   serializeJson(json, buffer);
   // Clear JSON
   json.clear();
@@ -243,6 +249,12 @@ void StateManager::restore() {
   _state.settings.edmx.mode = settings["edmx"]["mode"] | DEFAULT_EDMX_MODE;
   _state.settings.edmx.timeout = settings["edmx"]["timeout"] | DEFAULT_EDMX_TIMEOUT;
 
+  // Scheduler
+  _state.settings.scheduler.enableDarkAutoPower = settings["scheduler"]["enableDarkAutoPower"] | DEFAULT_SCHED_ENABLE_DARK;
+  _state.settings.scheduler.darkThresholdLux = settings["scheduler"]["darkThresholdLux"] | DEFAULT_SCHED_DARK_THRESHOLD_LUX;
+  _state.settings.scheduler.darkHysteresisLux = settings["scheduler"]["darkHysteresisLux"] | DEFAULT_SCHED_DARK_HYSTERESIS_LUX;
+  _state.settings.scheduler.darkStabilitySeconds = settings["scheduler"]["darkStabilitySeconds"] | DEFAULT_SCHED_DARK_STABILITY_SECONDS;
+
   // Free memory
   json.clear();
 
@@ -312,6 +324,12 @@ void StateManager::setDefaultState() {
     _state.settings.edmx.start_address = DEFAULT_EDMX_START_ADDRESS;
     _state.settings.edmx.mode = DEFAULT_EDMX_MODE;
     _state.settings.edmx.timeout = DEFAULT_EDMX_TIMEOUT;
+
+    // Scheduler
+    _state.settings.scheduler.enableDarkAutoPower = DEFAULT_SCHED_ENABLE_DARK;
+    _state.settings.scheduler.darkThresholdLux = DEFAULT_SCHED_DARK_THRESHOLD_LUX;
+    _state.settings.scheduler.darkHysteresisLux = DEFAULT_SCHED_DARK_HYSTERESIS_LUX;
+    _state.settings.scheduler.darkStabilitySeconds = DEFAULT_SCHED_DARK_STABILITY_SECONDS;
 }
 
 void StateManager::startPeriodicSave() {

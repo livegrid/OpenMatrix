@@ -42,11 +42,11 @@
     {:else if currentTab === 'images'}
       <Images />
     {:else if currentTab === 'text'}
-      <Text />
+      <Text color="#ffffff" onColorChange={() => {}} />
     {:else if currentTab === 'settings'}
       <Settings />
     {:else}
-      <Environment />
+      <Aquarium />
     {/if}
   </div>
 </main>

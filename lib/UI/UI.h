@@ -22,6 +22,7 @@ class UI {
         typedef std::function<void(const char* host, uint16_t port, const char* client_id, const char* username, const char* password, const char* co2_topic, const char* matrix_text_topic, bool show_text)> onMqttSettingsCallback;
         typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, uint16_t start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
         typedef std::function<void(bool show_text)> onHomeAssistantSettingsCallback;
+        typedef std::function<void(bool enableDarkAutoPower, float darkThresholdLux, float darkHysteresisLux, uint16_t darkStabilitySeconds)> onSchedulerSettingsCallback;
         typedef std::function<void()> onResetCallback;
 
         UI(WebServer* server, StateManager* stateManager);
@@ -37,6 +38,7 @@ class UI {
         void onMqttSettings(onMqttSettingsCallback cb);
         void onDmxSettings(onDmxSettingsCallback cb);
         void onHomeAssistantSettings(onHomeAssistantSettingsCallback cb);
+        void onSchedulerSettings(onSchedulerSettingsCallback cb);
         void onNetworkReset(onResetCallback cb);
         void onFactoryReset(onResetCallback cb);
         void handleImageUpload();
@@ -59,6 +61,7 @@ class UI {
         onMqttSettingsCallback _on_mqtt_settings_cb;
         onDmxSettingsCallback _on_dmx_settings_cb;
         onHomeAssistantSettingsCallback _on_home_assistant_settings_cb;
+        onSchedulerSettingsCallback _on_scheduler_settings_cb;
         onResetCallback _on_network_reset_cb;
         onResetCallback _on_factory_reset_cb;
 

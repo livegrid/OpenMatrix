@@ -1,17 +1,15 @@
 <script>
   import TextButton from "./TextButton.svelte";
   import EffectSettingsPopup from "./EffectSettingsPopup.svelte";
-  export let effectType;
   export let image, name, selected, loading;
-  export let color = '#ffffff';
-  export let speed = 50;
-  export let scale = 50;
+  let color = '#ffffff'; // Used in EffectSettingsPopup
+  let speed = 50; // Used in EffectSettingsPopup
+  let scale = 50; // Used in EffectSettingsPopup
   export let onColorChange;
   export let onSpeedChange;
   export let onScaleChange;
   export let onParticleCountChange;
   export let onComplexityChange;
-  let showSettingsPopup = false;
   
   function handleColorChange(newColor) {
     onColorChange(newColor);
@@ -45,23 +43,8 @@
       </div>
     </div>
     <div class="flex justify-end items-center mt-auto">
-      <!-- <TextButton on:click={() => showSettingsPopup=!showSettingsPopup} loading={showSettingsPopup} text="Edit"/> -->
       <TextButton on:click loading={loading} selected={selected} text="Select"/>
     </div>
   </div>
   
-  <!-- {#if showSettingsPopup}
-    <EffectSettingsPopup
-      {color}
-      {speed}
-      {scale}
-      {effectType}
-      on:close={() => showSettingsPopup = false}
-      on:colorChange={handleColorChange}
-      on:speedChange={handleSpeedChange}
-      on:scaleChange={handleScaleChange}
-      on:particleCountChange={handleParticleCountChange}
-      on:complexityChange={handleComplexityChange}
-    />
-  {/if} -->
 </div>

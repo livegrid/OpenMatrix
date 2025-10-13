@@ -395,6 +395,27 @@ void UI::begin() {
     }
     return _server->send(200, "application/json", ok_response);
   });
+
+  // on scheduler settings
+  _server->on("/openmatrix/settings/scheduler", HTTP_POST, [&]() {
+    JsonDocument json;
+    DeserializationError err = deserializeJson(json, _server->arg("plain"));
+    if (err == DeserializationError::Ok) {
+      if (_on_scheduler_settings_cb) {
+        _on_scheduler_settings_cb(
+          json["enableDarkAutoPower"].as<bool>(),
+          json["darkThresholdLux"].as<float>(),
+          json["darkHysteresisLux"].as<float>(),
+          json["darkStabilitySeconds"].as<uint16_t>()
+        );
+        log_i("Scheduler settings updated.");
+      }
+      return _server->send(200, "application/json", ok_response);
+    } else {
+      log_e("Failed to deserialize Scheduler settings request.");
+      return _server->send(400, "application/json", invalid_response);
+    }
+  });
 }
 
 void UI::onPower(onPowerCallback cb) {
@@ -495,6 +516,10 @@ void UI::onDmxSettings(onDmxSettingsCallback cb) {
 
 void UI::onHomeAssistantSettings(onHomeAssistantSettingsCallback cb) {
   _on_home_assistant_settings_cb = cb;
+}
+
+void UI::onSchedulerSettings(onSchedulerSettingsCallback cb) {
+  _on_scheduler_settings_cb = cb;
 }
 
 void UI::onNetworkReset(onResetCallback cb) {

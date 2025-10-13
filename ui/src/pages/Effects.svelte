@@ -3,6 +3,7 @@
   // @ts-nocheck
   import ModePageLayout from "@/components/ModePageLayout.svelte";
   import EffectCard from "@/components/EffectCard.svelte";
+  import EffectSettingsPopup from "@/components/EffectSettingsPopup.svelte";
   import Snake from "@/components/effects/Snake.svelte";
   import SimplexNoise from "@/components/effects/SimplexNoise.svelte";
   import Flocking from "@/components/effects/Flocking.svelte";
@@ -92,10 +93,8 @@
           on:settings={() => openSettings(effect)}
           name={effect.name}
           image={effect.image}
-          effectType={effect.name}
           loading={effect.id === loading_effect_id}
           selected={effect.id === $state?.effects?.selected}
-          color={$state?.effects?.colors?.[effect.id] || '#ffffff'}
           onColorChange={(color) => handleSettingsUpdate(effect.id, { color })}
           onSpeedChange={(speed) => handleSettingsUpdate(effect.id, { speed })}
           onScaleChange={(scale) => handleSettingsUpdate(effect.id, { scale })}

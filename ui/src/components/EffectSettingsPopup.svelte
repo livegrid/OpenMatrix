@@ -41,6 +41,10 @@
 <div
   class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
   on:click|self={closePopup}
+  on:keydown={(e) => { if (e.key === 'Escape') { closePopup(); } }}
+  tabindex="0"
+  role="button"
+  aria-label="Close settings popup"
   transition:fade
 >
   <div class="bg-white rounded-md border border-zinc-200 dark:border-zinc-900 bg-white/90 dark:bg-black/90 p-6 w-80 shadow-xl">

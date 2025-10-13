@@ -97,7 +97,14 @@
   {#if navbarState !== 'closed'}
 
     <div class="fixed inset-0 flex">
-      <div on:click={closeNavbar} class={`fixed inset-0 bg-gray-900/80 dark:bg-zinc-900/40 transition-opacity ease-linear duration-300 ${ navbarState === 'open' ? 'opacity-100' : 'opacity-0'}`} />
+      <div
+        on:click={closeNavbar}
+        on:keydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeNavbar(); } }}
+        tabindex="0"
+        role="button"
+        aria-label="Close navigation menu"
+        class={`fixed inset-0 bg-gray-900/80 dark:bg-zinc-900/40 transition-opacity ease-linear duration-300 ${ navbarState === 'open' ? 'opacity-100' : 'opacity-0'}`}
+      />
     <!--
         Off-canvas menu, show/hide based on off-canvas menu navbarState.
 
@@ -170,7 +177,7 @@
           <ul class="-mx-2 space-y-1">
             {#each navMenu as item (item.id)}
               <li>
-                <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} id={item.id} active={currentTab === item.id} disabled={Object.keys($state).length === 0 || item.disabled} title={item.title} icon={item.icon} />
+                <NavItem on:click={() => changeTab(item.id)} modeId={item.modeId} active={currentTab === item.id} disabled={Object.keys($state).length === 0 || item.disabled} title={item.title} icon={item.icon} />
               </li>
             {/each}
           </ul>
