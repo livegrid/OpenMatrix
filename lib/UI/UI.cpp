@@ -416,6 +416,26 @@ void UI::begin() {
       return _server->send(400, "application/json", invalid_response);
     }
   });
+
+  // on calibration settings
+  _server->on("/openmatrix/settings/calibration", HTTP_POST, [&]() {
+    JsonDocument json;
+    DeserializationError err = deserializeJson(json, _server->arg("plain"));
+    if (err == DeserializationError::Ok) {
+      if (_on_calibration_settings_cb) {
+        _on_calibration_settings_cb(
+          json["temperatureOffsetC"].as<float>(),
+          json["humidityOffsetPct"].as<float>(),
+          json["co2OffsetPpm"].as<int16_t>()
+        );
+        log_i("Calibration settings updated.");
+      }
+      return _server->send(200, "application/json", ok_response);
+    } else {
+      log_e("Failed to deserialize Calibration settings request.");
+      return _server->send(400, "application/json", invalid_response);
+    }
+  });
 }
 
 void UI::onPower(onPowerCallback cb) {
@@ -520,6 +540,10 @@ void UI::onHomeAssistantSettings(onHomeAssistantSettingsCallback cb) {
 
 void UI::onSchedulerSettings(onSchedulerSettingsCallback cb) {
   _on_scheduler_settings_cb = cb;
+}
+
+void UI::onCalibrationSettings(onCalibrationSettingsCallback cb) {
+  _on_calibration_settings_cb = cb;
 }
 
 void UI::onNetworkReset(onResetCallback cb) {

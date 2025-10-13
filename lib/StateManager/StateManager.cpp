@@ -82,6 +82,10 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 
   // Settings
   JsonObject settings = json["settings"].to<JsonObject>();
+  // Calibration
+  settings["calibration"]["temperatureOffsetC"] = _state.settings.calibration.temperatureOffsetC;
+  settings["calibration"]["humidityOffsetPct"] = _state.settings.calibration.humidityOffsetPct;
+  settings["calibration"]["co2OffsetPpm"] = _state.settings.calibration.co2OffsetPpm;
   // MQTT
   settings["mqtt"]["status"] = _state.settings.mqtt.status;
   settings["mqtt"]["host"] = _state.settings.mqtt.host;
@@ -249,6 +253,11 @@ void StateManager::restore() {
   _state.settings.edmx.mode = settings["edmx"]["mode"] | DEFAULT_EDMX_MODE;
   _state.settings.edmx.timeout = settings["edmx"]["timeout"] | DEFAULT_EDMX_TIMEOUT;
 
+  // Calibration
+  _state.settings.calibration.temperatureOffsetC = settings["calibration"]["temperatureOffsetC"] | DEFAULT_CAL_TEMP_OFFSET_C;
+  _state.settings.calibration.humidityOffsetPct = settings["calibration"]["humidityOffsetPct"] | DEFAULT_CAL_HUMIDITY_OFFSET_PCT;
+  _state.settings.calibration.co2OffsetPpm = settings["calibration"]["co2OffsetPpm"] | DEFAULT_CAL_CO2_OFFSET_PPM;
+
   // Scheduler
   _state.settings.scheduler.enableDarkAutoPower = settings["scheduler"]["enableDarkAutoPower"] | DEFAULT_SCHED_ENABLE_DARK;
   _state.settings.scheduler.darkThresholdLux = settings["scheduler"]["darkThresholdLux"] | DEFAULT_SCHED_DARK_THRESHOLD_LUX;
@@ -324,6 +333,11 @@ void StateManager::setDefaultState() {
     _state.settings.edmx.start_address = DEFAULT_EDMX_START_ADDRESS;
     _state.settings.edmx.mode = DEFAULT_EDMX_MODE;
     _state.settings.edmx.timeout = DEFAULT_EDMX_TIMEOUT;
+
+    // Calibration
+    _state.settings.calibration.temperatureOffsetC = DEFAULT_CAL_TEMP_OFFSET_C;
+    _state.settings.calibration.humidityOffsetPct = DEFAULT_CAL_HUMIDITY_OFFSET_PCT;
+    _state.settings.calibration.co2OffsetPpm = DEFAULT_CAL_CO2_OFFSET_PPM;
 
     // Scheduler
     _state.settings.scheduler.enableDarkAutoPower = DEFAULT_SCHED_ENABLE_DARK;

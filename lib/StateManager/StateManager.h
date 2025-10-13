@@ -135,6 +135,11 @@ struct State {
     // Settings
     struct {
         struct {
+            float temperatureOffsetC = 0.0f;
+            float humidityOffsetPct = 0.0f;
+            int16_t co2OffsetPpm = 0;
+        } calibration;
+        struct {
             ConnectionStatus status = DISCONNECTED;
             String host;
             String port;

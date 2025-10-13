@@ -23,6 +23,7 @@ class UI {
         typedef std::function<void(eDmxProtocol protocol, eDmxMode mode, bool multicast, uint16_t start_universe, uint16_t start_address, uint16_t timeout)> onDmxSettingsCallback;
         typedef std::function<void(bool show_text)> onHomeAssistantSettingsCallback;
         typedef std::function<void(bool enableDarkAutoPower, float darkThresholdLux, float darkHysteresisLux, uint16_t darkStabilitySeconds)> onSchedulerSettingsCallback;
+        typedef std::function<void(float temperatureOffsetC, float humidityOffsetPct, int16_t co2OffsetPpm)> onCalibrationSettingsCallback;
         typedef std::function<void()> onResetCallback;
 
         UI(WebServer* server, StateManager* stateManager);
@@ -39,6 +40,7 @@ class UI {
         void onDmxSettings(onDmxSettingsCallback cb);
         void onHomeAssistantSettings(onHomeAssistantSettingsCallback cb);
         void onSchedulerSettings(onSchedulerSettingsCallback cb);
+        void onCalibrationSettings(onCalibrationSettingsCallback cb);
         void onNetworkReset(onResetCallback cb);
         void onFactoryReset(onResetCallback cb);
         void handleImageUpload();
@@ -62,6 +64,7 @@ class UI {
         onDmxSettingsCallback _on_dmx_settings_cb;
         onHomeAssistantSettingsCallback _on_home_assistant_settings_cb;
         onSchedulerSettingsCallback _on_scheduler_settings_cb;
+        onCalibrationSettingsCallback _on_calibration_settings_cb;
         onResetCallback _on_network_reset_cb;
         onResetCallback _on_factory_reset_cb;
 

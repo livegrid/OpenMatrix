@@ -138,19 +138,26 @@ void SCD40::runMeasurementTask() {
       uint8_t humidityValue = static_cast<uint8_t>(constrain(humidity, 0.0f, 255.0f));
       
       State* state = stateManager.getState();
-      state->environment.temperature.value = temperature;
+      // Apply user calibration offsets
+      float tempCal = temperature + state->settings.calibration.temperatureOffsetC;
+      float humCal = humidityValue + state->settings.calibration.humidityOffsetPct;
+      int co2Cal = static_cast<int>(co2) + state->settings.calibration.co2OffsetPpm;
+      humCal = constrain(humCal, 0.0f, 100.0f);
+      co2Cal = max(0, co2Cal);
+
+      state->environment.temperature.value = tempCal;
       state->environment.temperature.diff.type = DiffType::DISABLE;
-      state->environment.temperature_fahrenheit.value = (temperature * 9.0/5.0) + 32.0;  // Convert to Fahrenheit
+      state->environment.temperature_fahrenheit.value = (tempCal * 9.0/5.0) + 32.0;  // Convert to Fahrenheit
       state->environment.temperature_fahrenheit.diff.type = DiffType::DISABLE;
-      state->environment.humidity.value = humidityValue;
+      state->environment.humidity.value = static_cast<uint8_t>(round(humCal));
       state->environment.humidity.diff.type = DiffType::DISABLE;
-      state->environment.co2.value = co2;
+      state->environment.co2.value = co2Cal;
       state->environment.co2.diff.type = DiffType::DISABLE;
 
       // Accumulate readings
-      tempSum += temperature;
-      humiditySum += humidityValue;
-      co2Sum += co2;
+      tempSum += tempCal;
+      humiditySum += humCal;
+      co2Sum += co2Cal;
       readingCount++;
 
       // Update running average
@@ -181,17 +188,21 @@ bool SCD40::isConnected() {
 }
 
 float SCD40::getTemperature() {
-  return temperature;
+  extern StateManager stateManager;
+  return stateManager.getState()->environment.temperature.value;
 }
 
 float SCD40::getTemperatureFahrenheit() {
-  return (temperature * 9.0/5.0) + 32.0;
+  extern StateManager stateManager;
+  return stateManager.getState()->environment.temperature_fahrenheit.value;
 }
 
 float SCD40::getHumidity() {
-  return humidity;
+  extern StateManager stateManager;
+  return stateManager.getState()->environment.humidity.value;
 }
 
 uint16_t SCD40::getCO2() {
-  return co2;
+  extern StateManager stateManager;
+  return stateManager.getState()->environment.co2.value;
 }

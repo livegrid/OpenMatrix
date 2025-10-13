@@ -249,6 +249,18 @@ void WebServerManager::setupInterface() {
     stateManager->save();
   });
 
+  // Calibration settings
+  interface.onCalibrationSettings([this](
+    float temperatureOffsetC,
+    float humidityOffsetPct,
+    int16_t co2OffsetPpm
+  ) {
+    stateManager->getState()->settings.calibration.temperatureOffsetC = temperatureOffsetC;
+    stateManager->getState()->settings.calibration.humidityOffsetPct = humidityOffsetPct;
+    stateManager->getState()->settings.calibration.co2OffsetPpm = co2OffsetPpm;
+    stateManager->save();
+  });
+
   interface.onNetworkReset([this]() {
     log_i("[*] Resetting network");
     nw.reset();

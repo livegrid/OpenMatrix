@@ -10,6 +10,7 @@
   import { state, resetNetwork, resetFactory } from "@/store";
   import HassSettings from "@/components/HassSettings.svelte";
   import SchedulerSettings from "@/components/SchedulerSettings.svelte";
+  import SensorCalibration from "@/components/SensorCalibration.svelte";
 
   let loading = true;
   let networkResetLoading = false;
@@ -93,6 +94,7 @@
     <DMXSettings initialValues={initialValues?.edmx} />
     <HassSettings initialValues={initialValues?.hass} />
     <SchedulerSettings initialValues={initialValues?.scheduler} />
+    <SensorCalibration initialValues={initialValues?.calibration} />
 
     <!-- Scheduler settings will be added here in a separate component -->
 
