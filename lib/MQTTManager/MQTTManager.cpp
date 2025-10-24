@@ -304,8 +304,8 @@ void MQTTManager::publishSensorData(float temperature, float humidity, int co2, 
   
   // Check if values are valid before adding them to the JSON document
   if (!isnan(temperature)) {
-    // limit to two decimals
-    doc["temperature"] = static_cast<float>(floorf(temperature * 100.0f) / 100.0f);
+    // round to two decimal places using double precision to avoid floating point errors
+    doc["temperature"] = static_cast<float>(round(temperature * 100.0) / 100.0);
   }
   if (!isnan(humidity) && humidity >= 0 && humidity <= 100) {
     doc["humidity"] = static_cast<int>(round(humidity));
