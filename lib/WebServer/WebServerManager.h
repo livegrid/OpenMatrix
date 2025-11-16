@@ -18,10 +18,10 @@
 // #define WIFI_PASSWORD "chocolate-Milk2@"
 // #define WIFI_SSID "Pixel_9363"
 // #define WIFI_PASSWORD "yellow22"
-// #define WIFI_SSID "LivegridHotspot"
-// #define WIFI_PASSWORD "livegrid22"
-#define WIFI_SSID "DHRUV 2244"
-#define WIFI_PASSWORD "226$Ff25"
+#define WIFI_SSID "LivegridHotspot"
+#define WIFI_PASSWORD "livegrid22"
+// #define WIFI_SSID "DHRUV 2244"
+// #define WIFI_PASSWORD "226$Ff25"
 
 class WebServerManager {
 public:

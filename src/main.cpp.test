@@ -301,8 +301,10 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   webServerManager.begin();
-  dmx.begin(&matrix,
-            &stateManager);  // Initialize E1.31 after WiFi is connected
+  bool dmxOk = dmx.begin(&matrix, &stateManager);  // Initialize E1.31 after WiFi is connected
+  if (!dmxOk) {
+    log_e("Test harness: DMX failed to start");
+  }
 #endif
 
   // Initialize MQTT

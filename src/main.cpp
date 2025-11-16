@@ -238,7 +238,7 @@ void serverTask(void* parameter) {
   vTaskDelay(pdMS_TO_TICKS(2000));
   
   // Initialize web server and related services
-  webServerManager.begin();
+  webServerManager.connectToWiFi();
   
   // Initialize DMX after web server is ready
   dmx.begin(&matrix, &stateManager);

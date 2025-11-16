@@ -4,22 +4,27 @@
 #include <ESPAsyncE131.h>
 #include <Matrix.h>
 #include <StateManager.h>
+#include <GFX_Lite.h>
+#include <vector>
+#include <string>
 
 class Edmx {
  public:
   static Edmx& getInstance();
-  void begin(Matrix* matrix, StateManager* stateManager);
+  bool begin(Matrix* matrix, StateManager* stateManager);
   void update();
   void setRGBMode(bool rgbMode);
   bool getRGBMode() const;
-  void applySettings();
+  bool applySettings();
 
  private:
   Edmx() {}
   ~Edmx() {}
   Edmx(const Edmx&) = delete;
   Edmx& operator=(const Edmx&) = delete;
-  void startE131(); 
+  bool startE131(); 
+  void prepareForStart();
+  void restoreSuspendedTasks();
 
   Matrix* matrix;
   StateManager* stateManager;
@@ -31,7 +36,6 @@ class Edmx {
   unsigned long lastPacketReceived;
   unsigned long packetDelay = 5000;
   OpenMatrixMode prevMode;
-  uint8_t* rawDataBuffer = nullptr;
   uint16_t totalPixels;
   bool isRGBMode = true;
 
@@ -41,4 +45,7 @@ class Edmx {
   uint8_t prevData[2];
 
   void onNewPacketReceived(void* packet, protocol_t protocol, void* userInfo);
+
+  std::vector<std::string> suspendedTasks;
+  bool startupSheddingActive = false;
 };
