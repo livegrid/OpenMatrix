@@ -102,6 +102,8 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   settings["edmx"]["start_address"] = _state.settings.edmx.start_address;
   settings["edmx"]["mode"] = _state.settings.edmx.mode;
   settings["edmx"]["timeout"] = _state.settings.edmx.timeout;
+  settings["edmx"]["udp_enabled"] = _state.settings.edmx.udp_enabled;
+  settings["edmx"]["udp_port"] = _state.settings.edmx.udp_port;
 
   serializeJson(json, buffer);
   // Clear JSON
@@ -242,6 +244,8 @@ void StateManager::restore() {
   _state.settings.edmx.start_address = settings["edmx"]["start_address"] | DEFAULT_EDMX_START_ADDRESS;
   _state.settings.edmx.mode = settings["edmx"]["mode"] | DEFAULT_EDMX_MODE;
   _state.settings.edmx.timeout = settings["edmx"]["timeout"] | DEFAULT_EDMX_TIMEOUT;
+  _state.settings.edmx.udp_enabled = settings["edmx"]["udp_enabled"] | DEFAULT_EDMX_UDP_ENABLED;
+  _state.settings.edmx.udp_port = settings["edmx"]["udp_port"] | DEFAULT_EDMX_UDP_PORT;
 
   // Free memory
   json.clear();
@@ -312,6 +316,8 @@ void StateManager::setDefaultState() {
     _state.settings.edmx.start_address = DEFAULT_EDMX_START_ADDRESS;
     _state.settings.edmx.mode = DEFAULT_EDMX_MODE;
     _state.settings.edmx.timeout = DEFAULT_EDMX_TIMEOUT;
+  _state.settings.edmx.udp_enabled = DEFAULT_EDMX_UDP_ENABLED;
+  _state.settings.edmx.udp_port = DEFAULT_EDMX_UDP_PORT;
 }
 
 void StateManager::startPeriodicSave() {

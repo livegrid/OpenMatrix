@@ -151,11 +151,13 @@ struct State {
         } home_assistant;
         struct {
             eDmxProtocol protocol = eDmxProtocol::S_ACN;
-            bool multicast = true;
+            bool multicast = false;
             uint16_t start_universe = 1;
             uint16_t start_address = 1;
             eDmxMode mode = eDmxMode::DMX_MODE_RGB;
             uint16_t timeout = 5000;
+            bool udp_enabled = true;
+            uint16_t udp_port = 4510;
         } edmx;
     } settings;
 };

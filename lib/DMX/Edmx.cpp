@@ -48,7 +48,7 @@ bool Edmx::begin(Matrix* matrix, StateManager* stateManager) {
 void Edmx::update() {
   if(millis() - lastPacketReceived > stateManager->getState()->settings.edmx.timeout) {
     newPacket = false;
-    stateManager->getState()->mode = prevMode;
+    // stateManager->getState()->mode = prevMode;
   }
 
   // Display the background layer (which contains our DMX data) to the matrix
@@ -89,7 +89,10 @@ bool Edmx::applySettings() {
         
   logMemoryStats("Edmx::applySettings");
   
-  return startE131();
+  bool dmxStarted = startE131();
+  bool udpStarted = startUdp();
+
+  return dmxStarted || udpStarted;
 }
 
 bool Edmx::startE131() {
@@ -137,6 +140,50 @@ bool Edmx::startE131() {
         stateManager->getState()->settings.edmx.protocol == eDmxProtocol::S_ACN ? "E1.31" : "Art-Net",
         maxRetries);
   return false;
+}
+
+bool Edmx::startUdp() {
+  if (!stateManager) {
+    return false;
+  }
+
+  const auto& settings = stateManager->getState()->settings.edmx;
+  if (!settings.udp_enabled) {
+    stopUdp();
+    return false;
+  }
+
+  const uint16_t desiredPort = settings.udp_port;
+
+  if (udpListening && currentUdpPort == desiredPort) {
+    return true;
+  }
+
+  stopUdp();
+
+  if (!_udp.listen(desiredPort)) {
+    log_e("Failed to start UDP listener on port %u", desiredPort);
+    return false;
+  }
+
+  _udp.onPacket([this](AsyncUDPPacket packet) {
+    this->handleUdpPacket(packet);
+  });
+
+  udpListening = true;
+  currentUdpPort = desiredPort;
+  log_i("UDP streaming listener active on port %u", desiredPort);
+  return true;
+}
+
+void Edmx::stopUdp() {
+  if (!udpListening) {
+    return;
+  }
+  _udp.close();
+  udpListening = false;
+  currentUdpPort = 0;
+  log_i("UDP streaming listener stopped");
 }
 
 void Edmx::prepareForStart() {
@@ -259,4 +306,167 @@ void Edmx::onNewPacketReceived(void* packet, protocol_t protocol, void* userInfo
   }
 
   lastPacketReceived = millis();
+}
+
+void Edmx::handleUdpPacket(AsyncUDPPacket packet) {
+  if (!matrix || !matrix->background) {
+    return;
+  }
+
+  const size_t length = packet.length();
+  if (length < kUdpHeaderSize) {
+    log_v("UDP packet too small (%u bytes)", static_cast<unsigned>(length));
+    return;
+  }
+
+  const uint8_t* data = packet.data();
+
+  if (data[0] != kUdpMagic0 || data[1] != kUdpMagic1) {
+    log_v("UDP packet with invalid magic bytes");
+    return;
+  }
+
+  if (data[2] != kUdpVersion) {
+    log_w("UDP packet version mismatch: %u", data[2]);
+    return;
+  }
+
+  const uint8_t flags = data[3];
+  auto readLE16 = [](const uint8_t* ptr) -> uint16_t {
+    return static_cast<uint16_t>(ptr[0]) |
+           (static_cast<uint16_t>(ptr[1]) << 8);
+  };
+
+  const uint16_t frameId = readLE16(data + 4);
+  const uint16_t chunkId = readLE16(data + 6);
+  const uint16_t chunkCount = readLE16(data + 8);
+  const uint16_t x = readLE16(data + 10);
+  const uint16_t y = readLE16(data + 12);
+  const uint16_t width = readLE16(data + 14);
+  const uint16_t height = readLE16(data + 16);
+
+  if (width == 0 || height == 0) {
+    log_v("UDP packet ignored due to zero sized payload (frame %u chunk %u/%u)",
+          frameId, chunkId, chunkCount);
+    return;
+  }
+
+  if (x + width > matrix->getXResolution() ||
+      y + height > matrix->getYResolution()) {
+    log_w("UDP payload out of bounds: x=%u y=%u w=%u h=%u (frame %u chunk %u/%u)",
+          x, y, width, height, frameId, chunkId, chunkCount);
+    return;
+  }
+
+  const uint8_t* payload = data + kUdpHeaderSize;
+  const size_t payloadLength = length - kUdpHeaderSize;
+
+  bool success = false;
+  if (flags & kUdpFlagCompressed) {
+    success = processRlePayload(payload, payloadLength, x, y, width, height);
+  } else {
+    success = processRawPayload(payload, payloadLength, x, y, width, height);
+  }
+
+  if (!success) {
+    log_w("Failed to process UDP chunk frame=%u chunk=%u/%u (flags=0x%02X)",
+          frameId, chunkId, chunkCount, flags);
+    return;
+  }
+
+  newPacket = true;
+  lastPacketReceived = millis();
+
+  if (stateManager->getState()->mode != OpenMatrixMode::DMX) {
+    prevMode = stateManager->getState()->mode;
+    stateManager->getState()->mode = OpenMatrixMode::DMX;
+  }
+}
+
+bool Edmx::processRawPayload(const uint8_t* payload, size_t length,
+                             uint16_t x, uint16_t y,
+                             uint16_t width, uint16_t height) {
+  if (!matrix || !matrix->background) {
+    return false;
+  }
+
+  const size_t expectedPixels =
+      static_cast<size_t>(width) * static_cast<size_t>(height);
+  const size_t expectedBytes = expectedPixels * 3;
+
+  if (length < expectedBytes) {
+    log_w("Raw UDP payload too small: expected %u bytes, got %u bytes",
+          static_cast<unsigned>(expectedBytes),
+          static_cast<unsigned>(length));
+    return false;
+  }
+
+  for (uint16_t row = 0; row < height; ++row) {
+    CRGB* targetRow = matrix->background->pixels->data[y + row];
+    for (uint16_t col = 0; col < width; ++col) {
+      const size_t idx =
+          (static_cast<size_t>(row) * width + col) * 3;
+      CRGB& pixel = targetRow[x + col];
+      pixel.r = payload[idx];
+      pixel.g = payload[idx + 1];
+      pixel.b = payload[idx + 2];
+    }
+  }
+
+  return true;
+}
+
+bool Edmx::processRlePayload(const uint8_t* payload, size_t length,
+                             uint16_t x, uint16_t y,
+                             uint16_t width, uint16_t height) {
+  if (!matrix || !matrix->background) {
+    return false;
+  }
+
+  const size_t totalPixels =
+      static_cast<size_t>(width) * static_cast<size_t>(height);
+
+  size_t offset = 0;
+  size_t written = 0;
+
+  while (offset + 5 <= length && written < totalPixels) {
+    const uint16_t runLength =
+        static_cast<uint16_t>(payload[offset]) |
+        (static_cast<uint16_t>(payload[offset + 1]) << 8);
+    offset += 2;
+
+    if (runLength == 0) {
+      log_w("Encountered zero-length RLE run");
+      return false;
+    }
+
+    CRGB color;
+    color.r = payload[offset++];
+    color.g = payload[offset++];
+    color.b = payload[offset++];
+
+    for (uint16_t i = 0; i < runLength && written < totalPixels; ++i) {
+      const size_t localIndex = written++;
+      const uint16_t row = static_cast<uint16_t>(localIndex / width);
+      const uint16_t col = static_cast<uint16_t>(localIndex % width);
+      CRGB& pixel = matrix->background->pixels->data[y + row][x + col];
+      pixel = color;
+    }
+  }
+
+  if (written != totalPixels) {
+    log_w("RLE payload incomplete: expected %u pixels, wrote %u pixels",
+          static_cast<unsigned>(totalPixels),
+          static_cast<unsigned>(written));
+    return false;
+  }
+
+  if (offset > length) {
+    log_w("RLE payload read past buffer (offset=%u length=%u)",
+          static_cast<unsigned>(offset),
+          static_cast<unsigned>(length));
+    return false;
+  }
+
+  return true;
 }

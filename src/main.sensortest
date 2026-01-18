@@ -1,0 +1,463 @@
+/**
+******************************************************************************
+* @file    VL53L8CX_3Sensors.ino
+* @author  Modified for 3 simultaneous sensors
+* @version V3.0.0
+* @date    18 January 2026
+* @brief   Arduino application for 3x VL53L8CX sensors running simultaneously
+*          with interference prevention and retry logic
+******************************************************************************
+*/
+
+/* Includes ------------------------------------------------------------------*/
+#include <vl53l8cx.h>
+
+#ifdef ARDUINO_SAM_DUE
+  #define DEV_I2C Wire1
+#else
+  #define DEV_I2C Wire
+#endif
+#define SerialPort Serial
+
+// Pin definitions
+#define LPN_PIN -1
+#define PWREN_PIN_1 2
+#define PWREN_PIN_2 11
+#define PWREN_PIN_3 12
+
+// I2C addresses for the three sensors (after address change)
+#define SENSOR_1_ADDRESS 0x52
+#define SENSOR_2_ADDRESS 0x54
+#define SENSOR_3_ADDRESS 0x56
+
+#define MAX_INIT_RETRIES 3
+#define RANGING_FREQUENCY 15  // 15 Hz per sensor to avoid interference
+
+// Function declarations
+void print_result(VL53L8CX_ResultsData *Result, uint8_t sensor_id);
+void clear_screen(void);
+void handle_cmd(uint8_t cmd);
+void display_commands_banner(void);
+bool init_sensor_with_retry(VL53L8CX *sensor, uint8_t new_address, uint8_t sensor_id, uint8_t pwren_pin);
+void power_cycle_sensor(uint8_t pwren_pin);
+bool check_and_recover_sensor(VL53L8CX *sensor, bool *active_flag, uint8_t sensor_id, uint8_t pwren_pin, uint8_t address);
+
+// Components - 3 sensors
+VL53L8CX sensor_1(&DEV_I2C, LPN_PIN);
+VL53L8CX sensor_2(&DEV_I2C, LPN_PIN);
+VL53L8CX sensor_3(&DEV_I2C, LPN_PIN);
+
+// Global settings
+bool EnableAmbient = false;
+bool EnableSignal = false;
+uint8_t res = VL53L8CX_RESOLUTION_4X4;
+char report[512];
+uint8_t status;
+
+// Sensor status tracking
+bool sensor_1_active = false;
+bool sensor_2_active = false;
+bool sensor_3_active = false;
+
+/* Helper Functions ----------------------------------------------------------*/
+
+// Power cycle a sensor
+void power_cycle_sensor(uint8_t pwren_pin) {
+  SerialPort.print("  Power cycling sensor on pin ");
+  SerialPort.println(pwren_pin);
+  digitalWrite(pwren_pin, LOW);
+  delay(50);
+  digitalWrite(pwren_pin, HIGH);
+  delay(50);
+}
+
+// Initialize sensor with retry logic
+bool init_sensor_with_retry(VL53L8CX *sensor, uint8_t new_address, uint8_t sensor_id, uint8_t pwren_pin) {
+  for (uint8_t attempt = 1; attempt <= MAX_INIT_RETRIES; attempt++) {
+    SerialPort.print("Sensor ");
+    SerialPort.print(sensor_id);
+    SerialPort.print(" - Attempt ");
+    SerialPort.print(attempt);
+    SerialPort.print("/");
+    SerialPort.println(MAX_INIT_RETRIES);
+    
+    // Power on this sensor
+    digitalWrite(pwren_pin, HIGH);
+    delay(100);
+    
+    // Begin communication
+    sensor->begin();
+    
+    // Initialize sensor
+    status = sensor->init();
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.print("  Init failed with status: ");
+      SerialPort.println(status);
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    SerialPort.println("  Init OK");
+    
+    // Change I2C address to avoid conflicts
+    status = sensor->set_i2c_address(new_address);
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.println("  Failed to change I2C address");
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    SerialPort.print("  I2C address changed to 0x");
+    SerialPort.println(new_address, HEX);
+    
+    // Set resolution
+    status = sensor->set_resolution(res);
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.println("  Failed to set resolution");
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    
+    // Set integration time to 20ms
+    status = sensor->set_integration_time_ms(20);
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.println("  Failed to set integration time");
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    
+    // Set ranging frequency (reduced to 15Hz to avoid interference)
+    status = sensor->set_ranging_frequency_hz(RANGING_FREQUENCY);
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.println("  Failed to set ranging frequency");
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    SerialPort.print("  Ranging frequency set to ");
+    SerialPort.print(RANGING_FREQUENCY);
+    SerialPort.println(" Hz");
+    
+    // Start ranging
+    status = sensor->start_ranging();
+    if (status != VL53L8CX_STATUS_OK) {
+      SerialPort.println("  Failed to start ranging");
+      power_cycle_sensor(pwren_pin);
+      continue;
+    }
+    SerialPort.println("  Ranging started successfully!");
+    
+    return true;  // Success!
+  }
+  
+  // All retries failed
+  SerialPort.print("Sensor ");
+  SerialPort.print(sensor_id);
+  SerialPort.println(" FAILED after all retries");
+  digitalWrite(pwren_pin, LOW);  // Power off failed sensor
+  return false;
+}
+
+// Check sensor and attempt recovery if needed
+bool check_and_recover_sensor(VL53L8CX *sensor, bool *active_flag, uint8_t sensor_id, uint8_t pwren_pin, uint8_t address) {
+  if (!(*active_flag)) {
+    return false;  // Sensor was never active
+  }
+  
+  uint8_t NewDataReady = 0;
+  status = sensor->check_data_ready(&NewDataReady);
+  
+  // If check fails, sensor may have stopped working
+  if (status != VL53L8CX_STATUS_OK) {
+    SerialPort.print("\n*** Sensor ");
+    SerialPort.print(sensor_id);
+    SerialPort.println(" appears to have failed! Attempting recovery... ***");
+    
+    // Stop ranging on failed sensor
+    sensor->stop_ranging();
+    
+    // Try to reinitialize
+    *active_flag = init_sensor_with_retry(sensor, address, sensor_id, pwren_pin);
+    
+    if (*active_flag) {
+      SerialPort.print("*** Sensor ");
+      SerialPort.print(sensor_id);
+      SerialPort.println(" recovered successfully! ***\n");
+    } else {
+      SerialPort.print("*** Sensor ");
+      SerialPort.print(sensor_id);
+      SerialPort.println(" recovery FAILED ***\n");
+    }
+  }
+  
+  return *active_flag;
+}
+
+/* Setup ---------------------------------------------------------------------*/
+void setup()
+{
+  // Initialize serial for output
+  SerialPort.begin(460800);
+  delay(1000);
+  SerialPort.println("\n\n===========================================");
+  SerialPort.println("  3-Sensor VL53L8CX System Starting");
+  SerialPort.println("===========================================\n");
+
+  // Initialize I2C bus - REDUCED SPEED TO 200kHz for stability (half of 400kHz)
+  DEV_I2C.begin();
+  DEV_I2C.setClock(200000);
+  SerialPort.println("I2C initialized at 200 kHz (reduced for stability)");
+
+  // Initially power off all sensors
+  pinMode(PWREN_PIN_1, OUTPUT);
+  pinMode(PWREN_PIN_2, OUTPUT);
+  pinMode(PWREN_PIN_3, OUTPUT);
+  digitalWrite(PWREN_PIN_1, LOW);
+  digitalWrite(PWREN_PIN_2, LOW);
+  digitalWrite(PWREN_PIN_3, LOW);
+  delay(100);
+
+  // Initialize sensors one at a time and change their I2C addresses
+  // This prevents address conflicts on the I2C bus
+  
+  SerialPort.println("\n=== Initializing Sensor 1 ===");
+  sensor_1_active = init_sensor_with_retry(&sensor_1, SENSOR_1_ADDRESS, 1, PWREN_PIN_1);
+  
+  SerialPort.println("\n=== Initializing Sensor 2 ===");
+  sensor_2_active = init_sensor_with_retry(&sensor_2, SENSOR_2_ADDRESS, 2, PWREN_PIN_2);
+  
+  SerialPort.println("\n=== Initializing Sensor 3 ===");
+  sensor_3_active = init_sensor_with_retry(&sensor_3, SENSOR_3_ADDRESS, 3, PWREN_PIN_3);
+
+  // Summary
+  SerialPort.println("\n===========================================");
+  SerialPort.println("  SENSOR INITIALIZATION SUMMARY");
+  SerialPort.println("===========================================");
+  SerialPort.print("Sensor 1 (Pin ");
+  SerialPort.print(PWREN_PIN_1);
+  SerialPort.print("): ");
+  SerialPort.println(sensor_1_active ? "✓ ACTIVE" : "✗ FAILED");
+  
+  SerialPort.print("Sensor 2 (Pin ");
+  SerialPort.print(PWREN_PIN_2);
+  SerialPort.print("): ");
+  SerialPort.println(sensor_2_active ? "✓ ACTIVE" : "✗ FAILED");
+  
+  SerialPort.print("Sensor 3 (Pin ");
+  SerialPort.print(PWREN_PIN_3);
+  SerialPort.print("): ");
+  SerialPort.println(sensor_3_active ? "✓ ACTIVE" : "✗ FAILED");
+  SerialPort.println("===========================================\n");
+
+  if (!sensor_1_active && !sensor_2_active && !sensor_3_active) {
+    SerialPort.println("ERROR: All sensors failed to initialize!");
+  } else {
+    SerialPort.println("System ready! Sensors will be polled sequentially to avoid interference.\n");
+  }
+}
+
+/* Main Loop -----------------------------------------------------------------*/
+void loop()
+{
+  VL53L8CX_ResultsData Results;
+  uint8_t NewDataReady = 0;
+  static unsigned long lastCheck = 0;
+  static uint8_t current_sensor = 1;  // Round-robin sensor polling
+
+  // Periodically check sensor health (every 5 seconds)
+  if (millis() - lastCheck > 5000) {
+    check_and_recover_sensor(&sensor_1, &sensor_1_active, 1, PWREN_PIN_1, SENSOR_1_ADDRESS);
+    check_and_recover_sensor(&sensor_2, &sensor_2_active, 2, PWREN_PIN_2, SENSOR_2_ADDRESS);
+    check_and_recover_sensor(&sensor_3, &sensor_3_active, 3, PWREN_PIN_3, SENSOR_3_ADDRESS);
+    lastCheck = millis();
+  }
+
+  // Poll sensors sequentially to avoid interference
+  // This implements time-division multiplexing of measurements
+  
+  if (current_sensor == 1 && sensor_1_active) {
+    status = sensor_1.check_data_ready(&NewDataReady);
+    if (status == VL53L8CX_STATUS_OK && NewDataReady) {
+      status = sensor_1.get_ranging_data(&Results);
+      if (status == VL53L8CX_STATUS_OK) {
+        print_result(&Results, 1);
+      }
+    }
+    current_sensor = 2;
+  } 
+  else if (current_sensor == 2 && sensor_2_active) {
+    status = sensor_2.check_data_ready(&NewDataReady);
+    if (status == VL53L8CX_STATUS_OK && NewDataReady) {
+      status = sensor_2.get_ranging_data(&Results);
+      if (status == VL53L8CX_STATUS_OK) {
+        print_result(&Results, 2);
+      }
+    }
+    current_sensor = 3;
+  } 
+  else if (current_sensor == 3 && sensor_3_active) {
+    status = sensor_3.check_data_ready(&NewDataReady);
+    if (status == VL53L8CX_STATUS_OK && NewDataReady) {
+      status = sensor_3.get_ranging_data(&Results);
+      if (status == VL53L8CX_STATUS_OK) {
+        print_result(&Results, 3);
+      }
+    }
+    current_sensor = 1;
+  } 
+  else {
+    // Skip inactive sensors
+    current_sensor++;
+    if (current_sensor > 3) current_sensor = 1;
+  }
+
+  // Handle serial commands
+  if (Serial.available() > 0) {
+    handle_cmd(Serial.read());
+  }
+  
+  // Small delay to prevent overwhelming the I2C bus
+  delay(5);
+}
+
+/* Display Functions ---------------------------------------------------------*/
+
+void print_result(VL53L8CX_ResultsData *Result, uint8_t sensor_id)
+{
+  int8_t i, j, k;
+  uint8_t l, zones_per_line;
+  uint8_t number_of_zones = res;
+
+  zones_per_line = (number_of_zones == 16) ? 4 : 8;
+
+  SerialPort.print("\n╔════════════════════════════════════╗\n");
+  SerialPort.print("║  SENSOR ");
+  SerialPort.print(sensor_id);
+  SerialPort.println(" DATA                    ║");
+  SerialPort.print("╚════════════════════════════════════╝\n");
+
+  // Print only distance data in compact format
+  for (j = 0; j < number_of_zones; j += zones_per_line) {
+    for (i = 0; i < zones_per_line; i++) {
+      SerialPort.print(" --------");
+    }
+    SerialPort.print("\n");
+
+    for (l = 0; l < VL53L8CX_NB_TARGET_PER_ZONE; l++) {
+      for (k = (zones_per_line - 1); k >= 0; k--) {
+        if (Result->nb_target_detected[j + k] > 0) {
+          snprintf(report, sizeof(report), "| %5ld ",
+                   (long)Result->distance_mm[(VL53L8CX_NB_TARGET_PER_ZONE * (j + k)) + l]);
+          SerialPort.print(report);
+        } else {
+          SerialPort.print("|   --  ");
+        }
+      }
+      SerialPort.print("|\n");
+    }
+  }
+  
+  for (i = 0; i < zones_per_line; i++) {
+    SerialPort.print(" --------");
+  }
+  SerialPort.print("\n");
+}
+
+void display_commands_banner(void)
+{
+  SerialPort.println("\n3-Sensor VL53L8CX System");
+  SerialPort.println("------------------------");
+  SerialPort.println("Commands:");
+  SerialPort.println(" 'r' : change resolution");
+  SerialPort.println(" 's' : toggle signal/ambient");
+  SerialPort.println(" 'c' : clear screen");
+  SerialPort.println(" 'i' : show sensor info\n");
+}
+
+void clear_screen(void)
+{
+  snprintf(report, sizeof(report), "%c[2J", 27); /* 27 is ESC command */
+  SerialPort.print(report);
+}
+
+void toggle_resolution(void)
+{
+  SerialPort.println("\nChanging resolution...");
+  
+  // Stop all active sensors
+  if (sensor_1_active) sensor_1.stop_ranging();
+  if (sensor_2_active) sensor_2.stop_ranging();
+  if (sensor_3_active) sensor_3.stop_ranging();
+
+  // Toggle resolution
+  switch (res) {
+    case VL53L8CX_RESOLUTION_4X4:
+      res = VL53L8CX_RESOLUTION_8X8;
+      SerialPort.println("Resolution set to 8x8");
+      break;
+    case VL53L8CX_RESOLUTION_8X8:
+      res = VL53L8CX_RESOLUTION_4X4;
+      SerialPort.println("Resolution set to 4x4");
+      break;
+    default:
+      break;
+  }
+  
+  // Apply new resolution and restart
+  if (sensor_1_active) {
+    sensor_1.set_resolution(res);
+    sensor_1.start_ranging();
+  }
+  if (sensor_2_active) {
+    sensor_2.set_resolution(res);
+    sensor_2.start_ranging();
+  }
+  if (sensor_3_active) {
+    sensor_3.set_resolution(res);
+    sensor_3.start_ranging();
+  }
+}
+
+void toggle_signal_and_ambient(void)
+{
+  EnableAmbient = !EnableAmbient;
+  EnableSignal = !EnableSignal;
+  SerialPort.print("Signal/Ambient display: ");
+  SerialPort.println(EnableSignal ? "ENABLED" : "DISABLED");
+}
+
+void show_sensor_info(void)
+{
+  SerialPort.println("\n=== SENSOR STATUS ===");
+  SerialPort.print("Sensor 1: ");
+  SerialPort.println(sensor_1_active ? "ACTIVE" : "INACTIVE");
+  SerialPort.print("Sensor 2: ");
+  SerialPort.println(sensor_2_active ? "ACTIVE" : "INACTIVE");
+  SerialPort.print("Sensor 3: ");
+  SerialPort.println(sensor_3_active ? "ACTIVE" : "INACTIVE");
+  SerialPort.print("Resolution: ");
+  SerialPort.println(res == VL53L8CX_RESOLUTION_4X4 ? "4x4" : "8x8");
+  SerialPort.print("Ranging Frequency: ");
+  SerialPort.print(RANGING_FREQUENCY);
+  SerialPort.println(" Hz per sensor");
+  SerialPort.print("I2C Speed: 200 kHz\n");
+  SerialPort.println("====================\n");
+}
+
+void handle_cmd(uint8_t cmd)
+{
+  switch (cmd) {
+    case 'r':
+      toggle_resolution();
+      break;
+    case 's':
+      toggle_signal_and_ambient();
+      break;
+    case 'c':
+      clear_screen();
+      display_commands_banner();
+      break;
+    case 'i':
+      show_sensor_info();
+      break;
+    default:
+      break;
+  }
+}

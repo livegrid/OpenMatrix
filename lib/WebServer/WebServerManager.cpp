@@ -163,7 +163,9 @@ void WebServerManager::setupInterface() {
     bool multicast,
     uint16_t start_universe,
     uint16_t start_address,
-    uint16_t timeout
+    uint16_t timeout,
+    bool udp_enabled,
+    uint16_t udp_port
   ) {
     stateManager->getState()->settings.edmx.protocol = protocol;
     stateManager->getState()->settings.edmx.mode = mode;
@@ -171,6 +173,8 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.edmx.start_universe = start_universe;
     stateManager->getState()->settings.edmx.start_address = start_address;
     stateManager->getState()->settings.edmx.timeout = timeout;
+    stateManager->getState()->settings.edmx.udp_enabled = udp_enabled;
+    stateManager->getState()->settings.edmx.udp_port = udp_port;
     stateManager->save();
 
     // Apply the new settings to the Edmx instance
