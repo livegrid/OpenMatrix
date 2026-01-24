@@ -25,8 +25,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // const float HEALTH_REDUCTION_RATE_REALBAD = 0.4f / (3600 * 30); // 40% per hour at 30 fps
 // const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
-#define NUM_FISH_START 20
-#define NUM_FISH_IDEAL 20
+#define NUM_FISH_START 5
+#define NUM_FISH_IDEAL 5
 #define NUM_PLANTS 9
 
 //PLANT SETTINGS
@@ -135,3 +135,25 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
     #define BOID_MAX_SPEED 4, 8
 #endif
 #define BOID_MAX_FORCE 1, 2
+
+//TOF Interaction Settings
+#define TOF_MIN_DETECTION_DIST 300    // mm - closer than this is ignored (too close)
+#define TOF_MAX_DETECTION_DIST 2000   // mm - further than this is ignored
+#define TOF_BASELINE_ADAPT_RATE 0.01f  // How fast baseline adapts (0-1)
+#define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
+#define TOF_MIN_BLOB_CELLS 2          // Minimum cells to count as valid blob
+#define TOF_VELOCITY_SMOOTH 0.3f       // Velocity smoothing factor (0-1)
+
+// Fish Response Settings
+#define INTERACTION_SLOW_THRESHOLD 0.5f   // Below this = attraction
+#define INTERACTION_FAST_THRESHOLD 2.0f   // Above this = strong repulsion
+#define INTERACTION_ATTRACT_FORCE 10.0f   // Base attraction force
+#define INTERACTION_REPEL_FORCE 20.0f      // Base repulsion force
+#define INTERACTION_MAX_DISTANCE 500.0f    // Max distance for interaction effect (in matrix pixels)
+
+// Silhouette Effect Settings (drawn on foreground)
+#define SILHOUETTE_OPACITY 0.8f        // How visible the silhouette is (0-1)
+#define SILHOUETTE_DEPTH_THRESHOLD 0.7f // Max normalized depth to show (0-1, higher = show further objects)
+#define SILHOUETTE_COLOR_R 30          // Dark blue-ish color for underwater shadow
+#define SILHOUETTE_COLOR_G 50
+#define SILHOUETTE_COLOR_B 80

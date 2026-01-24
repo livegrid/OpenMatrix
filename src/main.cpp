@@ -30,6 +30,13 @@ StateManager stateManager(STATE_SAVE_INTERVAL);
 #include "SCD40.h"
 SCD40 scd40;
 
+#ifdef VL53L8CX_ENABLED
+#include "TOFSensor.h"
+#include "TOFVisualizer.h"
+TOFSensor tofSensor(TOF_PWREN_PIN_1, TOF_SENSOR_1_ADDRESS);
+TOFVisualizer* tofVisualizer = nullptr;
+#endif
+
 #include "Aquarium.h"
 Aquarium aquarium(&matrix, &scd40, &stateManager);
 
@@ -103,10 +110,10 @@ void displayTask(void* parameter) {
   // Initialize matrix
   log_i("Initializing matrix display...");
   matrix.init();
-  matrix.setRotation(2);
+  matrix.setRotation(0);
   matrix.setBrightness(250);
   
-  const uint8_t idealFPS = 30;  // Set your desired FPS here
+  const uint8_t idealFPS = 60;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -121,17 +128,43 @@ void displayTask(void* parameter) {
       99;  // make sure currentMode is not the same as OpenMatrixMode
 
   // Initialize components
-  effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
 
   aquarium.begin();
+  
+#ifdef VL53L8CX_ENABLED
+  // Initialize TOF visualizer after matrix is initialized
+  tofVisualizer = new TOFVisualizer(&tofSensor, &matrix);
+  tofVisualizer->setDistanceRange(100, 2000);  // 100mm to 2000mm range
+  
+  // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders)
+  effectManager.setTofSensor(&tofSensor);
+  
+  // Connect TOF sensor to Aquarium for interactive fish behavior
+  aquarium.setTofSensor(&tofSensor);
+
+  // Set mode and effect BEFORE calling setEffect
+  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  
+  // Set the effect using the correct array index
+  // EffectManager array: [0=NoiseEffect, 1=MeteorShower, 2=SpaceInvaders]
+  // So METEOR_SHOWER maps to index 1
+  effectManager.setEffect(2);  // MeteorShower is at index 1
+  
+  stateManager.save();
+#else
+  // Set effect from state (only if TOF is not enabled)
+  effectManager.setEffect(stateManager.getState()->effects.selected - 1);
+#endif
 
   for (;;) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
-      digitalWrite(2, LOW);
+      // Pin 2 disabled - now used by TOF sensor power enable
+      // digitalWrite(2, LOW);
       if (currentMode != stateManager.getState()->mode) {
         if (currentMode == OpenMatrixMode::IMAGE) {
           imageDraw.closeGIF();
@@ -179,6 +212,16 @@ void displayTask(void* parameter) {
             matrix.background->display();
             break;
           case OpenMatrixMode::AQUARIUM:
+#ifdef VL53L8CX_ENABLED
+            // Temporarily show TOF data for debugging
+            // if (tofVisualizer && tofSensor.isActive()) {
+            //   tofVisualizer->draw();
+            //   matrix.background->display();
+            // } else {
+              // aquarium.update(touchMenu.showSensorData());
+              // aquarium.display();
+            // }
+#endif
             aquarium.update(touchMenu.showSensorData());
             aquarium.display();
             break;
@@ -204,15 +247,25 @@ void displayTask(void* parameter) {
 
       frameCount++;
 
-      if (millis() - lastLogTime >= MATRIX_REFRESH_INTERVAL) {
-        float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
-        // TaskManager::getInstance().printTaskInfo();
-        lastLogTime = currentTime;
+      static unsigned long lastFramerateLogTime = 0;
+      static unsigned long lastFramerateCheckTime = 0;
+
+      if (millis() - lastFramerateLogTime >= 1000) {
+        // Compute elapsed time between framerate logs, NOT since main loop started
+        unsigned long now = millis();
+        float secondsElapsed = (now - lastFramerateCheckTime) / 1000.0f;
+        float framerate = secondsElapsed > 0 ? (frameCount / secondsElapsed) : 0.0f;
+        log_i("Framerate: %.2f", framerate);
+
+        lastFramerateLogTime = now;
+        lastFramerateCheckTime = now;
         frameCount = 0;
       }
+
     }
     else {
-      digitalWrite(2, HIGH);
+      // Pin 2 disabled - now used by TOF sensor power enable
+      // digitalWrite(2, HIGH);
       matrix.clearScreen();
       matrix.update();
     }
@@ -294,6 +347,31 @@ void mqttTask(void* parameter) {
   }
 }
 
+#ifdef VL53L8CX_ENABLED
+void tofTask(void* parameter) {
+  // Initialize sensor
+  log_i("TOF Task: Starting sensor initialization...");
+  if (!tofSensor.begin()) {
+    log_e("TOF Task: Sensor initialization failed!");
+    vTaskDelete(NULL);
+    return;
+  }
+  
+  const TickType_t xFrequency = pdMS_TO_TICKS(100);  // 10Hz update rate
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  
+  for (;;) {
+    // Update sensor and get new data
+    if (tofSensor.update()) {
+      // New data available, visualization will be updated in display task
+      log_v("TOF: New data received");
+    }
+    
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+#endif
+
 void sensorTask(void* parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(1000);  // 1 second
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -350,8 +428,9 @@ void setup(void) {
         FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
   log_i("");
 
-  pinMode(2, OUTPUT);
-  digitalWrite(2, LOW);
+  // Pin 2 disabled - now used by TOF sensor power enable
+  // pinMode(2, OUTPUT);
+  // digitalWrite(2, LOW);
 
 #ifdef SCD40_ENABLED
   delay(50);
@@ -394,17 +473,22 @@ void setup(void) {
 
 #ifdef WIFI_ENABLED
   // Increase server task stack size for larger displays
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096 , 1, 0);
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
+  // TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
 #endif
 
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
   TaskManager::getInstance().createTask("SensorTask", sensorTask, 2056, 1, 0);
+#endif
+
+#ifdef VL53L8CX_ENABLED
+  // Create TOF sensor task with large stack for sensor operations (VL53L8CX needs ~8KB+)
+  // TaskManager::getInstance().createTask("TOFTask", tofTask, 8192, 1, 0);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);

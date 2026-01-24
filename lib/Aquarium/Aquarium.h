@@ -17,6 +17,8 @@
 #include "Plants.h"
 #include "Water.h"
 #include "StateManager.h"
+#include "../TOFSensor/TOFSensor.h"
+#include "../TOFSensor/TOFInteractionManager.h"
 
 class Aquarium {
  private:
@@ -31,6 +33,10 @@ class Aquarium {
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
+
+  // TOF sensor interaction
+  TOFInteractionManager* interactionManager = nullptr;
+  TOFSensor* tofSensor = nullptr;  // Store sensor pointer for lazy init
 
   // Demo settings
   bool demoMode;
@@ -281,7 +287,110 @@ class Aquarium {
         demoMode
             ? demoTemperature
             : (scd40->isFirstReadingReceived() ? scd40->getTemperature() : 25);
+    
     water.update(temperature);
+  }
+  
+  // Helper: Bilinear interpolation to get smooth depth value at any position
+  float interpolateDepth(const InteractionData& interaction, float normX, float normY) {
+    // Map normalized 0-1 coordinates to sensor grid (0-7)
+    float sensorX = normX * 7.0f;
+    float sensorY = normY * 7.0f;
+    
+    // Get grid cell indices
+    int x0 = (int)sensorX;
+    int y0 = (int)sensorY;
+    int x1 = min(x0 + 1, 7);
+    int y1 = min(y0 + 1, 7);
+    
+    // Clamp
+    x0 = constrain(x0, 0, 7);
+    y0 = constrain(y0, 0, 7);
+    
+    // Interpolation weights
+    float fx = sensorX - x0;
+    float fy = sensorY - y0;
+    
+    // Get depth values at corners
+    float d00 = (float)interaction.depthMap[y0][x0];
+    float d10 = (float)interaction.depthMap[y0][x1];
+    float d01 = (float)interaction.depthMap[y1][x0];
+    float d11 = (float)interaction.depthMap[y1][x1];
+    
+    // Handle invalid readings (0 or negative) by using neighbors
+    if (d00 <= 0) d00 = TOF_MAX_DETECTION_DIST + 1;
+    if (d10 <= 0) d10 = TOF_MAX_DETECTION_DIST + 1;
+    if (d01 <= 0) d01 = TOF_MAX_DETECTION_DIST + 1;
+    if (d11 <= 0) d11 = TOF_MAX_DETECTION_DIST + 1;
+    
+    // Bilinear interpolation
+    float d0 = d00 * (1.0f - fx) + d10 * fx;
+    float d1 = d01 * (1.0f - fx) + d11 * fx;
+    return d0 * (1.0f - fy) + d1 * fy;
+  }
+  
+  // Draw TOF silhouette with smooth bilinear interpolation
+  // Fish and other elements are drawn after, so they appear in front
+  void drawTOFSilhouette() {
+    if (!interactionManager) return;
+    
+    InteractionData interaction = interactionManager->getInteractionData();
+    
+    // Debug logging
+    static unsigned long lastLogTime = 0;
+    if (millis() - lastLogTime > 2000) {
+      log_i("Aquarium TOF: hasBlob=%d, blobX=%.2f, blobY=%.2f, vel=%.2f, depth[4][4]=%d", 
+            interaction.hasBlob, interaction.blobX, interaction.blobY, 
+            interaction.velocityMag, interaction.depthMap[4][4]);
+      lastLogTime = millis();
+    }
+    
+    uint16_t matrixWidth = matrix->getXResolution();
+    uint16_t matrixHeight = matrix->getYResolution();
+    
+    // Draw pixel-by-pixel with bilinear interpolation for smooth silhouette
+    for (uint16_t py = 0; py < matrixHeight; py++) {
+      for (uint16_t px = 0; px < matrixWidth; px++) {
+        // Map pixel to normalized 0-1 coordinates
+        float normX = (float)px / (float)(matrixWidth - 1);
+        float normY = (float)py / (float)(matrixHeight - 1);
+        
+        // Get interpolated depth at this position
+        float depth = interpolateDepth(interaction, normX, normY);
+        
+        // Skip if out of detection range
+        if (depth <= 0 || depth > TOF_MAX_DETECTION_DIST) {
+          continue;
+        }
+        
+        // Clamp minimum
+        if (depth < TOF_MIN_DETECTION_DIST) {
+          depth = TOF_MIN_DETECTION_DIST;
+        }
+        
+        // Normalize depth (closer = 0, further = 1)
+        float normalizedDepth = (depth - TOF_MIN_DETECTION_DIST) / 
+                               (TOF_MAX_DETECTION_DIST - TOF_MIN_DETECTION_DIST);
+        normalizedDepth = constrain(normalizedDepth, 0.0f, 1.0f);
+        
+        // Only show if within depth threshold
+        if (normalizedDepth > SILHOUETTE_DEPTH_THRESHOLD) continue;
+        
+        // Calculate intensity: closer = more visible, with smooth falloff
+        float intensity = (1.0f - normalizedDepth / SILHOUETTE_DEPTH_THRESHOLD);
+        intensity = intensity * intensity;  // Quadratic falloff for softer edges
+        intensity *= SILHOUETTE_OPACITY;
+        
+        // Create shadow color
+        CRGB shadowColor = CRGB(
+          (uint8_t)(SILHOUETTE_COLOR_R * intensity),
+          (uint8_t)(SILHOUETTE_COLOR_G * intensity),
+          (uint8_t)(SILHOUETTE_COLOR_B * intensity)
+        );
+        
+        matrix->foreground->drawPixel(px, py, shadowColor);
+      }
+    }
   }
 
   // Update all fish in the aquarium
@@ -294,8 +403,16 @@ class Aquarium {
       co2 = scd40->isFirstReadingReceived() ? scd40->getCO2() : 400;
     }
     
+    // Get interaction data if available
+    InteractionData* interaction = nullptr;
+    InteractionData interactionData;
+    if (interactionManager) {
+      interactionData = interactionManager->getInteractionData();
+      interaction = &interactionData;
+    }
+    
     for (auto it = fishArray.begin(); it != fishArray.end();) {
-      bool destroy = (*it)->update(co2, demoMode);
+      bool destroy = (*it)->update(co2, demoMode, interaction);
       if (destroy) {
         it = fishArray.erase(it);
       } else {
@@ -331,7 +448,7 @@ class Aquarium {
 
   void handleTouchInput() {
     if (touchRead(13) / 1000 > FOOD_TOUCH_THRESHOLD) {
-      addFood();
+      // addFood();
     }
   }
 
@@ -369,14 +486,23 @@ class Aquarium {
   void update(bool showSensorData = false) {
     handleTouchInput();
 
+    // Lazily create interaction manager when sensor becomes active
+    ensureInteractionManager();
+    
+    // Update interaction manager if available
+    if (interactionManager) {
+      interactionManager->update();
+    }
+
     if (demoMode) {
       updateDemo();
     } else {
       updateWater();
-      boidManager.updateBoids(scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
-      boidManager.renderBoids();
-      updateFish();
-      updateFood();
+      // drawTOFSilhouette();  // Draw silhouette on background after water
+      // boidManager.updateBoids(scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
+      // boidManager.renderBoids();
+      // updateFish();
+      // updateFood();
       updatePlants();
       updateSensorData(showSensorData);
       periodicSave();
@@ -388,9 +514,31 @@ class Aquarium {
     matrix->foreground->clear();
   }
 
+  void setTofSensor(TOFSensor* sensor) {
+    tofSensor = sensor;
+    // Don't create interaction manager yet - will be created lazily in update()
+    // This handles the case where sensor isn't active yet when this is called
+  }
+  
+  // Lazily initialize interaction manager when sensor becomes active
+  void ensureInteractionManager() {
+    if (interactionManager) return;  // Already initialized
+    
+    if (tofSensor && tofSensor->isActive()) {
+      log_i("Aquarium: Creating TOFInteractionManager - sensor is active");
+      interactionManager = new TOFInteractionManager(tofSensor);
+      interactionManager->setRotation(0);  // Match TOFVisualizer rotation
+      interactionManager->calibrateBaseline();  // Calibrate background for subtraction
+    }
+  }
+
   // Destructor to clean up resources
   ~Aquarium() {
     // Unique pointers automatically clean up
+    if (interactionManager) {
+      delete interactionManager;
+      interactionManager = nullptr;
+    }
   }
 
   void drawMultilineText(GFX_Layer* layer, const char* text,

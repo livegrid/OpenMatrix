@@ -165,6 +165,52 @@ class Motion {
     foodDirection = foodPos;
     followingFood = true;
   }
+
+  void applyInteractionForce(PVector blobPos, float blobVelocity, float distance) {
+    // Only apply if within interaction range
+    if (distance > INTERACTION_MAX_DISTANCE) {
+      return;
+    }
+    
+    // Calculate direction to/from blob
+    PVector toBlob = blobPos - pos;
+    float distToBlob = toBlob.mag();
+    
+    if (distToBlob < 0.1f) return;  // Avoid division by zero
+    
+    // Determine force direction and magnitude based on velocity
+    float forceMagnitude = 0;
+    PVector forceDirection;
+    
+    if (blobVelocity < INTERACTION_SLOW_THRESHOLD) {
+      // Slow movement - attract fish
+      forceDirection = toBlob;
+      forceDirection.normalize();
+      forceMagnitude = INTERACTION_ATTRACT_FORCE;
+    } else if (blobVelocity > INTERACTION_FAST_THRESHOLD) {
+      // Fast movement - repel fish
+      forceDirection = toBlob * -1.0f;  // Away from blob
+      forceDirection.normalize();
+      forceMagnitude = INTERACTION_REPEL_FORCE;
+    } else {
+      // Medium speed - neutral or slight attraction
+      forceDirection = toBlob;
+      forceDirection.normalize();
+      forceMagnitude = INTERACTION_ATTRACT_FORCE * 0.5f;
+    }
+    
+    // Scale force by inverse distance (closer = stronger)
+    float distanceFactor = 1.0f - (distToBlob / INTERACTION_MAX_DISTANCE);
+    distanceFactor = constrain(distanceFactor, 0.0f, 1.0f);
+    
+    // Scale by velocity magnitude (faster movement = stronger effect)
+    float velocityFactor = constrain(blobVelocity / INTERACTION_FAST_THRESHOLD, 0.0f, 1.5f);
+    
+    forceMagnitude *= distanceFactor * velocityFactor;
+    forceDirection *= forceMagnitude;
+    
+    applyForce(forceDirection);
+  }
 };
 
 #endif  // MOVEMENT_H

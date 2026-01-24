@@ -9,9 +9,14 @@
 #include "GameofLifeEffect.h"
 #include "FlockEffect.h"
 #include "LSystemEffect.h"
+#include "MeteorShowerEffect.h"
+#include "SpaceInvadersEffect.h"
 
 #include <vector>
 #include <string>
+
+// Forward declaration
+class TOFSensor;
 
 class EffectManager {
 public:
@@ -27,9 +32,17 @@ public:
     size_t getEffectCount() const;
     const char* getCurrentEffectName() const;
     uint8_t getCurrentEffect() const;
+    
+    // ToF sensor integration for interactive effects
+    void setTofSensor(TOFSensor* sensor);
 
 private:
     Matrix* m_matrix;
+    TOFSensor* m_tofSensor = nullptr;
     std::vector<Effect*> m_effects;
     size_t m_currentEffect = 0;
+    
+    // Store pointers to TOF-enabled effects for sensor updates
+    MeteorShowerEffect* m_meteorShower = nullptr;
+    SpaceInvadersEffect* m_spaceInvaders = nullptr;
 };

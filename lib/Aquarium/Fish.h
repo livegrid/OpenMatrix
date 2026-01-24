@@ -14,6 +14,7 @@
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
 #include "Motion/MotionFactory.h"
+#include "../TOFSensor/TOFInteractionManager.h"
 
 class Fish {
   Matrix* matrix = nullptr;
@@ -124,7 +125,7 @@ class Fish {
   }
   // ~Fish(); // Destructor
 
-  bool update(long co2 = 600, bool stayInside = false) {
+  bool update(long co2 = 600, bool stayInside = false, InteractionData* interaction = nullptr) {
     if (!motion) {
       log_e(
           "Error: motion is null in Fish::update for fish type: %s, motion "
@@ -147,6 +148,21 @@ class Fish {
             fishDefinition.bodyType.c_str(), fishDefinition.motionType.c_str());
       }
     }
+    
+    // Apply interaction force before motion update
+    if (interaction && interaction->hasBlob) {
+      // Convert normalized blob position to matrix coordinates
+      PVector blobPos(interaction->blobX * matrix->getXResolution() * PHYSICS_SCALE,
+                      interaction->blobY * matrix->getYResolution() * PHYSICS_SCALE);
+      
+      // Calculate distance from fish to blob
+      PVector fishPosScaled = pos * PHYSICS_SCALE;
+      float distance = fishPosScaled.dist(blobPos);
+      
+      // Apply interaction force
+      motion->applyInteractionForce(blobPos, interaction->velocityMag, distance);
+    }
+    
     motion->update(age, co2, stayInside);
     pos = motion->getPosition() / PHYSICS_SCALE;
     updateAge(co2);

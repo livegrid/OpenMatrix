@@ -13,6 +13,7 @@
 // #define ADXL345_ENABLED 1   //AUTOROTATE
 // #define BH1750_ENABLED 1
 #define TOUCH_ENABLED 1
+#define VL53L8CX_ENABLED 1  // Time-of-Flight sensor
 
 #define WIFI_ENABLED 1
 

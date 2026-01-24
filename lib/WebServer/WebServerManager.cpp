@@ -25,24 +25,64 @@ void WebServerManager::handleClient() {
 
 void WebServerManager::connectToWiFi() {
   log_i("[*] Connecting to WiFi");
+  log_i("[WiFi] SSID: '%s'", WIFI_SSID);
+  log_i("[WiFi] Password length: %d", strlen(WIFI_PASSWORD));
+  
   WiFi.mode(WIFI_STA);
+  WiFi.disconnect(); // Clear any previous connection attempts
+  
+  // Set hostname before connecting (helps with some routers)
+  // WiFi.setHostname("livegrid");
+  
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // Wait for connection with timeout
+  // Wait for connection with longer timeout (30 seconds)
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  const int maxAttempts = 60; // 60 * 500ms = 30 seconds
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(500);
-    log_i(".");
+    if (attempts % 10 == 0) { // Log every 5 seconds
+      wl_status_t status = WiFi.status();
+      log_i("[WiFi] Attempt %d/%d, Status: %d", attempts, maxAttempts, status);
+    } else {
+      log_i(".");
+    }
     attempts++;
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
+  wl_status_t status = WiFi.status();
+  if (status == WL_CONNECTED) {
     log_i("[WiFi] Connected successfully");
     log_i("[WiFi] IP address: %s", WiFi.localIP().toString().c_str());
     log_i("[WiFi] Gateway IP: %s", WiFi.gatewayIP().toString().c_str());
     log_i("[WiFi] Subnet mask: %s", WiFi.subnetMask().toString().c_str());
+    log_i("[WiFi] RSSI: %d dBm", WiFi.RSSI());
   } else {
-    log_e("[WiFi] Failed to connect");
+    log_e("[WiFi] Failed to connect after %d attempts", attempts);
+    log_e("[WiFi] Final status code: %d", status);
+    switch(status) {
+      case WL_IDLE_STATUS:
+        log_e("[WiFi] Status: WL_IDLE_STATUS - WiFi is in process of changing between states");
+        break;
+      case WL_NO_SSID_AVAIL:
+        log_e("[WiFi] Status: WL_NO_SSID_AVAIL - SSID cannot be reached");
+        break;
+      case WL_SCAN_COMPLETED:
+        log_e("[WiFi] Status: WL_SCAN_COMPLETED - Scan completed, no SSID found");
+        break;
+      case WL_CONNECT_FAILED:
+        log_e("[WiFi] Status: WL_CONNECT_FAILED - Connection failed (wrong password?)");
+        break;
+      case WL_CONNECTION_LOST:
+        log_e("[WiFi] Status: WL_CONNECTION_LOST - Connection lost");
+        break;
+      case WL_DISCONNECTED:
+        log_e("[WiFi] Status: WL_DISCONNECTED - Disconnected");
+        break;
+      default:
+        log_e("[WiFi] Status: Unknown (%d)", status);
+        break;
+    }
   }
 }
 

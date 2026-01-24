@@ -1,5 +1,5 @@
 #include "EffectManager.h"
-#include "LSystemEffect.h"  // Add this line
+#include "../TOFSensor/TOFSensor.h"
 
 EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     // m_effects.push_back(new SimplexNoiseEffect(matrix));
@@ -9,7 +9,13 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     // m_effects.push_back(new FlockEffect(matrix));
     // m_effects.push_back(new GameofLifeEffect(matrix));
     // m_effects.push_back(new LSystemEffect(matrix));
-    // Add other effects here as you create them
+    
+    // TOF-enabled interactive effects
+    m_meteorShower = new MeteorShowerEffect(matrix);
+    // m_effects.push_back(m_meteorShower);
+    
+    m_spaceInvaders = new SpaceInvadersEffect(matrix);
+    // m_effects.push_back(m_spaceInvaders);
 }
 
 EffectManager::~EffectManager() {
@@ -74,4 +80,16 @@ const char* EffectManager::getCurrentEffectName() const {
 
 uint8_t EffectManager::getCurrentEffect() const {
     return m_currentEffect;
+}
+
+void EffectManager::setTofSensor(TOFSensor* sensor) {
+    m_tofSensor = sensor;
+    
+    // Pass sensor to TOF-enabled effects
+    if (m_meteorShower) {
+        m_meteorShower->setTofSensor(sensor);
+    }
+    if (m_spaceInvaders) {
+        m_spaceInvaders->setTofSensor(sensor);
+    }
 }

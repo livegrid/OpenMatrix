@@ -39,6 +39,8 @@ typedef enum {
     FLOCKING,
     GAMEOFLIFE,
     LSYSTEM,
+    METEOR_SHOWER,
+    SPACE_INVADERS
 } Effects;
 
 // Text

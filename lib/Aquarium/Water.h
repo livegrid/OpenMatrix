@@ -3,6 +3,7 @@
 
 #include <FastNoise.h> 
 #include <Matrix.h>
+#include "AquariumSettings.h"
 
 // Define the palette at global scope
 DEFINE_GRADIENT_PALETTE( waterPalette ) {
@@ -20,7 +21,7 @@ class Water {
 
   CRGB** updateBuffer = nullptr;
   size_t currentRow = 0;
-  static const size_t rowsPerUpdate = 8;
+  static const size_t rowsPerUpdate = 4;
   size_t totalRows = matrix->getYResolution();
 
   uint8_t scale = 20;
@@ -41,7 +42,6 @@ class Water {
     }
     delete[] updateBuffer;
   }
-
 
   void update(long temperature = 25) {
 
