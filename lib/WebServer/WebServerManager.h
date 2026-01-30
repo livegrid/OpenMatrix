@@ -2,6 +2,8 @@
 
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_wifi.h>  // For esp_wifi_set_ps() and low-level WiFi control
+#include <nvs_flash.h> // For NVS initialization (required before WiFi on ESP32-S3/IDF5)
 #include "StateManager.h"
 #include "UI.h"
 #include "Matrix.h"
@@ -14,14 +16,14 @@
 #include "Edmx.h"
 
 // WiFi credentials
-#define WIFI_SSID "Tardigrade"
-#define WIFI_PASSWORD "chocolate-milk"
+// #define WIFI_SSID "Tardigrade"
+// #define WIFI_PASSWORD "chocolate-milk"
 // #define WIFI_SSID "Pixel_9363"
 // #define WIFI_PASSWORD "yellow22"
 // #define WIFI_SSID "LivegridHotspot"
 // #define WIFI_PASSWORD "livegrid22"
-// #define WIFI_SSID "Hone Wifi 2.4Ghz"
-// #define WIFI_PASSWORD "Findyouredge"
+#define WIFI_SSID "Hone Wifi 2.4Ghz"
+#define WIFI_PASSWORD "Findyouredge"
 
 class WebServerManager {
 public:
@@ -32,6 +34,11 @@ public:
     void handleClient();
     void setupUniqueHostname();
     void connectToWiFi();
+    void setupInterface();
+    void startServer();
+    
+    // WiFi event handler for diagnostics (public for callback access)
+    void onWiFiEvent(WiFiEvent_t event);
     
 private:
     WebServer server;
@@ -42,8 +49,6 @@ private:
     ImageDraw* imageDraw;
     TaskManager* taskManager;
     
-    void setupInterface();
-    void startServer();
     void handleModeChange();
     void handleGetState();
     void handleEffectSettings();

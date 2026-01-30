@@ -35,13 +35,17 @@ void BoidManager::updateBoids(long co2) {
 void BoidManager::renderBoids() {
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
-      // Calculate the second point of the line
-      float angle = atan2(boid.velocity.y, boid.velocity.x);
-      int x2 = boid.location.x + cos(angle);
-      int y2 = boid.location.y + sin(angle);
-
-      // Draw the line
-      matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2, CRGB(50, 200, 100));
+      // Use normalized velocity directly instead of expensive atan2/cos/sin
+      float velMagSq = boid.velocity.x * boid.velocity.x + boid.velocity.y * boid.velocity.y;
+      if (velMagSq > 0.0001f) {  // Avoid division by zero
+        float invMag = 1.0f / sqrt(velMagSq);
+        int x2 = boid.location.x + boid.velocity.x * invMag;
+        int y2 = boid.location.y + boid.velocity.y * invMag;
+        matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2, CRGB(50, 200, 100));
+      } else {
+        // Stationary boid - just draw a pixel
+        matrix->foreground->drawPixel(boid.location.x, boid.location.y, CRGB(50, 200, 100));
+      }
     }
   }
 }

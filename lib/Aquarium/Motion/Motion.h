@@ -80,18 +80,18 @@ class Motion {
       PVector foodForce = foodDirection - pos;
       foodForce.setMag(FOOD_FORCE);
       applyForce(foodForce);
-    } else if (followingFood) {
-      PVector foodForce = foodDirection - pos;
-      foodForce.setMag(FOOD_FORCE);
-      applyForce(foodForce);
     }
 
     PVector desiredVel = vel;
 
     desiredVel += acc;
-    if (desiredVel.mag() < minSpeed) {
+    
+    // Use squared magnitude to avoid sqrt when possible
+    float minSpeedSq = (float)minSpeed * minSpeed;
+    if (desiredVel.magSq() < minSpeedSq) {
       desiredVel.setMag(minSpeed);
     }
+    
     float maxSpeedCO2 = map(co2, CO2_BAD, CO2_REALBAD, maxSpeed, 0);
     if (maxSpeedCO2 < 0) {
       maxSpeedCO2 = 0;
@@ -100,7 +100,7 @@ class Motion {
     }
     desiredVel.limit(maxSpeedCO2);
 
-    vel = vel.lerp(vel, desiredVel, 1);
+    vel = desiredVel;  // Simplified from vel.lerp(vel, desiredVel, 1) which always returns desiredVel
     pos += vel;
     acc *= 0;
     angle = vel.heading();

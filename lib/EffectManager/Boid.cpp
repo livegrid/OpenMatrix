@@ -75,12 +75,19 @@ void Boid::flock(Boid boids[], uint8_t boidCount) {
 PVector Boid::separate(Boid boids[], uint8_t boidCount) {
     PVector steer(0, 0);
     int count = 0;
+    float desiredSepSq = desiredseparation * desiredseparation;
+    const int MAX_NEIGHBORS = 8;  // Early exit to prevent performance degradation
     
-    for (int i = 0; i < boidCount; i++) {
+    for (int i = 0; i < boidCount && count < MAX_NEIGHBORS; i++) {
         if (!boids[i].enabled) continue;
-        float d = location.dist(boids[i].location);
-        if ((d > 0) && (d < desiredseparation)) {
+        
+        // Skip self-comparison using pointer comparison (faster than distSq check)
+        if (&boids[i] == this) continue;
+        
+        float dSq = location.distSq(boids[i].location);
+        if (dSq < desiredSepSq) {  // Removed dSq > 0 check since we skip self
             PVector diff = location - boids[i].location;
+            float d = sqrt(dSq);  // Only sqrt when we actually need the distance
             diff.normalize();
             diff /= d;
             steer += diff;
@@ -92,7 +99,7 @@ PVector Boid::separate(Boid boids[], uint8_t boidCount) {
         steer /= (float)count;
     }
     
-    if (steer.mag() > 0) {
+    if (steer.magSq() > 0) {
         steer.normalize();
         steer *= maxspeed;
         steer -= velocity;
@@ -104,10 +111,17 @@ PVector Boid::separate(Boid boids[], uint8_t boidCount) {
 PVector Boid::align(Boid boids[], uint8_t boidCount) {
     PVector sum(0, 0);
     int count = 0;
-    for (int i = 0; i < boidCount; i++) {
+    float neighborDistSq = neighbordist * neighbordist;
+    const int MAX_NEIGHBORS = 8;  // Early exit to prevent performance degradation
+    
+    for (int i = 0; i < boidCount && count < MAX_NEIGHBORS; i++) {
         if (!boids[i].enabled) continue;
-        float d = location.dist(boids[i].location);
-        if ((d > 0) && (d < neighbordist)) {
+        
+        // Skip self-comparison
+        if (&boids[i] == this) continue;
+        
+        float dSq = location.distSq(boids[i].location);
+        if (dSq < neighborDistSq) {
             sum += boids[i].velocity;
             count++;
         }
@@ -127,10 +141,17 @@ PVector Boid::align(Boid boids[], uint8_t boidCount) {
 PVector Boid::cohesion(Boid boids[], uint8_t boidCount) {
     PVector sum(0, 0);
     int count = 0;
-    for (int i = 0; i < boidCount; i++) {
+    float neighborDistSq = neighbordist * neighbordist;
+    const int MAX_NEIGHBORS = 8;  // Early exit to prevent performance degradation
+    
+    for (int i = 0; i < boidCount && count < MAX_NEIGHBORS; i++) {
         if (!boids[i].enabled) continue;
-        float d = location.dist(boids[i].location);
-        if ((d > 0) && (d < neighbordist)) {
+        
+        // Skip self-comparison
+        if (&boids[i] == this) continue;
+        
+        float dSq = location.distSq(boids[i].location);
+        if (dSq < neighborDistSq) {
             sum += boids[i].location;
             count++;
         }

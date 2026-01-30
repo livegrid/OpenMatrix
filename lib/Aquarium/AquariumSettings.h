@@ -25,8 +25,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // const float HEALTH_REDUCTION_RATE_REALBAD = 0.4f / (3600 * 30); // 40% per hour at 30 fps
 // const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
-#define NUM_FISH_START 5
-#define NUM_FISH_IDEAL 5
+#define NUM_FISH_START 20
+#define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 9
 
 //PLANT SETTINGS
@@ -101,7 +101,6 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define TURTLE_SIN_FREQUENCY 0.001
 #define TURTLE_NOISE_AMPLITUDE 1
 #define TURTLE_NOISE_FREQUENCY 0.01
-
 //OCTOPUS SETTINGS
 #define OCTOPUS_SIZE 10, 20
 #define OCTOPUS_MIN_TENTACLES 6

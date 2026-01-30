@@ -86,10 +86,17 @@ public:
 
     void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b) {
         PVector dv = vin - segmentPositions[i];
-        float segmentAngle = dv.heading();
-
-        segmentPositions[i].x = vin.x - cos(segmentAngle);
-        segmentPositions[i].y = vin.y - sin(segmentAngle);
+        float dvMagSq = dv.x * dv.x + dv.y * dv.y;
+        
+        // Use normalized vector directly instead of atan2 + cos/sin
+        if (dvMagSq > 0.0001f) {
+            float invMag = 1.0f / sqrt(dvMagSq);
+            segmentPositions[i].x = vin.x - dv.x * invMag;
+            segmentPositions[i].y = vin.y - dv.y * invMag;
+        } else {
+            segmentPositions[i].x = vin.x - 1.0f;
+            segmentPositions[i].y = vin.y;
+        }
         matrix->foreground->drawPixel(segmentPositions[i].x, segmentPositions[i].y, CRGB(r, g, b));
     }
 

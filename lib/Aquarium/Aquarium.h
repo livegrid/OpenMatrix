@@ -499,10 +499,12 @@ class Aquarium {
     } else {
       updateWater();
       // drawTOFSilhouette();  // Draw silhouette on background after water
-      // boidManager.updateBoids(scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
-      // boidManager.renderBoids();
-      // updateFish();
+      boidManager.updateBoids(scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
+      boidManager.renderBoids();
+
+      updateFish();
       // updateFood();
+
       updatePlants();
       updateSensorData(showSensorData);
       periodicSave();

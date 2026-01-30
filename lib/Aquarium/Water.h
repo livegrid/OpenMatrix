@@ -22,22 +22,25 @@ class Water {
   CRGB** updateBuffer = nullptr;
   size_t currentRow = 0;
   static const size_t rowsPerUpdate = 4;
-  size_t totalRows = matrix->getYResolution();
+  size_t totalRows;
+  size_t totalCols;
 
   uint8_t scale = 20;
   float simplexSpeed = .002;
 
  public:
   Water(Matrix* matrix): matrix(matrix) {
-    updateBuffer = new CRGB*[matrix->getYResolution()];
-    for (size_t i = 0; i < matrix->getYResolution(); i++) {
-      updateBuffer[i] = new CRGB[matrix->getXResolution()];
+    totalRows = matrix->getYResolution();
+    totalCols = matrix->getXResolution();
+    updateBuffer = new CRGB*[totalRows];
+    for (size_t i = 0; i < totalRows; i++) {
+      updateBuffer[i] = new CRGB[totalCols];
     }
   }
 
   ~Water() {
     // Clean up updateBuffer
-    for (size_t i = 0; i < matrix->getYResolution(); i++) {
+    for (size_t i = 0; i < totalRows; i++) {
       delete[] updateBuffer[i];
     }
     delete[] updateBuffer;
@@ -48,8 +51,9 @@ class Water {
     // If we've filled the entire buffer, update the matrix background
     if (currentRow >= totalRows) {
       for (size_t i = 0; i < totalRows; ++i) {
-        for (size_t j = 0; j < matrix->getXResolution(); ++j) {
-          matrix->background->drawPixel(j, i, updateBuffer[i][j]);
+        CRGB* rowBuffer = updateBuffer[i];  // Cache row pointer
+        for (size_t j = 0; j < totalCols; ++j) {
+          matrix->background->drawPixel(j, i, rowBuffer[j]);
         }
       }
       currentRow = 0;  // Reset for the next cycle
@@ -60,13 +64,19 @@ class Water {
     uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 245);
     simplexColor = ColorFromPalette(palette, colorIndex);
     
+    // Cache time component outside inner loop
+    uint32_t timeComponent = static_cast<uint32_t>(millis() * simplexSpeed);
+    
     // Update a portion of the buffer
-    for (size_t row = currentRow; row < currentRow + rowsPerUpdate && row < totalRows; ++row) {
-      for (size_t col = 0; col < matrix->getXResolution(); ++col) {
-        uint8_t noiseFactor = inoise8(col * scale, row * scale, (millis() * simplexSpeed));
+    size_t endRow = min(currentRow + rowsPerUpdate, totalRows);
+    for (size_t row = currentRow; row < endRow; ++row) {
+      uint16_t scaledRow = row * scale;
+      CRGB* rowBuffer = updateBuffer[row];  // Cache row pointer
+      for (size_t col = 0; col < totalCols; ++col) {
+        uint8_t noiseFactor = inoise8(col * scale, scaledRow, timeComponent);
         CRGB color = simplexColor;
         color.nscale8(noiseFactor);
-        updateBuffer[row][col] = color;
+        rowBuffer[col] = color;
       }
     }
 

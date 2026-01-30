@@ -131,6 +131,13 @@ public:
         Vector2 d(v.x - x, v.y - y);
         return d.length();
     }
+    
+    float distSq(Vector2 v) const {
+        float dx = v.x - x;
+        float dy = v.y - y;
+        return dx * dx + dy * dy;
+    }
+    
     float length() const {
         return sqrt(x * x + y * y);
     }
@@ -139,7 +146,7 @@ public:
         return length();
     }
 
-    float magSq() {
+    float magSq() const {
         return (x * x + y * y);
     }
 

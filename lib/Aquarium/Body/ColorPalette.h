@@ -9,7 +9,13 @@ class ColorPalette {
  public:
   std::vector<CHSV> colorsHSV;
   std::vector<CRGB> colors;
-
+  
+ private:
+  // Cached values to avoid redundant HSV→RGB conversions
+  uint8_t lastSat = 255;
+  uint8_t lastVal = 255;
+  
+ public:
   ColorPalette(uint8_t size, bool stripesEnabled = false) {
     
     colorsHSV.reserve(size);
@@ -44,6 +50,8 @@ class ColorPalette {
     colorsHSV.reserve(newColors.size());
     colors.reserve(newColors.size());
     colorsHSV = newColors;
+    // Ensure RGB buffer is sized before writing into it in updateRGB()
+    colors.resize(colorsHSV.size());
     updateRGB();
   }
 
@@ -54,19 +62,27 @@ class ColorPalette {
   }
 
   void adjustColorByAgeAndHealth(float age, float health) {
+    // Age adjustment
+    float ageFactor = 1.0f;
+    if (age >= AGE_ADULT) {
+      ageFactor = 1.0f - ((age - AGE_ADULT) / (AGE_DEAD - AGE_ADULT)) * 0.5f;
+    }
+
+    // Calculate new sat/val values
+    uint8_t newSat = static_cast<uint8_t>(115 * health);
+    uint8_t newVal = static_cast<uint8_t>(255 * ageFactor);
+    
+    // Only update if values actually changed (avoids expensive HSV→RGB conversion)
+    if (newSat == lastSat && newVal == lastVal) {
+      return;
+    }
+    
+    lastSat = newSat;
+    lastVal = newVal;
+
     for (auto& hsvColor : colorsHSV) {
-      // Age adjustment
-      float ageFactor = 1.0f;
-      if (age >= AGE_ADULT) {
-        ageFactor = 1.0f - ((age - AGE_ADULT) / (AGE_DEAD - AGE_ADULT)) * 0.5f;
-      }
-
-      // Health adjustment
-      float healthFactor = health;
-
-      // Combine age and health effects
-      hsvColor.sat = static_cast<uint8_t>(115 * healthFactor);  // Reduce saturation as health decreases
-      hsvColor.val = static_cast<uint8_t>(255 * ageFactor);  // Keep value high, only affected by age
+      hsvColor.sat = newSat;
+      hsvColor.val = newVal;
     }
     updateRGB();
   }

@@ -28,49 +28,43 @@ public:
         type = "Octopus";
     }
 
-    void drawTentacle(uint8_t i, PVector bodyPos) {
-    float spreadAngle = PI * 2; // We'll keep this as a reasonable base spread
-    
-    // Calculate the back center of the octopus
-    float backOffsetX = cos(angle) * (rad * size / 6);
-    float backOffsetY = sin(angle) * (rad * size / 6);
-    PVector backCenter(
-        bodyPos.x - backOffsetX,
-        bodyPos.y - backOffsetY
-    );
-    
+    void drawTentacle(uint8_t i, PVector bodyPos, float time, float velocityFactor, 
+                       float backCenterX, float backCenterY, float spreadFactor) {
     // Calculate the angle for this tentacle
-    float tentacleAngle = angle + PI + (i - (numTentacles - 1) / 2.0) * (spreadAngle / (numTentacles - 1));
-    // Calculate the start position of the tentacle
-    PVector tentacleStart(
-        backCenter.x + cos(tentacleAngle) * (rad * size / 6),
-        backCenter.y + sin(tentacleAngle) * (rad * size / 6)
-    );
+    float tentacleAngle = angle + PI + (i - (numTentacles - 1) / 2.0f) * spreadFactor;
     
-    PVector current = tentacleStart;
+    // Calculate the start position of the tentacle
+    float tentacleStartX = backCenterX + cos(tentacleAngle) * (rad * size / 6);
+    float tentacleStartY = backCenterY + sin(tentacleAngle) * (rad * size / 6);
+    
+    float currentX = tentacleStartX;
+    float currentY = tentacleStartY;
     float segmentLength = (tentacleLength * size) / OCTOPUS_TENTACLE_SEGMENTS;
 
-    float time = millis() / 1000.0; // Time factor for movement
-    float velocityFactor = min(vel.mag() / 2.0, 1.0); // Velocity influence on movement
+    // Pre-calculate base for sin: time * 2 + i * 0.5
+    float sinBase = time * 2.0f + i * 0.5f;
+    float movementScale = 0.2f * velocityFactor;
 
     for (uint8_t j = 0; j < OCTOPUS_TENTACLE_SEGMENTS; ++j) {
-        PVector dv = current - tentacleSegments[i][j];
-        float segmentAngle = dv.heading();
+        float dx = currentX - tentacleSegments[i][j].x;
+        float dy = currentY - tentacleSegments[i][j].y;
+        float segmentAngle = atan2(dy, dx);
 
         // Add subtle movement to each segment
-        float movementAngle = sin(time * 2 + i * 0.5 + j * 0.3) * 0.2 * velocityFactor;
+        float movementAngle = sin(sinBase + j * 0.3f) * movementScale;
         segmentAngle += movementAngle;
 
-        tentacleSegments[i][j].x = current.x - cos(segmentAngle) * segmentLength;
-        tentacleSegments[i][j].y = current.y - sin(segmentAngle) * segmentLength;
+        tentacleSegments[i][j].x = currentX - cos(segmentAngle) * segmentLength;
+        tentacleSegments[i][j].y = currentY - sin(segmentAngle) * segmentLength;
 
         CRGB segmentColor = colorPalette->colors[j + 1];
         
-        matrix->foreground->drawLine(current.x, current.y, 
+        matrix->foreground->drawLine(currentX, currentY, 
                                      tentacleSegments[i][j].x, tentacleSegments[i][j].y, 
                                      segmentColor);
         
-        current = tentacleSegments[i][j];
+        currentX = tentacleSegments[i][j].x;
+        currentY = tentacleSegments[i][j].y;
     }
 }
     void display() override {
@@ -85,9 +79,22 @@ public:
         // Draw the body (horizontally stretched ellipse)
         matrix->foreground->drawCircleArray(pos.x, pos.y, rad2draw, length2draw, angle, colorPalette->colors[0]);
 
+        // Cache expensive calculations once for all tentacles
+        // Wrap time to keep trig input small and consistent cost
+        float time = fmodf(millis() / 1000.0f, TWO_PI);
+        float velMagSq = vel.x * vel.x + vel.y * vel.y;
+        float velocityFactor = min(sqrt(velMagSq) / 2.0f, 1.0f);
+        
+        // Calculate back center once
+        float backOffsetX = cos(angle) * (rad * size / 6);
+        float backOffsetY = sin(angle) * (rad * size / 6);
+        float backCenterX = pos.x - backOffsetX;
+        float backCenterY = pos.y - backOffsetY;
+        float spreadFactor = (PI * 2.0f) / (numTentacles - 1);
+
         // Draw tentacles
         for (uint8_t i = 0; i < numTentacles; ++i) {
-            drawTentacle(i, pos);
+            drawTentacle(i, pos, time, velocityFactor, backCenterX, backCenterY, spreadFactor);
         }
     }
 };

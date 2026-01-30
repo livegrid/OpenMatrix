@@ -113,7 +113,7 @@ void displayTask(void* parameter) {
   matrix.setRotation(0);
   matrix.setBrightness(250);
   
-  const uint8_t idealFPS = 60;  // Set your desired FPS here
+  const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -146,14 +146,14 @@ void displayTask(void* parameter) {
 
   // Set mode and effect BEFORE calling setEffect
   // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
   
   // Set the effect using the correct array index
   // EffectManager array: [0=NoiseEffect, 1=MeteorShower, 2=SpaceInvaders]
   // So METEOR_SHOWER maps to index 1
-  effectManager.setEffect(2);  // MeteorShower is at index 1
+  // effectManager.setEffect(2);  // MeteorShower is at index 1
   
-  stateManager.save();
+  // stateManager.save();
 #else
   // Set effect from state (only if TOF is not enabled)
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
@@ -214,13 +214,13 @@ void displayTask(void* parameter) {
           case OpenMatrixMode::AQUARIUM:
 #ifdef VL53L8CX_ENABLED
             // Temporarily show TOF data for debugging
-            // if (tofVisualizer && tofSensor.isActive()) {
-            //   tofVisualizer->draw();
-            //   matrix.background->display();
-            // } else {
-              // aquarium.update(touchMenu.showSensorData());
-              // aquarium.display();
-            // }
+            if (tofVisualizer && tofSensor.isActive()) {
+              tofVisualizer->draw();
+              matrix.background->display();
+            } else {
+              aquarium.update(touchMenu.showSensorData());
+              aquarium.display();
+            }
 #endif
             aquarium.update(touchMenu.showSensorData());
             aquarium.display();
@@ -287,19 +287,38 @@ void touchTask(void* parameter) {
 #endif
 
 void serverTask(void* parameter) {
-  // Give some time for system to stabilize after boot
-  vTaskDelay(pdMS_TO_TICKS(2000));
+  // Give MORE time for system to stabilize after boot
+  // ESP32-S3 with IDF5 needs extra time for hardware init before WiFi
+  // This delay helps ensure consistent WiFi connection after reset
+  vTaskDelay(pdMS_TO_TICKS(5000));  // Increased to 5000ms for ESP32-S3
+  
+  log_i("[ServerTask] ========================================");
+  log_i("[ServerTask] Starting network services...");
+  log_i("[ServerTask] Free heap: %u bytes", ESP.getFreeHeap());
+  log_i("[ServerTask] ========================================");
   
   // Initialize web server and related services
   webServerManager.connectToWiFi();
   
+  // Wait for WiFi to fully stabilize before starting services
+  vTaskDelay(pdMS_TO_TICKS(2000));  // Increased from 1000ms
+  
   // Initialize DMX after web server is ready
+  log_i("[ServerTask] Initializing DMX/E131...");
   dmx.begin(&matrix, &stateManager);
+  
+  // Setup the web interface and start server (these don't require WiFi to be connected)
+  log_i("[ServerTask] Setting up web interface...");
+  webServerManager.setupInterface();
+  webServerManager.startServer();
+  webServerManager.setupUniqueHostname();
+  
+  log_i("[ServerTask] All services started. Entering main loop.");
   
   // Main server loop
   for (;;) {
     webServerManager.handleClient();
-    vTaskDelay(1);  // Small delay to prevent watchdog timer issues
+    vTaskDelay(pdMS_TO_TICKS(10));  // 10ms delay - reduces CPU usage while maintaining responsiveness
   }
 }
 
@@ -469,11 +488,22 @@ void setup(void) {
 #endif
 
   // Create tasks with adjusted stack sizes
-  TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
+  // When VL53L8CX (TOF sensor) is enabled, reduce DisplayTask to free memory for ServerTask
+  #ifdef VL53L8CX_ENABLED
+    TaskManager::getInstance().createTask("DisplayTask", displayTask, 6144, 1, 1);
+  #else
+    TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
+  #endif
 
 #ifdef WIFI_ENABLED
-  // Increase server task stack size for larger displays
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 4096 , 1, 0);
+  // Increase server task stack size for larger displays and TOF sensor memory overhead
+  // When VL53L8CX is enabled, heap fragmentation from TOF initialization requires
+  // larger stack for AsyncUDP buffers to work reliably
+  #ifdef VL53L8CX_ENABLED
+    TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
+  #else
+    TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 0);
+  #endif
 #endif
 
 #ifdef TOUCH_ENABLED
@@ -488,7 +518,7 @@ void setup(void) {
 
 #ifdef VL53L8CX_ENABLED
   // Create TOF sensor task with large stack for sensor operations (VL53L8CX needs ~8KB+)
-  // TaskManager::getInstance().createTask("TOFTask", tofTask, 8192, 1, 0);
+  TaskManager::getInstance().createTask("TOFTask", tofTask, 8192, 1, 0);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);

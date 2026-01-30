@@ -28,64 +28,64 @@ class StarBody : public Body {
   }
   
   void display() override {
-    float velocityMagnitude = max(vel.mag(), 0.1f);  // Ensure minimum velocity for rotation
+    // Use squared magnitude to avoid sqrt - only need sqrt if actually near zero
+    float velMagSq = vel.x * vel.x + vel.y * vel.y;
+    float velocityMagnitude = velMagSq > 0.01f ? sqrt(velMagSq) : 0.1f;
     starAngle += velocityMagnitude * rotationSpeed;
     
     // Normalize starAngle to keep it between 0 and TWO_PI
-    starAngle = fmod(starAngle, TWO_PI);
-    if (starAngle < 0) starAngle += TWO_PI;
+    if (starAngle >= TWO_PI) starAngle -= TWO_PI;
+    else if (starAngle < 0) starAngle += TWO_PI;
+
+    // Pre-calculate common values
+    float angleStep = TWO_PI / arms;
+    float lengthScaled = length * size;
+    float radScaled = rad * size;
+    int centerRadius = max(1, int(radScaled * 0.5f));
+    int nodeRadius = max(1, int(radScaled * 0.5f));
+    
+    // Cache colors to avoid repeated array lookups
+    CRGB color0 = colorPalette->colors[0];
+    CRGB color1 = colorPalette->colors[1];
+    CRGB color2 = colorPalette->colors[2];
 
     if (nodes) {
       // Node-based star
       for (int i = 0; i < arms; i++) {
-        float armAngle = starAngle + (TWO_PI / arms * i);
-        PVector armPt = PVector::fromAngle(armAngle);
-        armPt.setMag(length * size);
-        PVector endPoint = pos + armPt;
+        float armAngle = starAngle + angleStep * i;
+        float cosArm = cos(armAngle);
+        float sinArm = sin(armAngle);
+        float endX = pos.x + cosArm * lengthScaled;
+        float endY = pos.y + sinArm * lengthScaled;
         
         // Draw arm
-        matrix->foreground->drawLine(
-            pos.x, pos.y, endPoint.x, endPoint.y,
-            CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g,
-                colorPalette->colors[0].b));
+        matrix->foreground->drawLine(pos.x, pos.y, endX, endY, color0);
         
         // Draw node at arm end
-        matrix->foreground->fillCircle(
-            endPoint.x, endPoint.y, max(1, int(rad * 0.5 * size)),
-            CRGB(colorPalette->colors[1].r, colorPalette->colors[1].g,
-                colorPalette->colors[1].b));
+        matrix->foreground->fillCircle(endX, endY, nodeRadius, color1);
       }
       
       // Draw center
-      matrix->foreground->fillCircle(
-          pos.x, pos.y, max(1, int(rad * 0.5 * size)),
-          CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g,
-              colorPalette->colors[2].b));
+      matrix->foreground->fillCircle(pos.x, pos.y, centerRadius, color2);
     } else {
       // Triangle-based star
+      float halfAngleStep = PI / arms;
       for (int i = 0; i < arms; i++) {
-        float armAngle = starAngle + (TWO_PI / arms * i);
-        PVector pt1 = PVector::fromAngle(armAngle);
-        PVector pt2 = PVector::fromAngle(armAngle - PI / arms);
-        PVector pt3 = PVector::fromAngle(armAngle + PI / arms);
+        float armAngle = starAngle + angleStep * i;
         
-        pt1.setMag(length * size);
-        pt2.setMag(rad * size);
-        pt3.setMag(rad * size);
+        // Calculate all three points with direct trig
+        float pt1x = pos.x + cos(armAngle) * lengthScaled;
+        float pt1y = pos.y + sin(armAngle) * lengthScaled;
+        float pt2x = pos.x + cos(armAngle - halfAngleStep) * radScaled;
+        float pt2y = pos.y + sin(armAngle - halfAngleStep) * radScaled;
+        float pt3x = pos.x + cos(armAngle + halfAngleStep) * radScaled;
+        float pt3y = pos.y + sin(armAngle + halfAngleStep) * radScaled;
         
-        matrix->foreground->fillTriangle(
-            pos.x + pt1.x, pos.y + pt1.y,
-            pos.x + pt2.x, pos.y + pt2.y,
-            pos.x + pt3.x, pos.y + pt3.y,
-            CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g,
-                colorPalette->colors[0].b));
+        matrix->foreground->fillTriangle(pt1x, pt1y, pt2x, pt2y, pt3x, pt3y, color0);
       }
       
       // Draw center
-      matrix->foreground->fillCircle(
-          pos.x, pos.y, max(1, int(rad * 0.5 * size)),
-          CRGB(colorPalette->colors[2].r, colorPalette->colors[2].g,
-              colorPalette->colors[2].b));
+      matrix->foreground->fillCircle(pos.x, pos.y, centerRadius, color2);
     }
   }
 };
