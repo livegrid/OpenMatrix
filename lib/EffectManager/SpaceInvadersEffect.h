@@ -25,7 +25,7 @@ struct Alien {
 
 // Background star
 struct Star {
-    uint8_t x, y;
+    uint16_t x, y;
     uint8_t brightness;
 };
 
@@ -58,11 +58,11 @@ private:
     // Alien configuration
     uint8_t alienRows;
     uint8_t alienCols;
-    uint8_t alienSpacingX;
-    uint8_t alienSpacingY;
-    uint8_t alienStartY;
-    uint8_t alienMoveSpeed;
-    uint8_t alienDropAmount;
+    uint16_t alienSpacingX;
+    uint16_t alienSpacingY;
+    uint16_t alienStartY;
+    uint16_t alienMoveSpeed;
+    uint16_t alienDropAmount;
     uint8_t alienMoveInterval;
     float alienShootChance;
     float alienBulletSpeed;
@@ -70,15 +70,15 @@ private:
     // Player configuration
     float playerX, playerY;
     float playerTargetX;
-    uint8_t playerWidth, playerHeight;
-    uint8_t playerYOffset;
+    uint16_t playerWidth, playerHeight;
+    uint16_t playerYOffset;
     float playerSmoothing;
     uint8_t playerHitTimer;
     uint8_t playerHitFlipFrames;
     
     // Bullet configuration
     float bulletSpeed;
-    uint8_t bulletWidth, bulletHeight;
+    uint16_t bulletWidth, bulletHeight;
     uint8_t bulletCooldown;
     uint8_t bulletCooldownFrames;
     
@@ -109,7 +109,7 @@ private:
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
-    uint8_t tofRotation;
+    uint16_t tofRotation;
     bool topRowActive;  // Used for shooting trigger
     
     // Blob detection parameters
@@ -122,8 +122,8 @@ private:
     uint32_t frameCount;
     
     // Play area dimensions (may differ from matrix for portrait orientation)
-    uint8_t playWidth;
-    uint8_t playHeight;
+    uint16_t playWidth;
+    uint16_t playHeight;
     
     // Alien pixel patterns (8x8)
     static const uint8_t alienPatternA[3][8];
@@ -180,5 +180,5 @@ public:
     // Configuration
     void setTofSensor(TOFSensor* sensor);
     void setDetectionRange(int16_t minDist, int16_t maxDist);
-    void setTofRotation(uint8_t rotation);
+    void setTofRotation(uint16_t rotation);
 };

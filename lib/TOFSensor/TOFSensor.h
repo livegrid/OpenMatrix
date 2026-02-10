@@ -7,7 +7,7 @@
 // Pin definitions for sensor 1
 #define TOF_LPN_PIN -1
 #define TOF_PWREN_PIN_1 12
-#define TOF_PWREN_PIN_2 2
+#define TOF_PWREN_PIN_2 13
 #define TOF_PWREN_PIN_3 11
 #define TOF_SENSOR_1_ADDRESS 0x52
 
@@ -22,7 +22,7 @@ private:
     uint8_t sensor_address;
     bool is_active;
     uint8_t resolution;
-    VL53L8CX_ResultsData results;
+    VL53L8CX_ResultsData results;  // Back to direct member for now (I2C/DMA may need internal RAM)
     
     void powerCycleSensor();
     bool initSensorWithRetry();

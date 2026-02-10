@@ -7,8 +7,8 @@
 #include <vector>
 #include <string>
 #include <StateManager.h>
-#include <NetWizard.h>
-#include <WebServerManager.h>
+
+class WebServerManager;  // Forward declaration so WIFI can be optional
 
 class TouchMenu {
  private:

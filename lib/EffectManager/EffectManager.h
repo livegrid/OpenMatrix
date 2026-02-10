@@ -11,6 +11,7 @@
 #include "LSystemEffect.h"
 #include "MeteorShowerEffect.h"
 #include "SpaceInvadersEffect.h"
+#include "ConstellationEffect.h"
 
 #include <vector>
 #include <string>
@@ -43,6 +44,7 @@ private:
     size_t m_currentEffect = 0;
     
     // Store pointers to TOF-enabled effects for sensor updates
+    ConstellationEffect* m_constellation = nullptr;
     MeteorShowerEffect* m_meteorShower = nullptr;
     SpaceInvadersEffect* m_spaceInvaders = nullptr;
 };

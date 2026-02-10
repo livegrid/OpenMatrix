@@ -7,6 +7,10 @@ TOFVisualizer::TOFVisualizer(TOFSensor* tofSensor, Matrix* matrixDisplay)
     maxDistance = 2000;
 }
 
+void TOFVisualizer::setMatrix(Matrix* matrixDisplay) {
+    matrix = matrixDisplay;
+}
+
 void TOFVisualizer::setDistanceRange(int16_t minDist, int16_t maxDist) {
     minDistance = minDist;
     maxDistance = maxDist;
@@ -61,7 +65,25 @@ uint16_t TOFVisualizer::distanceToColor(int16_t distance) {
 }
 
 void TOFVisualizer::draw() {
-    drawWithBlockSize(8);
+    // Calculate block size dynamically based on display resolution
+    // Sensor provides 8x8 zones, so we need to scale to fit the display
+    uint8_t displayWidth = matrix->getXResolution();
+    uint8_t displayHeight = matrix->getYResolution();
+    
+    // Calculate block sizes to cover FULL display (sensor is 8x8)
+    // For 192x64 display: blockSizeX=24, blockSizeY=8
+    uint8_t blockSizeX = displayWidth / 8;
+    uint8_t blockSizeY = displayHeight / 8;
+    
+    // Ensure at least 1 pixel per block
+    if (blockSizeX < 1) blockSizeX = 1;
+    if (blockSizeY < 1) blockSizeY = 1;
+    
+    log_i("TOF Visualizer: Display=%dx%d, BlockSize=%dx%d, Rotation=%d°", 
+          displayWidth, displayHeight, blockSizeX, blockSizeY, ROTATION);
+    
+    // Use separate X and Y block sizes to fill entire display
+    drawWithBlockSizes(blockSizeX, blockSizeY);
 }
 
 void TOFVisualizer::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
@@ -93,8 +115,20 @@ void TOFVisualizer::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8
 }
 
 void TOFVisualizer::drawWithBlockSize(uint8_t blockSize) {
+    // Deprecated - use draw() for auto-scaling or drawWithBlockSizes() for custom scaling
+    drawWithBlockSizes(blockSize, blockSize);
+}
+
+void TOFVisualizer::drawWithBlockSizes(uint8_t blockSizeX, uint8_t blockSizeY) {
+    // Check if matrix pointer is valid
+    if (!matrix) {
+        log_e("TOF Visualizer: Matrix pointer is null!");
+        return;
+    }
+    
     if (!sensor->isActive()) {
         // Sensor not active - clear screen and show error
+        log_v("TOF Visualizer: Sensor not active");
         matrix->clearScreen();
         return;
     }
@@ -115,12 +149,12 @@ void TOFVisualizer::drawWithBlockSize(uint8_t blockSize) {
             uint8_t px, py;
             rotateCoordinates(x, y, px, py);
             
-            // Draw block on matrix
-            px = px * blockSize;
-            py = py * blockSize;
+            // Draw block on matrix with separate X and Y sizes
+            uint16_t blockX = px * blockSizeX;
+            uint16_t blockY = py * blockSizeY;
             
-            // Fill the block
-            matrix->background->fillRect(px, py, blockSize, blockSize, color);
+            // Fill the block (now can be non-square to fill full display)
+            matrix->background->fillRect(blockX, blockY, blockSizeX, blockSizeY, color);
         }
     }
 }

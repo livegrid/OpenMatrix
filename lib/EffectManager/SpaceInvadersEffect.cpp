@@ -41,31 +41,32 @@ SpaceInvadersEffect::SpaceInvadersEffect(Matrix* matrix, TOFSensor* sensor)
     playHeight = m_matrix->getYResolution();
     
     // Scale parameters based on matrix size (default designed for 64x64)
-    float scale = (float)playWidth / 64.0f;
+    float scaleX = (float)playWidth / 64.0f;
+    float scaleY = (float)playHeight / 64.0f;
     
     // Alien configuration (scaled)
     alienRows = 4;
     alienCols = 5;
-    alienSpacingX = (uint8_t)(11 * scale);
-    alienSpacingY = (uint8_t)(10 * scale);
-    alienStartY = (uint8_t)(8 * scale);
-    alienMoveSpeed = 1;
-    alienDropAmount = (uint8_t)(4 * scale);
+    alienSpacingX = (uint16_t)(11 * scaleX);
+    alienSpacingY = (uint16_t)(10 * scaleY);
+    alienStartY = (uint16_t)(8 * scaleY);
+    alienMoveSpeed = max((uint16_t)1, (uint16_t)(1 * scaleX));
+    alienDropAmount = (uint16_t)(4 * scaleY);
     alienMoveInterval = 25;  // frames between moves
     alienShootChance = 0.003f;
-    alienBulletSpeed = 0.8f * scale;
+    alienBulletSpeed = 0.8f * scaleY;
     
     // Player configuration (scaled)
-    playerWidth = (uint8_t)(6 * scale);
-    playerHeight = (uint8_t)(4 * scale);
-    playerYOffset = (uint8_t)(4 * scale);
+    playerWidth = (uint16_t)(6 * scaleX);
+    playerHeight = (uint16_t)(4 * scaleY);
+    playerYOffset = (uint16_t)(4 * scaleY);
     playerSmoothing = 0.25f;
     playerHitFlipFrames = 18;
     
     // Bullet configuration (scaled)
-    bulletSpeed = 2.0f * scale;
-    bulletWidth = max(1, (int)(2 * scale));
-    bulletHeight = max(2, (int)(3 * scale));
+    bulletSpeed = 2.0f * scaleY;
+    bulletWidth = max(1, (int)(2 * scaleX));
+    bulletHeight = max(2, (int)(3 * scaleY));
     bulletCooldownFrames = 15;
     
     // ToF parameters
@@ -114,29 +115,28 @@ void SpaceInvadersEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
     maxDetectionDistance = maxDist;
 }
 
-void SpaceInvadersEffect::setTofRotation(uint8_t rotation) {
+void SpaceInvadersEffect::setTofRotation(uint16_t rotation) {
     tofRotation = rotation;
 }
 
 void SpaceInvadersEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    switch (tofRotation) {
-        case 90:
-            outX = 7 - y;
-            outY = x;
-            break;
-        case 180:
-            outX = 7 - x;
-            outY = 7 - y;
-            break;
-        case 270:
-            outX = y;
-            outY = 7 - x;
-            break;
-        default:
-            outX = x;
-            outY = y;
-            break;
+    if (tofRotation == 90) {
+        outX = 7 - y;
+        outY = x;
+        return;
     }
+    if (tofRotation == 180) {
+        outX = 7 - x;
+        outY = 7 - y;
+        return;
+    }
+    if (tofRotation == 270) {
+        outX = y;
+        outY = 7 - x;
+        return;
+    }
+    outX = x;
+    outY = y;
 }
 
 void SpaceInvadersEffect::updateTofData() {
@@ -321,8 +321,8 @@ void SpaceInvadersEffect::nextLevel() {
 
 void SpaceInvadersEffect::initStars() {
     for (uint8_t i = 0; i < MAX_STARS; i++) {
-        stars[i].x = (uint8_t)(randomFloat() * playWidth);
-        stars[i].y = (uint8_t)(randomFloat() * playHeight);
+        stars[i].x = (uint16_t)(randomFloat() * playWidth);
+        stars[i].y = (uint16_t)(randomFloat() * playHeight);
         stars[i].brightness = 30 + (uint8_t)(randomFloat() * 40);
     }
 }
@@ -594,7 +594,7 @@ void SpaceInvadersEffect::checkWinCondition() {
 
 void SpaceInvadersEffect::drawGradientBackground() {
     // Deep space gradient
-    for (uint8_t y = 0; y < playHeight; y++) {
+    for (uint16_t y = 0; y < playHeight; y++) {
         float gradientFactor = (float)y / playHeight;
         
         uint8_t hue = 170 - (uint8_t)(gradientFactor * 25);
@@ -604,7 +604,7 @@ void SpaceInvadersEffect::drawGradientBackground() {
         CRGB color;
         hsv2rgb_rainbow(CHSV(hue, sat, val), color);
         
-        for (uint8_t x = 0; x < playWidth; x++) {
+        for (uint16_t x = 0; x < playWidth; x++) {
             m_matrix->background->drawPixel(x, y, color);
         }
     }

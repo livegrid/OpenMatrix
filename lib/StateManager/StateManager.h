@@ -34,13 +34,14 @@ typedef enum {
 // Effects
 typedef enum {
     NONE = 0,
+    CONSTELLATION,
+    METEOR_SHOWER,
+    SPACE_INVADERS,
     SIMPLEX_NOISE,
     SNAKE,
     FLOCKING,
     GAMEOFLIFE,
-    LSYSTEM,
-    METEOR_SHOWER,
-    SPACE_INVADERS
+    LSYSTEM
 } Effects;
 
 // Text
@@ -118,7 +119,7 @@ struct State {
 
     // Effects
     struct {
-        Effects selected = SIMPLEX_NOISE;
+        Effects selected = CONSTELLATION;
     } effects;
 
     // Image

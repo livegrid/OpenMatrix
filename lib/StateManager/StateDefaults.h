@@ -1,7 +1,7 @@
 #define DEFAULT_POWER true
 #define DEFAULT_AUTOBRIGHTNESS true
 #define DEFAULT_BRIGHTNESS 100
-#define DEFAULT_MODE OpenMatrixMode::AQUARIUM
+#define DEFAULT_MODE OpenMatrixMode::EFFECT
 #define DEFAULT_FIRST_BOOT true
 #define DEFAULT_TEMPERATURE_UNIT TemperatureUnit::CELSIUS
 
@@ -22,7 +22,7 @@
 #define DEFAULT_CO2_DIFF_INVERSE false
 
 // Effects Defaults
-#define DEFAULT_EFFECTS_SELECTED Effects::SIMPLEX_NOISE
+#define DEFAULT_EFFECTS_SELECTED Effects::CONSTELLATION
 
 // Image Defaults
 #define DEFAULT_IMAGE_SELECTED "Hut.gif"

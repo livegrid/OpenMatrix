@@ -2,6 +2,17 @@
 #include "../TOFSensor/TOFSensor.h"
 
 EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
+    // TOF-enabled interactive effects (Constellation is default/first)
+    m_constellation = new ConstellationEffect(matrix);
+    m_effects.push_back(m_constellation);
+    
+    m_meteorShower = new MeteorShowerEffect(matrix);
+    m_effects.push_back(m_meteorShower);
+    
+    m_spaceInvaders = new SpaceInvadersEffect(matrix);
+    m_effects.push_back(m_spaceInvaders);
+    
+    // Other effects
     // m_effects.push_back(new SimplexNoiseEffect(matrix));
     // m_effects.push_back(new CellularNoiseEffect(matrix));
     m_effects.push_back(new NoiseEffect(matrix));
@@ -9,13 +20,6 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     // m_effects.push_back(new FlockEffect(matrix));
     // m_effects.push_back(new GameofLifeEffect(matrix));
     // m_effects.push_back(new LSystemEffect(matrix));
-    
-    // TOF-enabled interactive effects
-    m_meteorShower = new MeteorShowerEffect(matrix);
-    // m_effects.push_back(m_meteorShower);
-    
-    m_spaceInvaders = new SpaceInvadersEffect(matrix);
-    // m_effects.push_back(m_spaceInvaders);
 }
 
 EffectManager::~EffectManager() {
@@ -86,6 +90,9 @@ void EffectManager::setTofSensor(TOFSensor* sensor) {
     m_tofSensor = sensor;
     
     // Pass sensor to TOF-enabled effects
+    if (m_constellation) {
+        m_constellation->setTofSensor(sensor);
+    }
     if (m_meteorShower) {
         m_meteorShower->setTofSensor(sensor);
     }

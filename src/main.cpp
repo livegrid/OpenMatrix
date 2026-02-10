@@ -27,18 +27,26 @@ OMatrix matrix;
 
 StateManager stateManager(STATE_SAVE_INTERVAL);
 
+#ifdef SCD40_ENABLED
 #include "SCD40.h"
 SCD40 scd40;
+#endif
 
 #ifdef VL53L8CX_ENABLED
 #include "TOFSensor.h"
 #include "TOFVisualizer.h"
 TOFSensor tofSensor(TOF_PWREN_PIN_1, TOF_SENSOR_1_ADDRESS);
-TOFVisualizer* tofVisualizer = nullptr;
+// Static allocation instead of heap to reduce fragmentation
+TOFVisualizer tofVisualizerStatic(&tofSensor, nullptr);
+TOFVisualizer* tofVisualizer = &tofVisualizerStatic;
 #endif
 
 #include "Aquarium.h"
-Aquarium aquarium(&matrix, &scd40, &stateManager);
+#ifdef SCD40_ENABLED
+  Aquarium aquarium(&matrix, &scd40, &stateManager);
+#else
+  Aquarium aquarium(&matrix, nullptr, &stateManager);  // nullptr when SCD40 disabled
+#endif
 
 #ifdef BH1750_ENABLED
 #include "AutoBrightness.h"
@@ -75,7 +83,11 @@ Edmx& dmx = Edmx::getInstance();
 
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
+#ifdef WIFI_ENABLED
 TouchMenu touchMenu(&matrix, &stateManager, &webServerManager);
+#else
+TouchMenu touchMenu(&matrix, &stateManager, nullptr);
+#endif
 #endif
 
 #ifndef SCD40_ENABLED
@@ -129,13 +141,10 @@ void displayTask(void* parameter) {
 
   // Initialize components
   imageDraw.begin();
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
-
-  aquarium.begin();
   
 #ifdef VL53L8CX_ENABLED
-  // Initialize TOF visualizer after matrix is initialized
-  tofVisualizer = new TOFVisualizer(&tofSensor, &matrix);
+  // Initialize TOF visualizer after matrix is initialized (static allocation)
+  tofVisualizer->setMatrix(&matrix);
   tofVisualizer->setDistanceRange(100, 2000);  // 100mm to 2000mm range
   
   // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders)
@@ -144,19 +153,24 @@ void displayTask(void* parameter) {
   // Connect TOF sensor to Aquarium for interactive fish behavior
   aquarium.setTofSensor(&tofSensor);
 
-  // Set mode and effect BEFORE calling setEffect
-  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  // Set mode to EFFECT with Constellation as default
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  effectManager.setEffect(0);  // Constellation is index 0
+  // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
+  // effectManager.setEffect(2);  // Constellation is index 0
   
-  // Set the effect using the correct array index
-  // EffectManager array: [0=NoiseEffect, 1=MeteorShower, 2=SpaceInvaders]
-  // So METEOR_SHOWER maps to index 1
-  // effectManager.setEffect(2);  // MeteorShower is at index 1
+  // Initialize aquarium (needed as fallback when mode changes)
+  aquarium.begin();
   
-  // stateManager.save();
+  stateManager.save();
 #else
-  // Set effect from state (only if TOF is not enabled)
-  effectManager.setEffect(stateManager.getState()->effects.selected - 1);
+  // Set mode to EFFECT with Constellation as default
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  effectManager.setEffect(0);  // Constellation is index 0
+
+  aquarium.begin();
 #endif
 
   for (;;) {
@@ -213,17 +227,29 @@ void displayTask(void* parameter) {
             break;
           case OpenMatrixMode::AQUARIUM:
 #ifdef VL53L8CX_ENABLED
-            // Temporarily show TOF data for debugging
+            // Show aquarium with TOF interaction (fish react to hand movements)
+            // To see raw TOF heatmap, uncomment the visualizer code below
+            aquarium.update(touchMenu.showSensorData());
+            aquarium.display();
+            
+            /* Debug: Show TOF heatmap instead of aquarium
             if (tofVisualizer && tofSensor.isActive()) {
+              static bool tofShownLogged = false;
+              if (!tofShownLogged) {
+                log_i("Display: Showing TOF visualizer heatmap");
+                tofShownLogged = true;
+              }
               tofVisualizer->draw();
               matrix.background->display();
             } else {
               aquarium.update(touchMenu.showSensorData());
               aquarium.display();
             }
-#endif
+            */
+#else
             aquarium.update(touchMenu.showSensorData());
             aquarium.display();
+#endif
             break;
           case OpenMatrixMode::DMX:
             dmx.update();
@@ -286,6 +312,7 @@ void touchTask(void* parameter) {
 }
 #endif
 
+#ifdef WIFI_ENABLED
 void serverTask(void* parameter) {
   // Give MORE time for system to stabilize after boot
   // ESP32-S3 with IDF5 needs extra time for hardware init before WiFi
@@ -321,6 +348,7 @@ void serverTask(void* parameter) {
     vTaskDelay(pdMS_TO_TICKS(10));  // 10ms delay - reduces CPU usage while maintaining responsiveness
   }
 }
+#endif
 
 void mqttTask(void* parameter) {
   MQTTManager& mqttManager = MQTTManager::getInstance();
@@ -368,22 +396,38 @@ void mqttTask(void* parameter) {
 
 #ifdef VL53L8CX_ENABLED
 void tofTask(void* parameter) {
+  // Wait for I2C bus to stabilize (initialized by SCD40)
+  // Also delay to allow WiFi/network services to start without memory contention
+  vTaskDelay(pdMS_TO_TICKS(7000));  // Wait 7 seconds for WiFi to stabilize
+  
   // Initialize sensor
   log_i("TOF Task: Starting sensor initialization...");
+  log_i("TOF Task: Free heap before init: %u bytes", ESP.getFreeHeap());
+  
   if (!tofSensor.begin()) {
     log_e("TOF Task: Sensor initialization failed!");
     vTaskDelete(NULL);
     return;
   }
   
-  const TickType_t xFrequency = pdMS_TO_TICKS(100);  // 10Hz update rate
+  log_i("TOF Task: Sensor initialized successfully!");
+  log_i("TOF Task: Free heap after init: %u bytes", ESP.getFreeHeap());
+  
+  // Poll the sensor faster than its 15Hz frame rate so we pick up
+  // new frames with minimal extra latency (~30 polls/sec).
+  const TickType_t xFrequency = pdMS_TO_TICKS(33);  // ~30Hz polling
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  
+  static int updateCount = 0;
   
   for (;;) {
     // Update sensor and get new data
     if (tofSensor.update()) {
       // New data available, visualization will be updated in display task
-      log_v("TOF: New data received");
+      updateCount++;
+      if (updateCount % 50 == 0) {  // Log every 5 seconds (50 * 100ms)
+        log_i("TOF: Active, received %d updates", updateCount);
+      }
     }
     
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -431,7 +475,6 @@ void restartTask(void* parameter) {
 }
 
 void setup(void) {
-  // Serial.begin(115200);
   log_i("\n");
 
   log_i(R""""(
@@ -454,8 +497,10 @@ void setup(void) {
 #ifdef SCD40_ENABLED
   delay(50);
   scd40.init();
+  log_i("SCD40 sensor initialized");
 #else
-  TaskManager::getInstance().createTask("DemoTask", demoTask, 1024, 1, 1);
+  log_i("SCD40 disabled - using default environmental values");
+  // No need for demo task - aquarium will use default values
 #endif
 
 #ifdef ADXL345_ENABLED
@@ -488,21 +533,18 @@ void setup(void) {
 #endif
 
   // Create tasks with adjusted stack sizes
-  // When VL53L8CX (TOF sensor) is enabled, reduce DisplayTask to free memory for ServerTask
-  #ifdef VL53L8CX_ENABLED
-    TaskManager::getInstance().createTask("DisplayTask", displayTask, 6144, 1, 1);
-  #else
-    TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
-  #endif
+  // When VL53L8CX (TOF sensor) is enabled, aggressively reduce other stacks
+  // With results buffer in PSRAM, we can tighten other task stacks to free heap
+
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
+  
 
 #ifdef WIFI_ENABLED
-  // Increase server task stack size for larger displays and TOF sensor memory overhead
-  // When VL53L8CX is enabled, heap fragmentation from TOF initialization requires
-  // larger stack for AsyncUDP buffers to work reliably
+  // Server task needs room for AsyncUDP and web server operations
   #ifdef VL53L8CX_ENABLED
-    TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
+    TaskManager::getInstance().createTask("ServerTask", serverTask, 7168, 1, 0);
   #else
-    TaskManager::getInstance().createTask("ServerTask", serverTask, 4096, 1, 0);
+    TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
   #endif
 #endif
 
@@ -513,11 +555,12 @@ void setup(void) {
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
-  TaskManager::getInstance().createTask("SensorTask", sensorTask, 2056, 1, 0);
+  TaskManager::getInstance().createTask("SensorTask", sensorTask, 1536, 1, 0);
 #endif
 
 #ifdef VL53L8CX_ENABLED
-  // Create TOF sensor task with large stack for sensor operations (VL53L8CX needs ~8KB+)
+  // Create TOF sensor task - VL53L8CX library requires large stack for init/firmware
+  // Results buffer is in PSRAM, but init routines need stack space
   TaskManager::getInstance().createTask("TOFTask", tofTask, 8192, 1, 0);
 #endif
 

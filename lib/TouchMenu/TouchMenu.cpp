@@ -1,4 +1,5 @@
 #include "TouchMenu.h"
+#include "GeneralSettings.h"
 
 TouchMenu* TouchMenu::instance = nullptr;
 
@@ -23,7 +24,16 @@ std::string TouchMenu::getTemperatureUnitText() const {
 }
 
 std::vector<std::string> TouchMenu::getItemList() const {
-  std::vector<std::string> baseList = {"Go Back","WiFi Info", getSensorDataMenuText(), getTemperatureUnitText(), "Brightness", "Start Demo", "Turn Off", "Factory Reset"};
+  std::vector<std::string> baseList = {"Go Back"};
+#ifdef WIFI_ENABLED
+  baseList.push_back("WiFi Info");
+#endif
+  baseList.push_back(getSensorDataMenuText());
+  baseList.push_back(getTemperatureUnitText());
+  baseList.push_back("Brightness");
+  baseList.push_back("Start Demo");
+  baseList.push_back("Turn Off");
+  baseList.push_back("Factory Reset");
   return baseList;
 }
 

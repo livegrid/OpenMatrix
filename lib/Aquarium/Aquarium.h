@@ -275,7 +275,7 @@ class Aquarium {
     float humidity =
         demoMode
             ? demoHumidity
-            : (scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
+            : (scd40 && scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
     for (auto& plant : plantArray) {
       plant->update(humidity);
     }
@@ -286,7 +286,7 @@ class Aquarium {
     float temperature =
         demoMode
             ? demoTemperature
-            : (scd40->isFirstReadingReceived() ? scd40->getTemperature() : 25);
+            : (scd40 && scd40->isFirstReadingReceived() ? scd40->getTemperature() : 25);
     
     water.update(temperature);
   }
@@ -400,7 +400,7 @@ class Aquarium {
     if (demoMode) {
       co2 = demoCO2;
     } else {
-      co2 = scd40->isFirstReadingReceived() ? scd40->getCO2() : 400;
+      co2 = (scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400;
     }
     
     // Get interaction data if available
@@ -454,7 +454,7 @@ class Aquarium {
 
   void updateSensorData(bool showSensorData) {
     if (showSensorData && !demoMode) {
-      if (scd40->isFirstReadingReceived()) {
+      if (scd40 && scd40->isFirstReadingReceived()) {
         float temperature = scd40->getTemperature();
         float humidity = scd40->getHumidity();
         float co2 = scd40->getCO2();
@@ -499,7 +499,7 @@ class Aquarium {
     } else {
       updateWater();
       // drawTOFSilhouette();  // Draw silhouette on background after water
-      boidManager.updateBoids(scd40->isFirstReadingReceived() ? scd40->getCO2() : 400);
+      boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400);
       boidManager.renderBoids();
 
       updateFish();
