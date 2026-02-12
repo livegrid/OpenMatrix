@@ -1,7 +1,7 @@
 #include "TOFSensor.h"
 
 TOFSensor::TOFSensor(uint8_t pwrenPin, uint8_t address) 
-    : pwren_pin(pwrenPin), sensor_address(address), is_active(false) {
+    : pwren_pin(pwrenPin), sensor_address(address), is_active(false), rotation(270) {
     // VL53L8CX object must be in internal RAM (contains hardware pointers for I2C)
     sensor = new VL53L8CX(&Wire, TOF_LPN_PIN);
     resolution = VL53L8CX_RESOLUTION_8X8;

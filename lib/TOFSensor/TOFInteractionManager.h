@@ -32,9 +32,6 @@ private:
     float smoothedVelocityX, smoothedVelocityY;
     unsigned long lastUpdateTime;
     
-    // Coordinate rotation (0, 90, 180, 270 degrees)
-    uint16_t rotation;
-    
     // Helper methods
     void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
     void updateBaseline();
@@ -48,6 +45,5 @@ public:
     void update();
     InteractionData getInteractionData() const;
     void calibrateBaseline();
-    void setRotation(uint16_t rot) { rotation = rot; }
     bool isBaselineReady() const { return baselineReady; }
 };

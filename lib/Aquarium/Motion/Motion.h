@@ -167,48 +167,36 @@ class Motion {
   }
 
   void applyInteractionForce(PVector blobPos, float blobVelocity, float distance) {
-    // Only apply if within interaction range
-    if (distance > INTERACTION_MAX_DISTANCE) {
+    // Interaction radius in same physics units as pos/blobPos (fraction of smaller screen dimension)
+    float maxDist = (float)min(xResolution, yResolution) * INTERACTION_RADIUS_FRACTION;
+    if (distance > maxDist) {
       return;
     }
-    
     // Calculate direction to/from blob
     PVector toBlob = blobPos - pos;
     float distToBlob = toBlob.mag();
-    
+
     if (distToBlob < 0.1f) return;  // Avoid division by zero
-    
-    // Determine force direction and magnitude based on velocity
-    float forceMagnitude = 0;
-    PVector forceDirection;
-    
+
+    // Slow movement: treat the blob like a strong "food" target so fish clearly chase it
     if (blobVelocity < INTERACTION_SLOW_THRESHOLD) {
-      // Slow movement - attract fish
-      forceDirection = toBlob;
-      forceDirection.normalize();
-      forceMagnitude = INTERACTION_ATTRACT_FORCE;
-    } else if (blobVelocity > INTERACTION_FAST_THRESHOLD) {
-      // Fast movement - repel fish
-      forceDirection = toBlob * -1.0f;  // Away from blob
-      forceDirection.normalize();
-      forceMagnitude = INTERACTION_REPEL_FORCE;
-    } else {
-      // Medium speed - neutral or slight attraction
-      forceDirection = toBlob;
-      forceDirection.normalize();
-      forceMagnitude = INTERACTION_ATTRACT_FORCE * 0.5f;
+      followFood(blobPos);
+      return;
     }
-    
-    // Scale force by inverse distance (closer = stronger)
-    float distanceFactor = 1.0f - (distToBlob / INTERACTION_MAX_DISTANCE);
+
+    // Faster movement: explicit repulsion force (like a scare response)
+    float maxDistInv = 1.0f / maxDist;
+    float distanceFactor = 1.0f - (distToBlob * maxDistInv);  // Closer = stronger
     distanceFactor = constrain(distanceFactor, 0.0f, 1.0f);
-    
-    // Scale by velocity magnitude (faster movement = stronger effect)
-    float velocityFactor = constrain(blobVelocity / INTERACTION_FAST_THRESHOLD, 0.0f, 1.5f);
-    
-    forceMagnitude *= distanceFactor * velocityFactor;
+
+    // Scale by velocity magnitude only for repulsion (faster = stronger scare)
+    float velocityFactor = constrain(blobVelocity / INTERACTION_FAST_THRESHOLD, 0.3f, 1.5f);
+
+    PVector forceDirection = toBlob * -1.0f;  // Away from blob
+    forceDirection.normalize();
+
+    float forceMagnitude = INTERACTION_REPEL_FORCE * distanceFactor * velocityFactor;
     forceDirection *= forceMagnitude;
-    
     applyForce(forceDirection);
   }
 };

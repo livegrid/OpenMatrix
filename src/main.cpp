@@ -154,13 +154,14 @@ void displayTask(void* parameter) {
   aquarium.setTofSensor(&tofSensor);
 
   // Set mode to EFFECT with Constellation as default
-  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  effectManager.setEffect(0);  // Constellation is index 0
+  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  // effectManager.setEffect(0);  // Constellation is index 0
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // effectManager.setEffect(2);  // Constellation is index 0
   
   // Initialize aquarium (needed as fallback when mode changes)
+  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   aquarium.begin();
   
   stateManager.save();

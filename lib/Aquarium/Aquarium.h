@@ -408,9 +408,29 @@ class Aquarium {
     InteractionData interactionData;
     if (interactionManager) {
       interactionData = interactionManager->getInteractionData();
+      // Depth-map fallback: when blob detection fails, use centroid of valid depth cells
+      if (!interactionData.hasBlob) {
+        float sumX = 0, sumY = 0;
+        int count = 0;
+        for (uint8_t y = 0; y < 8; y++) {
+          for (uint8_t x = 0; x < 8; x++) {
+            int16_t d = interactionData.depthMap[y][x];
+            if (d >= TOF_MIN_DETECTION_DIST && d <= TOF_MAX_DETECTION_DIST) {
+              sumX += x + 0.5f;
+              sumY += y + 0.5f;
+              count++;
+            }
+          }
+        }
+        if (count > 0) {
+          interactionData.hasBlob = true;
+          interactionData.blobX = (sumX / count) / 8.0f;
+          interactionData.blobY = (sumY / count) / 8.0f;
+          interactionData.velocityMag = 0.0f;  // Unknown velocity -> attract
+        }
+      }
       interaction = &interactionData;
     }
-    
     for (auto it = fishArray.begin(); it != fishArray.end();) {
       bool destroy = (*it)->update(co2, demoMode, interaction);
       if (destroy) {
@@ -529,7 +549,6 @@ class Aquarium {
     if (tofSensor && tofSensor->isActive()) {
       log_i("Aquarium: Creating TOFInteractionManager - sensor is active");
       interactionManager = new TOFInteractionManager(tofSensor);
-      interactionManager->setRotation(0);  // Match TOFVisualizer rotation
       interactionManager->calibrateBaseline();  // Calibrate background for subtraction
     }
   }

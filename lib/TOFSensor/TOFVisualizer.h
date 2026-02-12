@@ -9,9 +9,6 @@ private:
     TOFSensor* sensor;
     Matrix* matrix;
     
-    // Rotation setting (0, 90, 180, 270 degrees) - hardcoded at start
-    static const uint16_t ROTATION = 90;  // 90 degrees clockwise
-    
     // Distance mapping parameters
     int16_t minDistance;  // Minimum distance in mm (closer = warmer colors)
     int16_t maxDistance;  // Maximum distance in mm (farther = cooler colors)
@@ -22,7 +19,7 @@ private:
     // Map a value from one range to another
     float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
     
-    // Rotate coordinates based on ROTATION setting
+    // Rotate coordinates based on sensor rotation setting
     void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
     
 public:

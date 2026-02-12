@@ -23,6 +23,7 @@ private:
     bool is_active;
     uint8_t resolution;
     VL53L8CX_ResultsData results;  // Back to direct member for now (I2C/DMA may need internal RAM)
+    uint16_t rotation;  // Display rotation in degrees (0, 90, 180, 270)
     
     void powerCycleSensor();
     bool initSensorWithRetry();
@@ -34,6 +35,10 @@ public:
     bool begin();
     bool update();
     bool isActive() { return is_active; }
+    
+    // Coordinate rotation (0, 90, 180, 270 degrees) - used by visualizer and interaction manager
+    uint16_t getRotation() const { return rotation; }
+    void setRotation(uint16_t rot) { rotation = rot; }
     
     // Get distance data for visualization
     int16_t getDistance(uint8_t x, uint8_t y);

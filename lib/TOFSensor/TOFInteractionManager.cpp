@@ -2,7 +2,7 @@
 #include <math.h>
 
 TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
-    : sensor(tofSensor), baselineReady(false), rotation(0) {
+    : sensor(tofSensor), baselineReady(false) {
     
     // Initialize arrays
     for (uint8_t y = 0; y < 8; y++) {
@@ -22,6 +22,7 @@ TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
 }
 
 void TOFInteractionManager::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
+    uint16_t rotation = sensor->getRotation();
     switch (rotation) {
         case 90:
             outX = 7 - y;

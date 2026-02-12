@@ -80,16 +80,17 @@ void TOFVisualizer::draw() {
     if (blockSizeY < 1) blockSizeY = 1;
     
     log_i("TOF Visualizer: Display=%dx%d, BlockSize=%dx%d, Rotation=%d°", 
-          displayWidth, displayHeight, blockSizeX, blockSizeY, ROTATION);
+          displayWidth, displayHeight, blockSizeX, blockSizeY, sensor->getRotation());
     
     // Use separate X and Y block sizes to fill entire display
     drawWithBlockSizes(blockSizeX, blockSizeY);
 }
 
 void TOFVisualizer::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Rotate coordinates based on ROTATION setting
+    // Rotate coordinates based on sensor rotation setting
     // For 8x8 grid, valid rotations are 0, 90, 180, 270 degrees
-    switch (ROTATION) {
+    uint16_t rotation = sensor->getRotation();
+    switch (rotation) {
         case 90:
             // 90° clockwise: (x, y) -> (7-y, x)
             outX = 7 - y;
