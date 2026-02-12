@@ -15,6 +15,7 @@
 #include "Fish.h"
 #include "Food.h"
 #include "Plants.h"
+#include "PlanktonField.h"
 #include "Water.h"
 #include "StateManager.h"
 #include "../TOFSensor/TOFSensor.h"
@@ -30,6 +31,7 @@ class Aquarium {
   std::vector<std::unique_ptr<Plants>> plantArray;
   std::vector<std::unique_ptr<Food>> foodArray;
   BoidManager boidManager;
+  PlanktonField planktonField;
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
@@ -56,6 +58,7 @@ class Aquarium {
         stateManager(stateManager),
         water(matrix),
         boidManager(m),
+        planktonField(m),
         demoMode(false),
         demoStep(0),
         demoFinished(false) {}
@@ -64,6 +67,7 @@ class Aquarium {
     loadState();
     initializePlants();
     boidManager.initializeBoids();
+    planktonField.init();
   }
 
   bool isDemoFinished() const {
@@ -518,7 +522,17 @@ class Aquarium {
       updateDemo();
     } else {
       updateWater();
-      // drawTOFSilhouette();  // Draw silhouette on background after water
+
+      InteractionData interactionData;
+      if (interactionManager) {
+        interactionData = interactionManager->getInteractionData();
+      } else {
+        memset(&interactionData, 0, sizeof(interactionData));
+        interactionData.hasBlob = false;
+      }
+      planktonField.update(interactionData);
+      planktonField.draw();
+
       boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400);
       boidManager.renderBoids();
 
