@@ -10,15 +10,20 @@ TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
             baseline[y][x] = 0;
             activeCells[y][x] = false;
             currentDepth[y][x] = 0;
+            previousDepth[y][x] = 0;  // 0 = uninitialized for motion weighting
         }
     }
     
     lastBlobX = 0.5f;
     lastBlobY = 0.5f;
+    smoothedBlobX = 0.5f;
+    smoothedBlobY = 0.5f;
     smoothedVelocityX = 0;
     smoothedVelocityY = 0;
     lastUpdateTime = millis();
     baselineCalibrationTime = millis();
+    presenceStartTime = 0;
+    presenceActive = false;
 }
 
 void TOFInteractionManager::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
@@ -110,6 +115,13 @@ void TOFInteractionManager::detectActiveCells() {
         return;
     }
     
+    // Save previous frame before overwriting (for motion-weighted centroid)
+    for (uint8_t y = 0; y < 8; y++) {
+        for (uint8_t x = 0; x < 8; x++) {
+            previousDepth[y][x] = currentDepth[y][x];
+        }
+    }
+    
     for (uint8_t y = 0; y < 8; y++) {
         for (uint8_t x = 0; x < 8; x++) {
             uint8_t rx, ry;
@@ -149,6 +161,7 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
             uint8_t qHead = 0, qTail = 0;
             uint8_t count = 0;
             float sumX = 0, sumY = 0;
+            float sumXW = 0, sumYW = 0, sumW = 0;  // Motion-weighted centroid
             
             queue[qTail][0] = sx;
             queue[qTail][1] = sy;
@@ -160,9 +173,23 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
                 uint8_t cy = queue[qHead][1];
                 qHead++;
                 
+                float cellX = cx + 0.5f;
+                float cellY = cy + 0.5f;
                 count++;
-                sumX += cx + 0.5f;  // Center of cell
-                sumY += cy + 0.5f;
+                sumX += cellX;
+                sumY += cellY;
+                
+                // Motion weight: cells with significant depth change get higher weight
+                // Prioritizes hand/head movement over static body
+                float motionWeight = 0.0f;
+                if (previousDepth[cy][cx] != 0) {
+                    int16_t delta = abs(currentDepth[cy][cx] - previousDepth[cy][cx]);
+                    motionWeight = (delta > TOF_MOTION_THRESHOLD_MM) 
+                        ? (float)(delta - TOF_MOTION_THRESHOLD_MM) : 0.0f;
+                }
+                sumXW += cellX * motionWeight;
+                sumYW += cellY * motionWeight;
+                sumW += motionWeight;
                 
                 // Check 4 neighbors
                 const int8_t dx[] = {1, -1, 0, 0};
@@ -187,8 +214,14 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
             // Check if this blob is the largest
             if (count >= TOF_MIN_BLOB_CELLS && count > maxBlobSize) {
                 maxBlobSize = count;
-                maxBlobCenterX = sumX / count;
-                maxBlobCenterY = sumY / count;
+                // Use motion-weighted centroid when there's moving content (hand/head)
+                if (sumW > 1.0f) {
+                    maxBlobCenterX = sumXW / sumW;
+                    maxBlobCenterY = sumYW / sumW;
+                } else {
+                    maxBlobCenterX = sumX / count;
+                    maxBlobCenterY = sumY / count;
+                }
             }
         }
     }
@@ -206,19 +239,28 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
 void TOFInteractionManager::updateVelocity(float blobX, float blobY) {
     unsigned long currentTime = millis();
     float deltaTime = (currentTime - lastUpdateTime) / 1000.0f;  // Convert to seconds
-    
-    if (deltaTime > 0 && deltaTime < 1.0f) {  // Sanity check
-        // Calculate velocity in normalized space per second
-        float velX = (blobX - lastBlobX) / deltaTime;
-        float velY = (blobY - lastBlobY) / deltaTime;
-        
-        // Smooth velocity
-        smoothedVelocityX = smoothedVelocityX * (1.0f - TOF_VELOCITY_SMOOTH) + velX * TOF_VELOCITY_SMOOTH;
-        smoothedVelocityY = smoothedVelocityY * (1.0f - TOF_VELOCITY_SMOOTH) + velY * TOF_VELOCITY_SMOOTH;
+
+    smoothedBlobX = smoothedBlobX * (1.0f - TOF_BLOB_POSITION_SMOOTH) + blobX * TOF_BLOB_POSITION_SMOOTH;
+    smoothedBlobY = smoothedBlobY * (1.0f - TOF_BLOB_POSITION_SMOOTH) + blobY * TOF_BLOB_POSITION_SMOOTH;
+
+    if (deltaTime > 0 && deltaTime < 1.0f) {
+        float moveX = smoothedBlobX - lastBlobX;
+        float moveY = smoothedBlobY - lastBlobY;
+        float moveMag = sqrtf(moveX * moveX + moveY * moveY);
+
+        if (moveMag >= TOF_VELOCITY_DEADZONE) {
+            float velX = moveX / deltaTime;
+            float velY = moveY / deltaTime;
+            smoothedVelocityX = smoothedVelocityX * (1.0f - TOF_VELOCITY_SMOOTH) + velX * TOF_VELOCITY_SMOOTH;
+            smoothedVelocityY = smoothedVelocityY * (1.0f - TOF_VELOCITY_SMOOTH) + velY * TOF_VELOCITY_SMOOTH;
+        } else {
+            smoothedVelocityX *= (1.0f - TOF_VELOCITY_SMOOTH);
+            smoothedVelocityY *= (1.0f - TOF_VELOCITY_SMOOTH);
+        }
     }
-    
-    lastBlobX = blobX;
-    lastBlobY = blobY;
+
+    lastBlobX = smoothedBlobX;
+    lastBlobY = smoothedBlobY;
     lastUpdateTime = currentTime;
 }
 
@@ -254,13 +296,17 @@ InteractionData TOFInteractionManager::getInteractionData() const {
         data.blobX = blobX;
         data.blobY = blobY;
         data.blobSize = blobSize;
-        
-        // Update velocity (this modifies internal state, but we need it)
+
+        if (!nonConstThis->presenceActive) {
+            nonConstThis->presenceActive = true;
+            nonConstThis->presenceStartTime = millis();
+        }
+        data.presenceDuration = (millis() - nonConstThis->presenceStartTime) / 1000.0f;
+
         nonConstThis->updateVelocity(blobX, blobY);
-        
-        // Calculate velocity magnitude (in pixels per frame, assuming ~30fps)
-        data.velocityMag = sqrtf(smoothedVelocityX * smoothedVelocityX + 
-                                 smoothedVelocityY * smoothedVelocityY) * 8.0f; // Scale to pixels
+
+        data.velocityMag = sqrtf(smoothedVelocityX * smoothedVelocityX +
+                                 smoothedVelocityY * smoothedVelocityY) * 8.0f;
         data.velocityX = smoothedVelocityX * 8.0f;
         data.velocityY = smoothedVelocityY * 8.0f;
     } else {
@@ -271,6 +317,8 @@ InteractionData TOFInteractionManager::getInteractionData() const {
         data.velocityMag = 0;
         data.velocityX = 0;
         data.velocityY = 0;
+        data.presenceDuration = 0;
+        nonConstThis->presenceActive = false;
     }
     
     return data;

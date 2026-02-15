@@ -149,18 +149,11 @@ class Fish {
       }
     }
     
-    // Apply interaction force before motion update
-    if (interaction && interaction->hasBlob) {
-      // Convert normalized blob position to matrix coordinates
-      PVector blobPos(interaction->blobX * matrix->getXResolution() * PHYSICS_SCALE,
-                      interaction->blobY * matrix->getYResolution() * PHYSICS_SCALE);
-      
-      // Calculate distance from fish to blob
-      PVector fishPosScaled = pos * PHYSICS_SCALE;
-      float distance = fishPosScaled.dist(blobPos);
-      
-      // Apply interaction force
-      motion->applyInteractionForce(blobPos, interaction->velocityMag, distance);
+    // Update interaction state machine (handles IDLE/ALERT/SCARED/CURIOUS)
+    if (interaction) {
+      motion->updateInteractionState(*interaction,
+          matrix->getXResolution() * PHYSICS_SCALE,
+          matrix->getYResolution() * PHYSICS_SCALE);
     }
     
     motion->update(age, co2, stayInside);

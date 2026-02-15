@@ -10,8 +10,8 @@
 // Drawn on foreground to avoid water's chunked background updates overwriting them.
 class PlanktonField {
 public:
-    static constexpr uint16_t MAX_PLANKTON = 2000;
-    static constexpr uint8_t TOF_GRID_SIZE = 8;
+    static constexpr uint16_t MAX_PLANKTON = PLANKTON_MAX_COUNT;
+    static constexpr uint8_t TOF_GRID_SIZE = PLANKTON_TOF_GRID_SIZE;
 
     PlanktonField(Matrix* matrix)
         : matrix(matrix),
@@ -43,10 +43,10 @@ public:
 
             int16_t diff = (int16_t)target - (int16_t)brightness[i];
             if (diff > 0) {
-                int16_t rise = max(1, diff >> 2);
+                int16_t rise = max(1, diff >> PLANKTON_BRIGHTNESS_RISE_SHIFT);
                 brightness[i] = min(255, (int)brightness[i] + rise);
             } else if (diff < 0) {
-                int16_t fade = min(-1, diff >> 4);
+                int16_t fade = min(-1, diff >> PLANKTON_BRIGHTNESS_FADE_SHIFT);
                 brightness[i] = max(0, (int)brightness[i] + fade);
             }
         }
@@ -62,8 +62,8 @@ public:
             uint16_t y = py[i];
             if (x >= screenWidth || y >= screenHeight) continue;
 
-            uint8_t hue = 96 + (uint8_t)((i * 2654435761u) >> 24) % 40;
-            uint8_t sat = 100 + (uint8_t)((i * 2654435761u) >> 20) % 60;
+            uint8_t hue = PLANKTON_HUE_BASE + (uint8_t)((i * 2654435761u) >> 24) % PLANKTON_HUE_RANGE;
+            uint8_t sat = PLANKTON_SAT_BASE + (uint8_t)((i * 2654435761u) >> 20) % PLANKTON_SAT_RANGE;
             CRGB color;
             hsv2rgb_rainbow(CHSV(hue, sat, brightness[i]), color);
             matrix->foreground->drawPixel(x, y, color);
@@ -96,18 +96,18 @@ private:
     }
 
     float getDepthBoostAt(float x, float y) {
-        float gx = (screenWidth > 1) ? (x / (float)(screenWidth - 1)) * 7.0f : 0;
-        float gy = (screenHeight > 1) ? (y / (float)(screenHeight - 1)) * 7.0f : 0;
+        float gx = (screenWidth > 1) ? (x / (float)(screenWidth - 1)) * (float)(TOF_GRID_SIZE - 1) : 0;
+        float gy = (screenHeight > 1) ? (y / (float)(screenHeight - 1)) * (float)(TOF_GRID_SIZE - 1) : 0;
 
         int x0 = (int)gx;
         int y0 = (int)gy;
-        int x1 = min(7, x0 + 1);
-        int y1 = min(7, y0 + 1);
+        int x1 = min((int)(TOF_GRID_SIZE - 1), x0 + 1);
+        int y1 = min((int)(TOF_GRID_SIZE - 1), y0 + 1);
         float tx = gx - x0;
         float ty = gy - y0;
 
-        x0 = max(0, min(7, x0));
-        y0 = max(0, min(7, y0));
+        x0 = max(0, min((int)(TOF_GRID_SIZE - 1), x0));
+        y0 = max(0, min((int)(TOF_GRID_SIZE - 1), y0));
 
         float v00 = depthField[y0][x0];
         float v10 = depthField[y0][x1];

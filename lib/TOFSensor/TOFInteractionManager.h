@@ -10,6 +10,7 @@ struct InteractionData {
     uint8_t blobSize;          // Number of active cells
     float velocityMag;         // Movement speed (pixels/frame)
     float velocityX, velocityY; // Direction
+    float presenceDuration;   // Seconds since blob first appeared (0 if no presence)
     int16_t depthMap[8][8];    // Processed depth for silhouette
 };
 
@@ -21,16 +22,20 @@ private:
     int16_t baseline[8][8];
     bool baselineReady;
     unsigned long baselineCalibrationTime;
-    static constexpr unsigned long BASELINE_CALIBRATION_DURATION = 2000; // 2 seconds
+    static constexpr unsigned long BASELINE_CALIBRATION_DURATION = TOF_BASELINE_CALIBRATION_DURATION_MS;
     
     // Current frame processing
     bool activeCells[8][8];
     int16_t currentDepth[8][8];
+    int16_t previousDepth[8][8];  // For motion-weighted centroid (prioritizes hand over static body)
     
     // Blob tracking
     float lastBlobX, lastBlobY;
+    float smoothedBlobX, smoothedBlobY;
     float smoothedVelocityX, smoothedVelocityY;
     unsigned long lastUpdateTime;
+    unsigned long presenceStartTime;
+    bool presenceActive;
     
     // Helper methods
     void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);

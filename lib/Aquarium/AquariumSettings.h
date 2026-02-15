@@ -142,13 +142,54 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
 #define TOF_MIN_BLOB_CELLS 2          // Minimum cells to count as valid blob
 #define TOF_VELOCITY_SMOOTH 0.3f       // Velocity smoothing factor (0-1)
+#define TOF_BLOB_POSITION_SMOOTH 0.3f   // Blob position smoothing (0-1, lower = smoother)
+#define TOF_VELOCITY_DEADZONE 0.0625f  // Ignore velocity if blob move < 0.5 grid cells (1/16)
+#define TOF_MOTION_THRESHOLD_MM 40      // mm depth change between frames to count as "moving" (prioritizes hand over static body)
 
-// Fish Response Settings (forces in same scale as FISH_MAX_FORCE ~0.3)
-#define INTERACTION_SLOW_THRESHOLD 0.5f   // Below this = attraction
-#define INTERACTION_FAST_THRESHOLD 2.0f   // Above this = strong repulsion
-#define INTERACTION_ATTRACT_FORCE 0.3f    // Base attraction force
-#define INTERACTION_REPEL_FORCE 1.2f      // Base repulsion force (stronger = fish flee faster)
-#define INTERACTION_RADIUS_FRACTION 1.0f  // Interaction radius = fraction of min(screen width, height) in physics units (1.0 = whole screen)
+// Fish Interaction State Machine
+#define INTERACTION_RADIUS_FRACTION 1.0f   // Fraction of min(screenW,screenH) that counts as interaction range
+#define INTERACTION_DISTANCE_EPSILON 0.1f  // Min distance to avoid div-by-zero
+
+// ALERT state
+#define STATE_ALERT_DURATION_MS 500        // How long fish freezes when blob first appears
+#define STATE_ALERT_DAMPING 0.85f          // vel *= this each frame while alert (quick decel)
+
+// SCARED state
+#define STATE_SCARED_REPEL_FORCE 1.5f      // Force magnitude when darting away
+#define STATE_SCARED_SPEED_BOOST 1.5f      // maxSpeed multiplier while scared
+#define STATE_SCARED_CALM_VELOCITY 0.3f    // Blob velocity below this = "calm" (allows transition to CURIOUS)
+#define STATE_SCARED_CALM_DURATION_S 3.0f  // Seconds of calm presence before transitioning to CURIOUS
+
+// CURIOUS state
+#define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.3f  // Fraction of FOOD_FORCE used to follow blob
+#define STATE_CURIOUS_SIN_SCALE 0.3f       // Reduce sin amplitude to this fraction
+#define STATE_CURIOUS_NOISE_SCALE 0.2f     // Reduce noise amplitude to this fraction
+#define STATE_CURIOUS_SCARE_VELOCITY 1.0f  // Blob velocity above this snaps back to SCARED (lowered for hand motion sensitivity)
+#define CURIOUS_ATTRACTION_STOP_DISTANCE 60  // Physics units - stop attracting when fish this close (avoids clustering)
+#define STATE_CURIOUS_PAUSE_INTERVAL_MS 500 // How often to check for a pause while curious
+#define STATE_CURIOUS_PAUSE_CHANCE 50      // 1/50 = 2% chance per check
+#define STATE_CURIOUS_PAUSE_MIN_MS 400     // Min curious pause
+#define STATE_CURIOUS_PAUSE_MAX_MS 800     // Max curious pause
+#define STATE_CURIOUS_PAUSE_DAMPING 0.90f  // Damping during curious pause
+
+// IDLE recovery
+#define STATE_IDLE_RECOVERY_MS 2000        // After blob disappears, return to IDLE after this delay
+
+// Plankton Visual Feedback
+#define PLANKTON_MAX_COUNT 2000
+#define PLANKTON_TOF_GRID_SIZE 8
+#define PLANKTON_HUE_BASE 96            // Greenish (FastLED hue)
+#define PLANKTON_HUE_RANGE 40
+#define PLANKTON_SAT_BASE 100
+#define PLANKTON_SAT_RANGE 60
+#define PLANKTON_BRIGHTNESS_RISE_SHIFT 2   // diff >> 2 = fast rise ~25%/frame
+#define PLANKTON_BRIGHTNESS_FADE_SHIFT 4   // diff >> 4 = slow fade ~6%/frame
+
+// Food
+#define FOOD_FALL_SPEED 0.3f
+
+// TOF Baseline
+#define TOF_BASELINE_CALIBRATION_DURATION_MS 2000
 
 // Silhouette Effect Settings (drawn on foreground)
 #define SILHOUETTE_OPACITY 0.8f        // How visible the silhouette is (0-1)

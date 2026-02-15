@@ -430,7 +430,8 @@ class Aquarium {
           interactionData.hasBlob = true;
           interactionData.blobX = (sumX / count) / 8.0f;
           interactionData.blobY = (sumY / count) / 8.0f;
-          interactionData.velocityMag = 0.0f;  // Unknown velocity -> attract
+          interactionData.velocityMag = 0.0f;
+          // presenceDuration already set by getInteractionData()
         }
       }
       interaction = &interactionData;

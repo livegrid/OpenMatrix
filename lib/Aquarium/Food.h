@@ -4,12 +4,12 @@
 #include <Arduino.h>
 #include <Matrix.h>
 #include <PVector.h>
+#include "AquariumSettings.h"
 
 class Food {
  private:
   Matrix* matrix;
   PVector position;
-  static constexpr float fallSpeed = 0.3;
   bool eaten = false;
   bool offScreen = false;
 
@@ -18,7 +18,7 @@ class Food {
     : matrix(m), position(x, 0) {}
 
   void update() {
-    position.y += fallSpeed;
+    position.y += FOOD_FALL_SPEED;
     if (position.y >= matrix->getYResolution()) {
       offScreen = true;  // Set the flag instead of relying on real-time calculation
     }
