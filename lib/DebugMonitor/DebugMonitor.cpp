@@ -1,8 +1,9 @@
 #include "DebugMonitor.h"
+#include <esp_heap_caps.h>
 
 void DebugMonitor::init() {
     TaskManager& taskManager = TaskManager::getInstance();
-    taskManager.createTask("DebugMonitor", debugTask, STACK_SIZE, PRIORITY, CORE_ID);
+    taskManager.createTask("DebugMonitor", debugTask, STACK_SIZE, PRIORITY, CORE_ID, true);
 }
 
 const char* DebugMonitor::getTaskStateString(TaskManager::TaskState state) {
@@ -42,40 +43,32 @@ void DebugMonitor::debugTask(void* parameters) {
         // Get heap information
         uint32_t freeHeap = ESP.getFreeHeap();
         uint32_t totalHeap = ESP.getHeapSize();
-        float heapPercentage = ((float)freeHeap / totalHeap) * 100;
+        float heapPercentage = totalHeap > 0 ? ((float)freeHeap / totalHeap) * 100 : 0;
+        size_t internalFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t internalLargest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        size_t psramFree = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        size_t psramLargest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
 
         // Print system information
-        log_e("=== Debug Information ===");
-        log_e("Free Heap: %u bytes (%.1f%%)", freeHeap, heapPercentage);
-        log_e("CPU Frequency: %u MHz", ESP.getCpuFreqMHz());
-        log_e("Minimum Free Heap: %u bytes", ESP.getMinFreeHeap());
-        
-        // Print task information
-        log_e("\n=== Task Information ===");
-        log_e("Task Name            State     Stack High Water  Core  Priority");
-        log_e("------------------------------------------------------------");
-        
-        // Iterate through all tasks in TaskManager
+        log_i("=== Memory & Tasks ===");
+        log_i("Heap: free=%u (%.1f%%) minFree=%u | internal free=%u largest=%u | PSRAM free=%u largest=%u",
+              (unsigned)freeHeap, heapPercentage, (unsigned)ESP.getMinFreeHeap(),
+              (unsigned)internalFree, (unsigned)internalLargest, (unsigned)psramFree, (unsigned)psramLargest);
+        log_i("Task Name            State     Stack HWM   Core  Pri");
+        log_i("----------------------------------------------------");
+
         for (const auto& task : taskManager.tasks) {
             const std::string& taskName = task.first;
             TaskHandle_t handle = task.second.handle;
-            
-            // Get detailed task information
             UBaseType_t stackHighWater = uxTaskGetStackHighWaterMark(handle);
             eTaskState runtimeState = eTaskGetState(handle);
             UBaseType_t priority = uxTaskPriorityGet(handle);
             BaseType_t core = xTaskGetAffinity(handle);
-
-            log_e("%-20s %-9s %6u bytes    %2d    %3u", 
-                taskName.c_str(),
-                getTaskStateString(runtimeState),
-                stackHighWater * sizeof(StackType_t),
-                core,
-                priority
-            );
+            log_i("%-20s %-9s %6u b   %2d   %3u",
+                taskName.c_str(), getTaskStateString(runtimeState),
+                (unsigned)(stackHighWater * sizeof(StackType_t)), (int)core, (unsigned)priority);
         }
-        
-        log_e("======================\n");
+        log_i("======================\n");
 
         vTaskDelay(pdMS_TO_TICKS(DEBUG_INTERVAL_MS));
     }

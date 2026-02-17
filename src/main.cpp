@@ -1,6 +1,7 @@
 #include "GeneralSettings.h"
 #include "StateManager.h"
 #include "TaskManager.h"
+#include <esp_heap_caps.h>
 
 #ifdef WIFI_ENABLED
 #include <Edmx.h>
@@ -13,7 +14,7 @@
 #include "WebServerManager.h"
 #endif
 
-// #include <DebugMonitor.h>
+#include <DebugMonitor.h>
 
 TaskManager& taskManager = TaskManager::getInstance();
 
@@ -152,27 +153,24 @@ void displayTask(void* parameter) {
   
   // Connect TOF sensor to Aquarium for interactive fish behavior
   aquarium.setTofSensor(&tofSensor);
+#endif
 
-  // Set mode to EFFECT with Constellation as default
-  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  // effectManager.setEffect(0);  // Constellation is index 0
-  // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
-  // effectManager.setEffect(2);  // Constellation is index 0
-  
-  // Initialize aquarium (needed as fallback when mode changes)
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
-  aquarium.begin();
-  
-  stateManager.save();
-#else
   // Set mode to EFFECT with Constellation as default
   stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  effectManager.setEffect(0);  // Constellation is index 0
+  // effectManager.setEffect(0);  // Constellation is index 0
 
+  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+
+  // Route large allocations (Fish, Plants, Boids) to PSRAM so internal heap
+  // stays free for WiFi, E1.31/AsyncUDP, and mDNS.
+  log_i("Aquarium begin: routing heap allocs >= 64 B to PSRAM (internal free=%u)",
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  heap_caps_malloc_extmem_enable(64);
   aquarium.begin();
-#endif
+  log_i("Aquarium begin done (internal free=%u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+  stateManager.save();
 
   for (;;) {
     unsigned long currentTime = millis();
@@ -315,21 +313,17 @@ void touchTask(void* parameter) {
 
 #ifdef WIFI_ENABLED
 void serverTask(void* parameter) {
-  // Give MORE time for system to stabilize after boot
-  // ESP32-S3 with IDF5 needs extra time for hardware init before WiFi
-  // This delay helps ensure consistent WiFi connection after reset
-  vTaskDelay(pdMS_TO_TICKS(5000));  // Increased to 5000ms for ESP32-S3
+  // WiFi is already initialized in setup() (before DisplayTask) to avoid heap exhaustion.
+  // Delay for DisplayTask to init matrix (needed by dmx.begin) and imageDraw/aquarium.
+  vTaskDelay(pdMS_TO_TICKS(3000));
   
   log_i("[ServerTask] ========================================");
   log_i("[ServerTask] Starting network services...");
-  log_i("[ServerTask] Free heap: %u bytes", ESP.getFreeHeap());
+  log_i("[ServerTask] Free heap: %u bytes (internal=%u, largest_block=%u) [AsyncUDP needs internal]",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
   log_i("[ServerTask] ========================================");
-  
-  // Initialize web server and related services
-  webServerManager.connectToWiFi();
-  
-  // Wait for WiFi to fully stabilize before starting services
-  vTaskDelay(pdMS_TO_TICKS(2000));  // Increased from 1000ms
   
   // Initialize DMX after web server is ready
   log_i("[ServerTask] Initializing DMX/E131...");
@@ -533,41 +527,60 @@ void setup(void) {
   }
 #endif
 
-  // Create tasks with adjusted stack sizes
-  // When VL53L8CX (TOF sensor) is enabled, aggressively reduce other stacks
-  // With results buffer in PSRAM, we can tighten other task stacks to free heap
+  // === CRITICAL: WiFi init MUST run before DisplayTask ===
+  // DisplayTask allocates matrix buffers, aquarium, etc. (~40KB+). If WiFi init runs
+  // in ServerTask (after DisplayTask starts), heap drops to ~20KB and esp_wifi_init
+  // fails with 257 (ESP_ERR_NO_MEM). Initialize WiFi in setup() when heap is ~75KB.
+#ifdef WIFI_ENABLED
+  log_i("Phase 0: Initializing WiFi (before DisplayTask to preserve heap)...");
+  log_i("Free heap before WiFi: %u bytes", ESP.getFreeHeap());
+  webServerManager.connectToWiFi();
+  log_i("WiFi phase complete. Free heap: %u bytes", ESP.getFreeHeap());
+#endif
 
-  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
-  
+  // === PHASE 1: Core tasks ===
+  log_i("Phase 1: Creating Display and Server tasks...");
+
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1, false);
 
 #ifdef WIFI_ENABLED
-  // Server task needs room for AsyncUDP and web server operations
-  #ifdef VL53L8CX_ENABLED
-    TaskManager::getInstance().createTask("ServerTask", serverTask, 7168, 1, 0);
-  #else
-    TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
-  #endif
+  // ServerTask in PSRAM: frees ~30KB internal heap for AsyncUDP.listen() (needs xTaskCreate from internal)
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 7528, 1, 0, true);
 #endif
+
+  // === PHASE 2: Additional tasks ===
+  log_i("Phase 2: Creating Touch, Sensor, and TOF tasks...");
 
 #ifdef TOUCH_ENABLED
-  // TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
+  // TouchTask: HWM 1388 B → 2048 words = 8KB [Core 1 - with display for UI responsiveness]
+  // TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 1, false);
 #endif
 
-
-// Create the combined sensor task
+// Create the combined sensor task (BH1750 + ADXL345). Tune with DebugMonitor HWM.
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
-  TaskManager::getInstance().createTask("SensorTask", sensorTask, 1536, 1, 0);
+  // SensorTask: HWM 604 B → 2048 words = 8KB [Core 0 - with other sensors]
+  TaskManager::getInstance().createTask("SensorTask", sensorTask, 2048, 1, 0, false);
 #endif
 
 #ifdef VL53L8CX_ENABLED
-  // Create TOF sensor task - VL53L8CX library requires large stack for init/firmware
-  // Results buffer is in PSRAM, but init routines need stack space
-  TaskManager::getInstance().createTask("TOFTask", tofTask, 8192, 1, 0);
+  // TOFTask: HWM 6488 B → 7168 words = 28KB [Core 0 - I2C hardware access]
+  // Using PSRAM stack to save internal RAM (I2C operations don't need fast memory)
+  TaskManager::getInstance().createTask("TOFTask", tofTask, 7168, 1, 0, true);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);
 
-  // DebugMonitor::init(); // Initialize the debug monitor
+  // One-time post-init heap snapshot (internal + PSRAM, largest block for fragmentation)
+  {
+    const size_t internalFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    const size_t internalLargest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+    const size_t psramFree = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    const size_t psramLargest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    log_i("Heap after init: internal free=%u largest_block=%u | PSRAM free=%u largest_block=%u",
+          (unsigned)internalFree, (unsigned)internalLargest, (unsigned)psramFree, (unsigned)psramLargest);
+  }
+
+  DebugMonitor::init();
 }
 
 void loop(void) {

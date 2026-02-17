@@ -15,9 +15,10 @@ friend class DebugMonitor;
   enum class TaskState { RUNNING, SUSPENDED, STOPPED };
 
   static TaskManager& getInstance(StateManager* stateManager = nullptr);
-  
+
   void createTask(const std::string& taskName, TaskFunction_t taskFunction,
-                  uint32_t stackSize, UBaseType_t priority, BaseType_t coreID);
+                  uint32_t stackSize, UBaseType_t priority, BaseType_t coreID,
+                  bool usePSRAM = false);
 
   void resumeTask(const std::string& taskName);
   void suspendTask(const std::string& taskName);
@@ -34,6 +35,8 @@ friend class DebugMonitor;
   struct TaskInfo {
     TaskHandle_t handle;
     TaskState state;
+    StackType_t* stackBuffer;  // For PSRAM-allocated stacks
+    StaticTask_t* taskBuffer;  // For static task creation
   };
 
   std::map<std::string, TaskInfo> tasks;
