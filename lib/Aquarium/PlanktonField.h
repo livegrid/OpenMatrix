@@ -56,7 +56,7 @@ public:
         if (!matrix || planktonCount == 0) return;
 
         for (uint16_t i = 0; i < planktonCount; i++) {
-            if (brightness[i] == 0) continue;
+            if (brightness[i] < PLANKTON_MIN_DRAW_BRIGHTNESS) continue;
 
             uint16_t x = px[i];
             uint16_t y = py[i];
@@ -83,12 +83,16 @@ private:
     float depthField[TOF_GRID_SIZE][TOF_GRID_SIZE];
 
     void buildDepthField(const InteractionData& interaction) {
+        const int16_t range = TOF_MAX_DETECTION_DIST - TOF_MIN_DETECTION_DIST;
         for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
             for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
                 int16_t depth = interaction.depthMap[y][x];
                 float value = 0;
                 if (depth > TOF_MIN_DETECTION_DIST && depth < TOF_MAX_DETECTION_DIST) {
-                    value = 1.0f;
+                    // Closer = stronger glow: 1.0 at min distance, 0.0 at max
+                    value = 1.0f - (float)(depth - TOF_MIN_DETECTION_DIST) / (float)range;
+                    if (value < 0) value = 0;
+                    if (value > 1.0f) value = 1.0f;
                 }
                 depthField[y][x] = value;
             }

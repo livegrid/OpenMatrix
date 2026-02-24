@@ -161,9 +161,9 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define STATE_SCARED_CALM_DURATION_S 3.0f  // Seconds of calm presence before transitioning to CURIOUS
 
 // CURIOUS state
-#define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.3f  // Fraction of FOOD_FORCE used to follow blob
-#define STATE_CURIOUS_SIN_SCALE 0.3f       // Reduce sin amplitude to this fraction
-#define STATE_CURIOUS_NOISE_SCALE 0.2f     // Reduce noise amplitude to this fraction
+#define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.8f  // Fraction of FOOD_FORCE used to follow blob
+#define STATE_CURIOUS_SIN_SCALE 0.8f       // Reduce sin amplitude to this fraction
+#define STATE_CURIOUS_NOISE_SCALE 0.5f     // Reduce noise amplitude to this fraction
 #define STATE_CURIOUS_SCARE_VELOCITY 1.0f  // Blob velocity above this snaps back to SCARED (lowered for hand motion sensitivity)
 #define CURIOUS_ATTRACTION_STOP_DISTANCE 60  // Physics units - stop attracting when fish this close (avoids clustering)
 #define STATE_CURIOUS_PAUSE_INTERVAL_MS 500 // How often to check for a pause while curious
@@ -178,12 +178,13 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // Plankton Visual Feedback
 #define PLANKTON_MAX_COUNT 2000
 #define PLANKTON_TOF_GRID_SIZE 8
-#define PLANKTON_HUE_BASE 96            // Greenish (FastLED hue)
-#define PLANKTON_HUE_RANGE 40
-#define PLANKTON_SAT_BASE 100
-#define PLANKTON_SAT_RANGE 60
+#define PLANKTON_HUE_BASE 135           // Cyan-aqua (bioluminescent, FastLED hue)
+#define PLANKTON_HUE_RANGE 20           // Tight range: 125-155 (cyan to teal)
+#define PLANKTON_SAT_BASE 160           // Highly saturated for a real glow
+#define PLANKTON_SAT_RANGE 40           // 160-200
 #define PLANKTON_BRIGHTNESS_RISE_SHIFT 2   // diff >> 2 = fast rise ~25%/frame
 #define PLANKTON_BRIGHTNESS_FADE_SHIFT 4   // diff >> 4 = slow fade ~6%/frame
+#define PLANKTON_MIN_DRAW_BRIGHTNESS 30    // Skip drawing below this — avoids dark edge bleed onto water
 
 // Food
 #define FOOD_FALL_SPEED 0.3f

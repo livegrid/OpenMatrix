@@ -15,7 +15,7 @@
 #define TOUCH_ENABLED 1
 #define VL53L8CX_ENABLED 1  // Time-of-Flight sensor
 
-#define WIFI_ENABLED 1  // Comment out to disable WiFi, web server, and ServerTask (saves RAM)
+// #define WIFI_ENABLED 1  // Comment out to disable WiFi, web server, and ServerTask (saves RAM)
 
 // WiFi Buffer Configuration for ESP32-S3 RAM constraints
 // Reduces WiFi buffers to minimum viable for connection (saves ~10KB RAM during init)
