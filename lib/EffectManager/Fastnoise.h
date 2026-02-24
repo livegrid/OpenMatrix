@@ -393,6 +393,14 @@ public:
         }
     }
 
+    /// <summary>
+    /// Fills a 2D buffer with noise. Uses cell-coherent optimization for Perlin/Value
+    /// when fractal is None, reducing lattice lookups when many samples fall in the same cell.
+    /// </summary>
+    /// <param name="pNoiseBuffer">Output buffer, row-major, size width*height</param>
+    /// <param name="z">For 3D noise types, the z coordinate (e.g. time). Use 0 for 2D-only.</param>
+    void FillNoise2D(float* pNoiseBuffer, int width, int height, float offsetX = 0, float offsetY = 0, float z = 0, float stepX = 1, float stepY = 1) const;
+
 private:
     template <typename T>
     struct Arguments_must_be_floating_point_values;
@@ -552,6 +560,25 @@ private:
         return xd * xg + yd * yg + zd * zg;
     }
 
+
+    void GetGradient2D(int seed, int xPrimed, int yPrimed, float& gx, float& gy) const
+    {
+        int hash = Hash(seed, xPrimed, yPrimed);
+        hash ^= hash >> 15;
+        hash &= 127 << 1;
+        gx = Lookup<float>::Gradients2D[hash];
+        gy = Lookup<float>::Gradients2D[hash | 1];
+    }
+
+    void GetGradient3D(int seed, int xPrimed, int yPrimed, int zPrimed, float& gx, float& gy, float& gz) const
+    {
+        int hash = Hash(seed, xPrimed, yPrimed, zPrimed);
+        hash ^= hash >> 15;
+        hash &= 63 << 2;
+        gx = Lookup<float>::Gradients3D[hash];
+        gy = Lookup<float>::Gradients3D[hash | 1];
+        gz = Lookup<float>::Gradients3D[hash | 2];
+    }
 
     void GradCoordOut(int seed, int xPrimed, int yPrimed, float& xo, float& yo) const
     {
@@ -2443,6 +2470,153 @@ private:
         zr += vz * warpAmp;
     }
 };
+
+inline void FastNoiseLite::FillNoise2D(float* pNoiseBuffer, int width, int height, float offsetX, float offsetY, float z, float stepX, float stepY) const
+{
+    if (!pNoiseBuffer || width <= 0 || height <= 0) return;
+
+    int seed = mSeed;
+    const float scale2D = 1.4247691104677813f;
+    const float scale3D = 0.964921414852142333984375f;
+
+    if (mFractalType != FractalType_None)
+    {
+        for (int j = 0; j < height; j++)
+        {
+            float wy = offsetY + j * stepY;
+            for (int i = 0; i < width; i++)
+            {
+                float wx = offsetX + i * stepX;
+                if (z != 0)
+                    pNoiseBuffer[i + j * width] = GetNoise(wx, wy, z);
+                else
+                    pNoiseBuffer[i + j * width] = GetNoise(wx, wy);
+            }
+        }
+        return;
+    }
+
+    if (mNoiseType == NoiseType_Perlin && z == 0)
+    {
+        int cacheX0 = 0x7FFFFFFF;
+        int cacheY0 = 0x7FFFFFFF;
+        float g00_x, g00_y, g10_x, g10_y, g01_x, g01_y, g11_x, g11_y;
+
+        for (int j = 0; j < height; j++)
+        {
+            float y = offsetY + j * stepY;
+            for (int i = 0; i < width; i++)
+            {
+                float x = offsetX + i * stepX;
+                float xr = x, yr = y;
+                TransformNoiseCoordinate(xr, yr);
+
+                int x0 = FastFloor(xr);
+                int y0 = FastFloor(yr);
+                if (x0 != cacheX0 || y0 != cacheY0)
+                {
+                    cacheX0 = x0;
+                    cacheY0 = y0;
+                    int x0p = x0 * PrimeX, y0p = y0 * PrimeY;
+                    GetGradient2D(seed, x0p, y0p, g00_x, g00_y);
+                    GetGradient2D(seed, x0p + PrimeX, y0p, g10_x, g10_y);
+                    GetGradient2D(seed, x0p, y0p + PrimeY, g01_x, g01_y);
+                    GetGradient2D(seed, x0p + PrimeX, y0p + PrimeY, g11_x, g11_y);
+                }
+                float xd0 = (float)(xr - x0);
+                float yd0 = (float)(yr - y0);
+                float xd1 = xd0 - 1;
+                float yd1 = yd0 - 1;
+                float xs = InterpQuintic(xd0);
+                float ys = InterpQuintic(yd0);
+                float v00 = xd0 * g00_x + yd0 * g00_y;
+                float v10 = xd1 * g10_x + yd0 * g10_y;
+                float v01 = xd0 * g01_x + yd1 * g01_y;
+                float v11 = xd1 * g11_x + yd1 * g11_y;
+                float xf0 = Lerp(v00, v10, xs);
+                float xf1 = Lerp(v01, v11, xs);
+                pNoiseBuffer[i + j * width] = Lerp(xf0, xf1, ys) * scale2D;
+            }
+        }
+        return;
+    }
+
+    if (mNoiseType == NoiseType_Perlin && z != 0)
+    {
+        int cacheX0 = 0x7FFFFFFF;
+        int cacheY0 = 0x7FFFFFFF;
+        int cacheZ0 = 0x7FFFFFFF;
+        float g[8][3];
+
+        for (int j = 0; j < height; j++)
+        {
+            float y = offsetY + j * stepY;
+            for (int i = 0; i < width; i++)
+            {
+                float x = offsetX + i * stepX;
+                float xr = x, yr = y, zr = z;
+                TransformNoiseCoordinate(xr, yr, zr);
+
+                int x0 = FastFloor(xr);
+                int y0 = FastFloor(yr);
+                int z0 = FastFloor(zr);
+                if (x0 != cacheX0 || y0 != cacheY0 || z0 != cacheZ0)
+                {
+                    cacheX0 = x0;
+                    cacheY0 = y0;
+                    cacheZ0 = z0;
+                    int x0p = x0 * PrimeX, y0p = y0 * PrimeY, z0p = z0 * PrimeZ, z1p = z0p + PrimeZ;
+                    GetGradient3D(seed, x0p, y0p, z0p, g[0][0], g[0][1], g[0][2]);
+                    GetGradient3D(seed, x0p + PrimeX, y0p, z0p, g[1][0], g[1][1], g[1][2]);
+                    GetGradient3D(seed, x0p, y0p + PrimeY, z0p, g[2][0], g[2][1], g[2][2]);
+                    GetGradient3D(seed, x0p + PrimeX, y0p + PrimeY, z0p, g[3][0], g[3][1], g[3][2]);
+                    GetGradient3D(seed, x0p, y0p, z1p, g[4][0], g[4][1], g[4][2]);
+                    GetGradient3D(seed, x0p + PrimeX, y0p, z1p, g[5][0], g[5][1], g[5][2]);
+                    GetGradient3D(seed, x0p, y0p + PrimeY, z1p, g[6][0], g[6][1], g[6][2]);
+                    GetGradient3D(seed, x0p + PrimeX, y0p + PrimeY, z1p, g[7][0], g[7][1], g[7][2]);
+                }
+                float xd0 = (float)(xr - x0);
+                float yd0 = (float)(yr - y0);
+                float zd0 = (float)(zr - z0);
+                float xd1 = xd0 - 1;
+                float yd1 = yd0 - 1;
+                float zd1 = zd0 - 1;
+                float xs = InterpQuintic(xd0);
+                float ys = InterpQuintic(yd0);
+                float zs = InterpQuintic(zd0);
+                float v000 = xd0 * g[0][0] + yd0 * g[0][1] + zd0 * g[0][2];
+                float v100 = xd1 * g[1][0] + yd0 * g[1][1] + zd0 * g[1][2];
+                float v010 = xd0 * g[2][0] + yd1 * g[2][1] + zd0 * g[2][2];
+                float v110 = xd1 * g[3][0] + yd1 * g[3][1] + zd0 * g[3][2];
+                float v001 = xd0 * g[4][0] + yd0 * g[4][1] + zd1 * g[4][2];
+                float v101 = xd1 * g[5][0] + yd0 * g[5][1] + zd1 * g[5][2];
+                float v011 = xd0 * g[6][0] + yd1 * g[6][1] + zd1 * g[6][2];
+                float v111 = xd1 * g[7][0] + yd1 * g[7][1] + zd1 * g[7][2];
+                float xf00 = Lerp(v000, v100, xs);
+                float xf10 = Lerp(v010, v110, xs);
+                float xf01 = Lerp(v001, v101, xs);
+                float xf11 = Lerp(v011, v111, xs);
+                float yf0 = Lerp(xf00, xf10, ys);
+                float yf1 = Lerp(xf01, xf11, ys);
+                pNoiseBuffer[i + j * width] = Lerp(yf0, yf1, zs) * scale3D;
+            }
+        }
+        return;
+    }
+
+    for (int j = 0; j < height; j++)
+    {
+        float wy = offsetY + j * stepY;
+        for (int i = 0; i < width; i++)
+        {
+            float wx = offsetX + i * stepX;
+            if (z != 0)
+                pNoiseBuffer[i + j * width] = GetNoise(wx, wy, z);
+            else
+                pNoiseBuffer[i + j * width] = GetNoise(wx, wy);
+        }
+    }
+}
 
 template <>
 struct FastNoiseLite::Arguments_must_be_floating_point_values<float> {};

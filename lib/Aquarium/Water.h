@@ -1,7 +1,7 @@
 #ifndef WATER_H
 #define WATER_H
 
-#include <FastNoise.h> 
+#include "FastNoise.h"
 #include <Matrix.h>
 #include "AquariumSettings.h"
 
@@ -19,68 +19,60 @@ class Water {
   CRGB simplexColor = CRGB(0, 100, 100);
   CRGBPalette16 palette = waterPalette;
 
-  CRGB** updateBuffer = nullptr;
+  FastNoiseLite noise;
   size_t currentRow = 0;
   static const size_t rowsPerUpdate = 4;
   size_t totalRows;
   size_t totalCols;
 
-  uint8_t scale = 20;
-  float simplexSpeed = .002;
+  uint8_t scale = 5;
+  float simplexSpeed = .002f;
 
  public:
   Water(Matrix* matrix): matrix(matrix) {
     totalRows = matrix->getYResolution();
     totalCols = matrix->getXResolution();
-    updateBuffer = new CRGB*[totalRows];
-    for (size_t i = 0; i < totalRows; i++) {
-      updateBuffer[i] = new CRGB[totalCols];
-    }
-  }
-
-  ~Water() {
-    // Clean up updateBuffer
-    for (size_t i = 0; i < totalRows; i++) {
-      delete[] updateBuffer[i];
-    }
-    delete[] updateBuffer;
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+    noise.SetFrequency(0.01f);
   }
 
   void update(long temperature = 25) {
-
-    // If we've filled the entire buffer, update the matrix background
     if (currentRow >= totalRows) {
-      for (size_t i = 0; i < totalRows; ++i) {
-        CRGB* rowBuffer = updateBuffer[i];  // Cache row pointer
-        for (size_t j = 0; j < totalCols; ++j) {
-          matrix->background->drawPixel(j, i, rowBuffer[j]);
-        }
-      }
-      currentRow = 0;  // Reset for the next cycle
+      currentRow = 0;
       return;
     }
 
     uint8_t limitTemperature = constrain(temperature, 0, 50);
     uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 245);
     simplexColor = ColorFromPalette(palette, colorIndex);
-    
-    // Cache time component outside inner loop
-    uint32_t timeComponent = static_cast<uint32_t>(millis() * simplexSpeed);
-    
-    // Update a portion of the buffer
-    size_t endRow = min(currentRow + rowsPerUpdate, totalRows);
+
+    float timeZ = (float)(millis() * simplexSpeed);
+
+    // Small stack buffer for the current row batch only (rowsPerUpdate * totalCols floats)
+    // For 192 cols × 4 rows = 768 floats = 3 KB — well within the display task stack
+    float batchNoise[rowsPerUpdate * 256];
+    size_t batchCols = totalCols < 256 ? totalCols : 256;
+
+    size_t endRow = currentRow + rowsPerUpdate < totalRows
+                    ? currentRow + rowsPerUpdate : totalRows;
+    size_t batchRows = endRow - currentRow;
+
+    noise.FillNoise2D(batchNoise, (int)batchCols, (int)batchRows,
+                     0.0f, (float)(currentRow * scale), timeZ,
+                     (float)scale, (float)scale);
+
     for (size_t row = currentRow; row < endRow; ++row) {
-      uint16_t scaledRow = row * scale;
-      CRGB* rowBuffer = updateBuffer[row];  // Cache row pointer
+      size_t batchRow = row - currentRow;
       for (size_t col = 0; col < totalCols; ++col) {
-        uint8_t noiseFactor = inoise8(col * scale, scaledRow, timeComponent);
+        float n = batchNoise[col + batchRow * batchCols];
+        uint8_t noiseFactor = (uint8_t)((n + 1.0f) * 127.5f);
         CRGB color = simplexColor;
         color.nscale8(noiseFactor);
-        rowBuffer[col] = color;
+        matrix->background->drawPixel((uint16_t)col, (uint16_t)row, color);
       }
     }
 
-    currentRow += rowsPerUpdate;    
+    currentRow += rowsPerUpdate;
   }
 };
 

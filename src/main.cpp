@@ -158,6 +158,7 @@ void displayTask(void* parameter) {
   // Set mode to EFFECT with Constellation as default
   // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0
 
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;

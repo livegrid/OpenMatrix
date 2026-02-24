@@ -14,7 +14,7 @@
 #include "BoidManager.h"
 #include "Fish.h"
 #include "Food.h"
-#include "Plants.h"
+#include "SeaFloor.h"
 #include "PlanktonField.h"
 #include "Water.h"
 #include "StateManager.h"
@@ -28,10 +28,10 @@ class Aquarium {
   StateManager* stateManager;
   Water water;
   std::vector<std::unique_ptr<Fish>> fishArray;
-  std::vector<std::unique_ptr<Plants>> plantArray;
   std::vector<std::unique_ptr<Food>> foodArray;
   BoidManager boidManager;
   PlanktonField planktonField;
+  SeaFloor seaFloor;
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
@@ -59,13 +59,14 @@ class Aquarium {
         water(matrix),
         boidManager(m),
         planktonField(m),
+        seaFloor(m),
         demoMode(false),
         demoStep(0),
         demoFinished(false) {}
 
   void begin() {
     loadState();
-    initializePlants();
+    seaFloor.generate();
     boidManager.initializeBoids();
     planktonField.init();
   }
@@ -197,7 +198,7 @@ class Aquarium {
 
   if (demoStep < 5 || demoStep > 8) {
     updateWater();
-    boidManager.updateBoids(demoCO2);
+    boidManager.updateBoids(demoCO2, nullptr);
     boidManager.renderBoids();
     updateFish();
     updateFood();
@@ -242,15 +243,6 @@ class Aquarium {
     }
   }
 
-  // Initialize plants and store them in a vector of unique pointers
-  void initializePlants() {
-    for (int i = 0; i < NUM_PLANTS; i++) {
-      plantArray.emplace_back(std::make_unique<Plants>(
-          matrix, matrix->getXResolution() * i / NUM_PLANTS,
-          matrix->getYResolution() + 7));
-    }
-  }
-
   void addFood() {
     float x = random(0, matrix->getXResolution());
     foodArray.emplace_back(std::make_unique<Food>(matrix, x));
@@ -274,15 +266,14 @@ class Aquarium {
     }
   }
 
-  // Update all plants in the aquarium
+  // Update and draw the seafloor
   void updatePlants() {
     float humidity =
         demoMode
             ? demoHumidity
             : (scd40 && scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
-    for (auto& plant : plantArray) {
-      plant->update(humidity);
-    }
+    seaFloor.update(humidity);
+    seaFloor.draw();
   }
 
   // Update the water environment
@@ -534,7 +525,8 @@ class Aquarium {
       planktonField.update(interactionData);
       planktonField.draw();
 
-      boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400);
+      boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400,
+                              &interactionData);
       boidManager.renderBoids();
 
       updateFish();

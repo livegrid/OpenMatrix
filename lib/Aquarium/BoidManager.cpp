@@ -1,4 +1,5 @@
 #include "BoidManager.h"
+#include "../TOFSensor/TOFInteractionManager.h"
 
 #include <random>
 
@@ -20,12 +21,31 @@ void BoidManager::initializeBoids() {
   }
 }
 
-void BoidManager::updateBoids(long co2) {
+void BoidManager::updateBoids(long co2, const InteractionData* interaction) {
   float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
   speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f);
   speedMultiplier /= 100.0f;
+
+  const bool hasAttractor = interaction && interaction->hasBlob;
+  PVector attractorPos;
+  float attractionRadius = min(limits.x, limits.y) * BOID_TOF_ATTRACTION_RADIUS_FRACTION;
+  if (hasAttractor) {
+    attractorPos.x = constrain(interaction->blobX, 0.0f, 1.0f) * (limits.x - 1.0f);
+    attractorPos.y = constrain(interaction->blobY, 0.0f, 1.0f) * (limits.y - 1.0f);
+  }
+
   for (auto& group : boidGroups) {
     for (auto& boid : group) {
+      if (hasAttractor) {
+        float distanceToBlob = boid.location.dist(attractorPos);
+        if (distanceToBlob > INTERACTION_DISTANCE_EPSILON &&
+            distanceToBlob <= attractionRadius) {
+          // Blend falloff so boids close to blob react more strongly.
+          float proximity = 1.0f - (distanceToBlob / attractionRadius);
+          float attractionWeight = BOID_TOF_ATTRACTION_FORCE * (0.2f + 0.8f * proximity);
+          boid.applyForce(boid.seek(attractorPos) * attractionWeight);
+        }
+      }
       boid.run(group.data(), group.size(),speedMultiplier);
       boid.avoidBorders();
     }

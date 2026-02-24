@@ -29,8 +29,24 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 9
 
-//PLANT SETTINGS
-
+//SEAFLOOR SETTINGS
+#define NUM_ROCKS 5
+#define NUM_MOSS_CLUSTERS 8
+#define NUM_SEAGRASS 21
+#define NUM_BRANCHING_PLANTS 8
+#define NUM_CORAL 12
+#define NUM_ANEMONES 7
+#define MAX_CORAL_SEGMENTS 16
+#define GROUND_SUBSTRATE_HEIGHT 0
+#define GROUND_MAX_HEIGHT 12
+#define MAX_SCREEN_WIDTH 192
+#define BLOOM_INTERVAL_MIN_MS 1200000UL
+#define BLOOM_INTERVAL_MAX_MS 2400000UL
+#define BLOOM_DURATION_MS 180000UL
+#define BLOOM_FADE_MS 30000UL
+#define MAX_BRANCHES_PER_PLANT 8
+#define MAX_NODES_PER_BRANCH 9
+#define MAX_TENTACLES 5
 
 //AGE THRESHOLDS
 #define AGE_EGG 0.1
@@ -126,7 +142,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define COHESION_WEIGHT .2
 
 //ATTRACTOR SETTINGS
-#define BOID_GROUPS 2
+#define BOID_GROUPS 3
 #define NUM_BOIDS 10, 20
 #if defined(PANEL_UPCYCLED)
     #define BOID_MAX_SPEED 5, 10
@@ -134,6 +150,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
     #define BOID_MAX_SPEED 4, 8
 #endif
 #define BOID_MAX_FORCE 1, 2
+#define BOID_TOF_ATTRACTION_FORCE 0.6f          // Extra steering weight toward TOF blob
+#define BOID_TOF_ATTRACTION_RADIUS_FRACTION 1.0f  // Attraction active within this fraction of min(width,height)
 
 //TOF Interaction Settings
 #define TOF_MIN_DETECTION_DIST 1000    // mm - closer than this is ignored (too close)
@@ -176,7 +194,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define STATE_IDLE_RECOVERY_MS 2000        // After blob disappears, return to IDLE after this delay
 
 // Plankton Visual Feedback
-#define PLANKTON_MAX_COUNT 2000
+#define PLANKTON_MAX_COUNT 500
 #define PLANKTON_TOF_GRID_SIZE 8
 #define PLANKTON_HUE_BASE 135           // Cyan-aqua (bioluminescent, FastLED hue)
 #define PLANKTON_HUE_RANGE 20           // Tight range: 125-155 (cyan to teal)
