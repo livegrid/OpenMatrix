@@ -274,7 +274,6 @@ void mqttTask(void* parameter) {
       int co2 = stateManager.getState()->environment.co2.value;
 
       mqttManager.publishSensorData(temperature, humidity, co2);
-      mqttManager.publishSensorData(temperature, humidity, co2);
       log_v("MQTT: Sent sensor data to Home Assistant");
     } else {
       log_v("MQTT: Not connected, skipping message");

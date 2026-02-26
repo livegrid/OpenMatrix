@@ -8,7 +8,7 @@ MQTTManager& MQTTManager::getInstance() {
 }
 
 MQTTManager::MQTTManager() {
-  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(60000), pdFALSE, this, [](TimerHandle_t xTimer) {
+  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(30000), pdTRUE, this, [](TimerHandle_t xTimer) {
     static_cast<MQTTManager*>(pvTimerGetTimerID(xTimer))->connect();
   });
 }
@@ -19,10 +19,20 @@ MQTTManager::~MQTTManager() {
 
 void MQTTManager::begin(const char* host, uint16_t port, StateManager* stateManager) {
   this->stateManager = stateManager;
+  mqttClient.setKeepAlive(60);
   setupCallbacks();
   updateSettingsFromState();
   computeTopics();
-  
+
+  // Reconnect MQTT when WiFi recovers
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+    MQTTManager& mgr = MQTTManager::getInstance();
+    if (!mgr.isConnected()) {
+      log_i("WiFi reconnected, triggering MQTT reconnect");
+      xTimerStart(mgr.mqttReconnectTimer, 0);
+    }
+  }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
+
   const State* state = stateManager->getState();
   if (!state->settings.mqtt.host.isEmpty() && state->settings.mqtt.host != "0") {
     connect();
@@ -99,6 +109,7 @@ void MQTTManager::setupCallbacks() {
 
 void MQTTManager::onMqttConnect(bool sessionPresent) {
   log_i("Connected to MQTT. Session present: %d", sessionPresent);
+  xTimerStop(MQTTManager::getInstance().mqttReconnectTimer, 0);
   MQTTManager::getInstance().stateManager->getState()->settings.mqtt.status = CONNECTED;
   MQTTManager::getInstance().stateManager->getState()->settings.home_assistant.status = CONNECTED;
   MQTTManager::getInstance().subscribeToTextTopic();
