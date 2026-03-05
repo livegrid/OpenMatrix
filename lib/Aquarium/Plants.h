@@ -46,30 +46,32 @@ class Plants {
     unsigned long currentTime = millis();
     float sizeFactor = map(humidity, 0, 100, 0, 250);
     sizeFactor /= 100;
+    
+    // Cache time factor for all branches
+    float timeBase = currentTime / 10000.0f;
 
     for (uint8_t i = 0; i < branches.size(); i++) {
+      // Calculate sin once per branch, not per node
+      float branchSinValue = sin(timeBase + phaseOffsets[i]);
+      float glowFactor = branchSinValue - 0.8f;
+      
       matrix->foreground->drawLine(branches[i].nodes[0].x * sizeFactor + pos.x, branches[i].nodes[0].y * sizeFactor + pos.y, pos.x, pos.y, CRGB(0, 0, 0));
-      // matrix->background->drawLine(branches[i].nodes[0].x * sizeFactor + pos.x, branches[i].nodes[0].y * sizeFactor + pos.y, pos.x, pos.y, CRGB(0, 0, 0));
-      for (uint8_t j = 1; j < branches[i].nodes.size(); j++) {
+      
+      size_t nodeCount = branches[i].nodes.size();
+      for (uint8_t j = 1; j < nodeCount; j++) {
         PVector node = branches[i].nodes[j];
         PVector prevNode = branches[i].nodes[j - 1];
         
-        // Calculate sway based on node height and time
-        float swayAmplitude = 0.8 * j; // Increase amplitude with node height
-        float sway = sin(currentTime / 10000.0 + phaseOffsets[i]) * swayAmplitude;
+        // Calculate sway using cached sin value
+        float sway = branchSinValue * (0.8f * j);
 
         // Apply sway to x coordinates
-        // matrix->background->drawLine(prevNode.x * sizeFactor + sway + pos.x, prevNode.y * sizeFactor + pos.y, node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, CRGB(0,0,1));
         matrix->foreground->drawLine(prevNode.x * sizeFactor + sway + pos.x, prevNode.y * sizeFactor + pos.y, node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, CRGB(0,0,1));
         
         // Flower at the end of the branch
-        if(j == branches[i].nodes.size()-1){
-          float glowFactor = (sin(currentTime / 10000.0 + phaseOffsets[i])) - 0.8; // Shift and scale the sine wave
-          if(glowFactor > 0) {
-            uint8_t glowIntensity = static_cast<uint8_t>(glowFactor * 1000); // Scale to color intensity
-            // matrix->background->fillCircle(node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, 1, CRGB(glowIntensity, glowIntensity, 0));
-            matrix->foreground->fillCircle(node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, 1, CRGB(glowIntensity, glowIntensity, 0));
-          }
+        if(j == nodeCount - 1 && glowFactor > 0) {
+          uint8_t glowIntensity = static_cast<uint8_t>(glowFactor * 1000); // Scale to color intensity
+          matrix->foreground->fillCircle(node.x * sizeFactor + sway + pos.x, node.y * sizeFactor + pos.y, 1, CRGB(glowIntensity, glowIntensity, 0));
         }
       }
     }
