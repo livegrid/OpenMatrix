@@ -161,6 +161,8 @@ struct State {
             uint16_t start_address = 1;
             eDmxMode mode = eDmxMode::DMX_MODE_RGB;
             uint16_t timeout = 5000;
+            bool udp_enabled = true;
+            uint16_t udp_port = 4510;
         } edmx;
         struct {
             bool enableDarkAutoPower = false;
