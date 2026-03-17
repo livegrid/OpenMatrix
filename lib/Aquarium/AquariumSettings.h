@@ -154,13 +154,11 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define BOID_TOF_ATTRACTION_RADIUS_FRACTION 1.0f  // Attraction active within this fraction of min(width,height)
 
 //TOF Interaction Settings
-#define TOF_MIN_DETECTION_DIST 1000    // mm - closer than this is ignored (too close)
-#define TOF_MAX_DETECTION_DIST 3000   // mm - further than this is ignored
 #define TOF_BASELINE_ADAPT_RATE 0.01f  // How fast baseline adapts (0-1)
 #define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
 #define TOF_MIN_BLOB_CELLS 2          // Minimum cells to count as valid blob
 #define TOF_VELOCITY_SMOOTH 0.3f       // Velocity smoothing factor (0-1)
-#define TOF_BLOB_POSITION_SMOOTH 0.3f   // Blob position smoothing (0-1, lower = smoother)
+#define TOF_BLOB_POSITION_SMOOTH 0.6f   // Blob position smoothing (0-1, higher = more responsive)
 #define TOF_VELOCITY_DEADZONE 0.0625f  // Ignore velocity if blob move < 0.5 grid cells (1/16)
 #define TOF_MOTION_THRESHOLD_MM 40      // mm depth change between frames to count as "moving" (prioritizes hand over static body)
 
@@ -169,26 +167,23 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define INTERACTION_DISTANCE_EPSILON 0.1f  // Min distance to avoid div-by-zero
 
 // ALERT state
-#define STATE_ALERT_DURATION_MS 500        // How long fish freezes when blob first appears
+#define STATE_ALERT_DURATION_MS 500        // Legacy: ALERT is currently bypassed
 #define STATE_ALERT_DAMPING 0.85f          // vel *= this each frame while alert (quick decel)
 
 // SCARED state
-#define STATE_SCARED_REPEL_FORCE 1.5f      // Force magnitude when darting away
-#define STATE_SCARED_SPEED_BOOST 1.5f      // maxSpeed multiplier while scared
-#define STATE_SCARED_CALM_VELOCITY 0.3f    // Blob velocity below this = "calm" (allows transition to CURIOUS)
-#define STATE_SCARED_CALM_DURATION_S 3.0f  // Seconds of calm presence before transitioning to CURIOUS
+#define STATE_SCARED_REPEL_FORCE 1.5f      // Legacy: SCARED is currently bypassed
+#define STATE_SCARED_SPEED_BOOST 1.5f      // Legacy: SCARED is currently bypassed
+#define STATE_SCARED_CALM_VELOCITY 0.3f    // Legacy: SCARED is currently bypassed
+#define STATE_SCARED_CALM_DURATION_S 3.0f  // Legacy: SCARED is currently bypassed
 
-// CURIOUS state
-#define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.8f  // Fraction of FOOD_FORCE used to follow blob
-#define STATE_CURIOUS_SIN_SCALE 0.8f       // Reduce sin amplitude to this fraction
-#define STATE_CURIOUS_NOISE_SCALE 0.5f     // Reduce noise amplitude to this fraction
-#define STATE_CURIOUS_SCARE_VELOCITY 1.0f  // Blob velocity above this snaps back to SCARED (lowered for hand motion sensitivity)
-#define CURIOUS_ATTRACTION_STOP_DISTANCE 60  // Physics units - stop attracting when fish this close (avoids clustering)
-#define STATE_CURIOUS_PAUSE_INTERVAL_MS 500 // How often to check for a pause while curious
-#define STATE_CURIOUS_PAUSE_CHANCE 50      // 1/50 = 2% chance per check
-#define STATE_CURIOUS_PAUSE_MIN_MS 400     // Min curious pause
-#define STATE_CURIOUS_PAUSE_MAX_MS 800     // Max curious pause
-#define STATE_CURIOUS_PAUSE_DAMPING 0.90f  // Damping during curious pause
+// FOLLOW state (fish track hand movement direction)
+#define FOLLOW_DIRECTION_FORCE 5.0f            // Force pushing fish in the hand's movement direction
+#define FOLLOW_POSITION_BIAS 0.4f              // Weak pull toward hand position (keeps fish near hand region)
+#define FOLLOW_DIRECTION_MIN_VELOCITY 0.15f    // Blob velocity below this = "stationary" (use position bias only)
+#define FOLLOW_IDLE_WOBBLE_SIN 0.3f            // Organic sine wobble during follow
+#define FOLLOW_IDLE_WOBBLE_NOISE 0.2f          // Organic noise wobble during follow
+#define CURIOUS_SEPARATION_DISTANCE (20 * PHYSICS_SCALE)  // Fish-to-fish personal space (~20 px)
+#define CURIOUS_SEPARATION_FORCE 6.0f                     // Repulsion force between neighbors
 
 // IDLE recovery
 #define STATE_IDLE_RECOVERY_MS 2000        // After blob disappears, return to IDLE after this delay

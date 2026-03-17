@@ -78,6 +78,9 @@ private:
     uint8_t baseSpawnRate;
     uint8_t boostedSpawnRate;
     uint8_t currentSpawnRate;
+    uint8_t baseSpawnBurst;
+    uint8_t boostedSpawnBurst;
+    uint8_t currentSpawnBurst;
     uint8_t baseMaxMeteors;
     uint8_t boostedMaxMeteors;
     uint8_t currentMaxMeteors;
@@ -103,7 +106,6 @@ private:
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
-    uint8_t tofRotation;
     bool topRowActive;
     
     // Background planets
@@ -114,6 +116,9 @@ private:
     
     // Timing
     uint32_t frameCount;
+    bool rotateEffect180;
+    float recentSpawnY[4];
+    uint8_t spawnHistoryIndex;
     
     // Helper methods
     void initMeteors();
@@ -129,6 +134,9 @@ private:
     void drawPlanets();
     void drawMeteors();
     void fadeTrails();
+    void transformEffectCoordinate(int16_t inX, int16_t inY, int16_t& outX, int16_t& outY) const;
+    void drawEffectPixel(int16_t x, int16_t y, const CRGB& color);
+    void drawEffectCircle(int16_t x, int16_t y, int16_t r, const CRGB& color);
     
     // Coordinate rotation for ToF
     void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);

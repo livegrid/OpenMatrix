@@ -61,7 +61,6 @@ private:
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
-    uint16_t tofRotation;
 
     // Depth field (8x8 normalized 0.0-1.0)
     float depthField[TOF_GRID_SIZE][TOF_GRID_SIZE];

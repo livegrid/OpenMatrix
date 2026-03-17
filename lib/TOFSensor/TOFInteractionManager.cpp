@@ -150,6 +150,7 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
     bool visited[8][8] = {false};
     uint8_t maxBlobSize = 0;
     float maxBlobCenterX = 0, maxBlobCenterY = 0;
+    float maxBlobClosestX = 0, maxBlobClosestY = 0;
     
     // BFS flood fill to find connected components
     for (uint8_t sy = 0; sy < 8; sy++) {
@@ -162,6 +163,9 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
             uint8_t count = 0;
             float sumX = 0, sumY = 0;
             float sumXW = 0, sumYW = 0, sumW = 0;  // Motion-weighted centroid
+            int16_t minDepthInBlob = INT16_MAX;
+            float closestX = sx + 0.5f;
+            float closestY = sy + 0.5f;
             
             queue[qTail][0] = sx;
             queue[qTail][1] = sy;
@@ -178,6 +182,13 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
                 count++;
                 sumX += cellX;
                 sumY += cellY;
+
+                int16_t depth = currentDepth[cy][cx];
+                if (depth > 0 && depth < minDepthInBlob) {
+                    minDepthInBlob = depth;
+                    closestX = cellX;
+                    closestY = cellY;
+                }
                 
                 // Motion weight: cells with significant depth change get higher weight
                 // Prioritizes hand/head movement over static body
@@ -222,14 +233,20 @@ bool TOFInteractionManager::findLargestBlob(uint8_t& blobSize, float& blobX, flo
                     maxBlobCenterX = sumX / count;
                     maxBlobCenterY = sumY / count;
                 }
+                maxBlobClosestX = closestX;
+                maxBlobClosestY = closestY;
             }
         }
     }
     
     if (maxBlobSize >= TOF_MIN_BLOB_CELLS) {
         blobSize = maxBlobSize;
-        blobX = maxBlobCenterX / 8.0f;  // Normalize to 0-1
-        blobY = maxBlobCenterY / 8.0f;
+        // Bias toward closest point so hand sweeps feel more "leading edge"-driven.
+        const float closestWeight = 0.7f;
+        float targetX = maxBlobClosestX * closestWeight + maxBlobCenterX * (1.0f - closestWeight);
+        float targetY = maxBlobClosestY * closestWeight + maxBlobCenterY * (1.0f - closestWeight);
+        blobX = targetX / 8.0f;  // Normalize to 0-1
+        blobY = targetY / 8.0f;
         return true;
     }
     

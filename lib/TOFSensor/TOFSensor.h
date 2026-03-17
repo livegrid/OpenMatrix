@@ -15,6 +15,10 @@
 #define TOF_MAX_INIT_RETRIES 3
 #define TOF_RANGING_FREQUENCY 15  // 15 Hz
 
+// Shared detection range configuration (mm)
+#define TOF_MIN_DETECTION_DIST 1000
+#define TOF_MAX_DETECTION_DIST 2000
+
 class TOFSensor {
 private:
     VL53L8CX* sensor;

@@ -1,5 +1,6 @@
 #include "SpaceInvadersEffect.h"
 #include "../TOFSensor/TOFSensor.h"
+#include <math.h>
 
 // Static random seed
 static uint32_t gameNoiseSeed = 54321;
@@ -33,52 +34,127 @@ const uint8_t SpaceInvadersEffect::alienPatternB[3][8] = {
 // Alien colors by row (FastLED hue values: 0=red, 32=orange, 96=green, 160=blue)
 const uint8_t SpaceInvadersEffect::alienHues[4] = {0, 24, 96, 192};
 
+// User-provided indexed sprites (RGB332, 0 = transparent)
+static const uint8_t kPlayerSpriteShootIdx[20][20] PROGMEM = {
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001010, B00000000, B00000000, B10101101, B10101101, B10101101, B10101101, B00000000, B00000000, B01001010, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B10101101, B10101101, B10101101, B10101101, B10101101, B10101101, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B10101101, B11010110, B11011010, B11011010, B11010110, B10101101, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00101011, B10101101, B11111100, B11011010, B11011010, B11111100, B10101101, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B10101101, B11011010, B11011010, B11011010, B11011010, B10101101, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B10101101, B10101101, B10101101, B10101101, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B00000000, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000}
+};
+
+static const uint8_t kPlayerSpriteMoveIdx[20][20] PROGMEM = {
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B11001101, B11001101, B11001101, B11001101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B11001001, B11001101, B11001101, B11001101, B11001101, B11001101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B10101101, B11001101, B10101101, B11010110, B11010110, B11011010, B10101101, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B10101101, B10101101, B11010110, B11111100, B11011010, B11111100, B10101101, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B10101101, B10101101, B11011010, B11011010, B11011010, B11011010, B11011010, B10101101, B00000000, B11011010, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B10101101, B10101101, B11011010, B11011010, B11011010, B11011010, B11011010, B10101101, B11011010, B11011010, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B11001101, B01001011, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001010, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000}
+};
+
+static const uint8_t kPlayerSpriteHitIdx[20][20] PROGMEM = {
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B00000000, B00101011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B00000000, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B01001011, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B01001011, B10101101, B10101101, B10101101, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B01001011, B10101101, B11011010, B11011010, B10101101, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001011, B10101101, B11011010, B11011010, B11111100, B11011010, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B10101101, B11011010, B11011010, B11011010, B11011010, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B10101101, B11011010, B11111100, B11011010, B11011010, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B10101101, B10101101, B11010110, B11011010, B11001101, B10101101, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00100101, B11001101, B11001101, B11001101, B11001101, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B01001010, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B01001011, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000},
+    {B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000}
+};
+
 SpaceInvadersEffect::SpaceInvadersEffect(Matrix* matrix, TOFSensor* sensor)
     : Effect(matrix), tofSensor(sensor) {
     
-    // Get matrix dimensions
-    playWidth = m_matrix->getXResolution();
-    playHeight = m_matrix->getYResolution();
+    // Matrix is landscape; game plays in portrait (rotated 90°)
+    matrixWidth = m_matrix->getXResolution();
+    matrixHeight = m_matrix->getYResolution();
+    playWidth = matrixHeight;    // narrow dimension = player left/right
+    playHeight = matrixWidth;    // wide dimension = alien descent
     
-    // Scale parameters based on matrix size (default designed for 64x64)
+    // Scale relative to the JS reference portrait dimensions (64×192)
     float scaleX = (float)playWidth / 64.0f;
-    float scaleY = (float)playHeight / 64.0f;
+    float scaleY = (float)playHeight / 192.0f;
     
-    // Alien configuration (scaled)
+    // Alien configuration (tuned for portrait play area)
     alienRows = 4;
     alienCols = 5;
     alienSpacingX = (uint16_t)(11 * scaleX);
-    alienSpacingY = (uint16_t)(10 * scaleY);
-    alienStartY = (uint16_t)(8 * scaleY);
+    alienSpacingY = (uint16_t)(12 * scaleY);
+    alienStartY = (uint16_t)(22 * scaleY);
     alienMoveSpeed = max((uint16_t)1, (uint16_t)(1 * scaleX));
-    alienDropAmount = (uint16_t)(4 * scaleY);
-    alienMoveInterval = 25;  // frames between moves
-    alienShootChance = 0.003f;
-    alienBulletSpeed = 0.8f * scaleY;
+    alienDropAmount = (uint16_t)(6 * scaleY);
+    alienMoveInterval = 30;
+    alienShootChance = 0.001f;
+    alienBulletSpeed = 2.0f * scaleY;
     
     // Player configuration (scaled)
-    playerWidth = (uint16_t)(6 * scaleX);
-    playerHeight = (uint16_t)(4 * scaleY);
-    playerYOffset = (uint16_t)(4 * scaleY);
-    playerSmoothing = 0.25f;
+    playerWidth = (uint16_t)(10 * scaleX);
+    playerHeight = (uint16_t)(14 * scaleY);
+    playerYOffset = (uint16_t)(7 * scaleY);
+    playerSmoothing = 0.28f;
     playerHitFlipFrames = 18;
     
     // Bullet configuration (scaled)
-    bulletSpeed = 2.0f * scaleY;
+    bulletSpeed = 4.0f * scaleY;
     bulletWidth = max(1, (int)(2 * scaleX));
-    bulletHeight = max(2, (int)(3 * scaleY));
-    bulletCooldownFrames = 15;
+    bulletHeight = max(2, (int)(4 * scaleY));
+    bulletCooldownFrames = 18;
     
     // ToF parameters
     tofGridReady = false;
-    minDetectionDistance = 1000;
-    maxDetectionDistance = 2000;
-    tofRotation = 180;
+    minDetectionDistance = TOF_MIN_DETECTION_DIST;
+    maxDetectionDistance = TOF_MAX_DETECTION_DIST;
     topRowActive = false;
+    handsRaised = false;
+    handRaiseFrames = 0;
+    handLowerFrames = 0;
     minBlobCells = 3;
     missingBlobRecentFrames = 20;
     lastBlobFrame = 0;
     lastBlobSize = 0;
+    filteredBlobX = playWidth * 0.5f;
     
     frameCount = 0;
     planetCount = 0;
@@ -110,33 +186,56 @@ void SpaceInvadersEffect::setTofSensor(TOFSensor* sensor) {
     tofSensor = sensor;
 }
 
-void SpaceInvadersEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
-    minDetectionDistance = minDist;
-    maxDetectionDistance = maxDist;
-}
-
 void SpaceInvadersEffect::setTofRotation(uint16_t rotation) {
-    tofRotation = rotation;
+    if (tofSensor) {
+        tofSensor->setRotation(rotation);
+    }
 }
 
 void SpaceInvadersEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    if (tofRotation == 90) {
+    uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
+    // Match ConstellationEffect rotation handling exactly.
+    if (rotation == 90) {
         outX = 7 - y;
         outY = x;
         return;
     }
-    if (tofRotation == 180) {
+    if (rotation == 180) {
         outX = 7 - x;
         outY = 7 - y;
         return;
     }
-    if (tofRotation == 270) {
+    if (rotation == 270) {
         outX = y;
         outY = 7 - x;
         return;
     }
     outX = x;
     outY = y;
+}
+
+// Portrait game coordinate (gx, gy) → landscape matrix coordinate.
+// Vertically flipped to match the working orientation on hardware.
+void SpaceInvadersEffect::drawGamePixel(int16_t gx, int16_t gy, const CRGB& color) {
+    if (gx < 0 || gx >= (int16_t)playWidth || gy < 0 || gy >= (int16_t)playHeight) return;
+    int16_t mx = gy;
+    int16_t my = gx;
+    m_matrix->background->drawPixel(mx, my, color);
+}
+
+void SpaceInvadersEffect::drawGameRect(int16_t gx, int16_t gy, int16_t gw, int16_t gh, const CRGB& color) {
+    // Game rect (gx, gy, gw, gh) → rotated matrix rect
+    int16_t mx = gy;
+    int16_t my = gx;
+    uint16_t c565 = m_matrix->background->color565(color.r, color.g, color.b);
+    m_matrix->background->fillRect(mx, my, gh, gw, c565);
+}
+
+void SpaceInvadersEffect::drawGameCircle(int16_t gx, int16_t gy, int16_t r, const CRGB& color) {
+    int16_t mx = gy;
+    int16_t my = gx;
+    uint16_t c565 = m_matrix->background->color565(color.r, color.g, color.b);
+    m_matrix->background->fillCircle(mx, my, r, c565);
 }
 
 void SpaceInvadersEffect::updateTofData() {
@@ -157,12 +256,31 @@ void SpaceInvadersEffect::updateTofData() {
 }
 
 void SpaceInvadersEffect::updateTopRowActive() {
-    topRowActive = false;
-    for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-        int16_t depth = tofGrid[0][x];
+    // Match gesture orientation used in MeteorShower: after rotation,
+    // the "raised hand/top edge" corresponds to x == 7.
+    uint8_t activeTopCells = 0;
+    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
+        int16_t depth = tofGrid[y][7];
         if (depth > minDetectionDistance && depth < maxDetectionDistance) {
-            topRowActive = true;
-            return;
+            activeTopCells++;
+        }
+    }
+
+    // Require at least 2 active cells to qualify as a hand raise region hit.
+    topRowActive = activeTopCells >= 2;
+
+    // Debounce / hysteresis so shooting does not flicker with sensor noise.
+    if (topRowActive) {
+        handRaiseFrames = min<uint8_t>(255, handRaiseFrames + 1);
+        handLowerFrames = 0;
+        if (handRaiseFrames >= 2) {
+            handsRaised = true;
+        }
+    } else {
+        handLowerFrames = min<uint8_t>(255, handLowerFrames + 1);
+        handRaiseFrames = 0;
+        if (handLowerFrames >= 3) {
+            handsRaised = false;
         }
     }
 }
@@ -172,10 +290,15 @@ BlobResult SpaceInvadersEffect::findLargestBlob() {
     
     if (!tofGridReady) return result;
     
-    // Check if cell is active (in detection range)
-    auto isActive = [this](uint8_t x, uint8_t y) -> bool {
+    // Movement tracking should be more tolerant than strict gameplay range.
+    // This reduces "closer/farther controls X" artifacts caused by range clipping.
+    int16_t trackingMin = max<int16_t>(0, minDetectionDistance - 350);
+    int16_t trackingMax = maxDetectionDistance + 700;
+
+    // Check if cell is active (in tolerant movement tracking range)
+    auto isActive = [this, trackingMin, trackingMax](uint8_t x, uint8_t y) -> bool {
         int16_t d = tofGrid[y][x];
-        return d > minDetectionDistance && d < maxDetectionDistance;
+        return d > trackingMin && d < trackingMax;
     };
     
     bool visited[TOF_GRID_SIZE][TOF_GRID_SIZE] = {false};
@@ -193,6 +316,8 @@ BlobResult SpaceInvadersEffect::findLargestBlob() {
             uint8_t qHead = 0, qTail = 0;
             uint8_t count = 0;
             float sumX = 0;
+            float closestX = sx + 0.5f;
+            int16_t minDepthInBlob = INT16_MAX;
             
             queue[qTail][0] = sx;
             queue[qTail][1] = sy;
@@ -206,6 +331,12 @@ BlobResult SpaceInvadersEffect::findLargestBlob() {
                 
                 count++;
                 sumX += cx + 0.5f;
+
+                int16_t depth = tofGrid[cy][cx];
+                if (depth > 0 && depth < minDepthInBlob) {
+                    minDepthInBlob = depth;
+                    closestX = cx + 0.5f;
+                }
                 
                 // Check 4 neighbors
                 const int8_t dx[] = {1, -1, 0, 0};
@@ -230,8 +361,20 @@ BlobResult SpaceInvadersEffect::findLargestBlob() {
             // Check if this blob is the largest
             if (count >= minBlobCells && count > bestSize) {
                 bestSize = count;
-                float cellWidth = (float)playWidth / TOF_GRID_SIZE;
-                bestCenterX = (sumX / count) * cellWidth;
+                float avgCellX = sumX / count;  // 0.5..7.5 (centroid)
+                // Bias toward closest point for more intuitive hand steering.
+                // Helps when depth changes alter blob shape.
+                constexpr float CLOSEST_WEIGHT = 0.7f;
+                float trackingX = closestX * CLOSEST_WEIGHT + avgCellX * (1.0f - CLOSEST_WEIGHT);
+                float normalizedX = (trackingX - 0.5f) / 7.0f;
+                normalizedX = constrain(normalizedX, 0.0f, 1.0f);
+
+                // Expand hand control near the edges so movement reaches both sides.
+                constexpr float EDGE_STRETCH = 1.35f;
+                normalizedX = (normalizedX - 0.5f) * EDGE_STRETCH + 0.5f;
+                normalizedX = constrain(normalizedX, 0.0f, 1.0f);
+
+                bestCenterX = normalizedX * (playWidth - 1);
             }
         }
     }
@@ -268,6 +411,7 @@ void SpaceInvadersEffect::resetGame() {
 void SpaceInvadersEffect::resetPlayer() {
     playerX = playWidth / 2.0f;
     playerTargetX = playerX;
+    filteredBlobX = playerX;
     playerY = playHeight - playerYOffset - playerHeight / 2.0f;
     playerHitTimer = 0;
 }
@@ -388,7 +532,16 @@ void SpaceInvadersEffect::updatePlanets() {
 
 void SpaceInvadersEffect::updatePlayer(BlobResult& blob) {
     if (blob.valid) {
-        playerTargetX = blob.x;
+        // Temporal filtering on blob center reduces jitter from ToF noise spikes.
+        float smoothing = 0.35f;
+        filteredBlobX += (blob.x - filteredBlobX) * smoothing;
+
+        // Ignore micro-jitter around current filtered point.
+        if (fabsf(blob.x - filteredBlobX) < 0.18f) {
+            filteredBlobX = (filteredBlobX * 0.7f) + (blob.x * 0.3f);
+        }
+
+        playerTargetX = filteredBlobX;
         lastBlobFrame = frameCount;
         lastBlobSize = blob.size;
     } else if (frameCount - lastBlobFrame > missingBlobRecentFrames) {
@@ -427,8 +580,8 @@ void SpaceInvadersEffect::fireBullet() {
 void SpaceInvadersEffect::updateBullets() {
     if (bulletCooldown > 0) bulletCooldown--;
     
-    // Fire if top row is active and cooldown is done
-    if (topRowActive && bulletCooldown == 0 && !gameOver && !gameWon) {
+    // Fire when hand-raise gesture is stably detected.
+    if (handsRaised && bulletCooldown == 0 && !gameOver && !gameWon) {
         fireBullet();
     }
     
@@ -593,9 +746,10 @@ void SpaceInvadersEffect::checkWinCondition() {
 }
 
 void SpaceInvadersEffect::drawGradientBackground() {
-    // Deep space gradient
-    for (uint16_t y = 0; y < playHeight; y++) {
-        float gradientFactor = (float)y / playHeight;
+    // Deep space gradient - each game row has uniform color.
+    // After 90° rotation, each game row becomes a matrix column.
+    for (uint16_t gy = 0; gy < playHeight; gy++) {
+        float gradientFactor = (float)gy / playHeight;
         
         uint8_t hue = 170 - (uint8_t)(gradientFactor * 25);
         uint8_t sat = 100 + (uint8_t)(gradientFactor * 75);
@@ -603,21 +757,20 @@ void SpaceInvadersEffect::drawGradientBackground() {
         
         CRGB color;
         hsv2rgb_rainbow(CHSV(hue, sat, val), color);
+        uint16_t c565 = m_matrix->background->color565(color.r, color.g, color.b);
         
-        for (uint16_t x = 0; x < playWidth; x++) {
-            m_matrix->background->drawPixel(x, y, color);
-        }
+        int16_t mx = gy;
+        m_matrix->background->fillRect(mx, 0, 1, playWidth, c565);
     }
 }
 
 void SpaceInvadersEffect::drawStars() {
     for (uint8_t i = 0; i < MAX_STARS; i++) {
-        // Twinkle effect
         float twinkle = stars[i].brightness + sin(frameCount * 0.1f + stars[i].x) * 15;
         uint8_t b = constrain((int)twinkle, 20, 80);
         
         CRGB color = CRGB(b, b, b);
-        m_matrix->background->drawPixel(stars[i].x, stars[i].y, color);
+        drawGamePixel(stars[i].x, stars[i].y, color);
     }
 }
 
@@ -628,17 +781,15 @@ void SpaceInvadersEffect::drawPlanets() {
         int16_t y = (int16_t)p.pos.y;
         int16_t r = (int16_t)(p.size / 2);
         
-        // Planet glow
         CRGB glowColor;
         hsv2rgb_rainbow(CHSV(p.hue, 50, 50), glowColor);
         glowColor.nscale8(40);
-        m_matrix->background->fillCircle(x, y, r + 1, m_matrix->background->color565(glowColor.r, glowColor.g, glowColor.b));
+        drawGameCircle(x, y, r + 1, glowColor);
         
-        // Planet body
         CRGB bodyColor;
         hsv2rgb_rainbow(CHSV(p.hue, 100, 80), bodyColor);
         bodyColor.nscale8(120);
-        m_matrix->background->fillCircle(x, y, r, m_matrix->background->color565(bodyColor.r, bodyColor.g, bodyColor.b));
+        drawGameCircle(x, y, r, bodyColor);
     }
 }
 
@@ -647,7 +798,7 @@ void SpaceInvadersEffect::drawPixelAlien(Alien& alien) {
                              alienPatternA[alien.type] : 
                              alienPatternB[alien.type];
     
-    int16_t offsetX = (int16_t)alien.x - 4;  // Center the 8x8 pattern
+    int16_t offsetX = (int16_t)alien.x - 4;
     int16_t offsetY = (int16_t)alien.y - 4;
     
     CRGB color;
@@ -656,13 +807,8 @@ void SpaceInvadersEffect::drawPixelAlien(Alien& alien) {
     for (uint8_t row = 0; row < 8; row++) {
         uint8_t rowBits = pattern[row];
         for (uint8_t col = 0; col < 8; col++) {
-            if (rowBits & (0x80 >> col)) {  // Check bit from left to right
-                int16_t px = offsetX + col;
-                int16_t py = offsetY + row;
-                
-                if (px >= 0 && px < playWidth && py >= 0 && py < playHeight) {
-                    m_matrix->background->drawPixel(px, py, color);
-                }
+            if (rowBits & (0x80 >> col)) {
+                drawGamePixel(offsetX + col, offsetY + row, color);
             }
         }
     }
@@ -677,7 +823,6 @@ void SpaceInvadersEffect::drawAliens() {
 }
 
 void SpaceInvadersEffect::drawBullets() {
-    // Player bullets (yellow/green)
     CRGB playerBulletColor;
     hsv2rgb_rainbow(CHSV(64, 230, 255), playerBulletColor);
     
@@ -685,13 +830,10 @@ void SpaceInvadersEffect::drawBullets() {
         if (playerBullets[i].active) {
             int16_t x = (int16_t)playerBullets[i].x;
             int16_t y = (int16_t)playerBullets[i].y;
-            m_matrix->background->fillRect(x - bulletWidth/2, y - bulletHeight/2, 
-                                           bulletWidth, bulletHeight,
-                                           m_matrix->background->color565(playerBulletColor.r, playerBulletColor.g, playerBulletColor.b));
+            drawGameRect(x - bulletWidth/2, y - bulletHeight/2, bulletWidth, bulletHeight, playerBulletColor);
         }
     }
     
-    // Alien bullets (red)
     CRGB alienBulletColor;
     hsv2rgb_rainbow(CHSV(0, 200, 255), alienBulletColor);
     
@@ -699,8 +841,7 @@ void SpaceInvadersEffect::drawBullets() {
         if (alienBullets[i].active) {
             int16_t x = (int16_t)alienBullets[i].x;
             int16_t y = (int16_t)alienBullets[i].y;
-            m_matrix->background->fillRect(x - 1, y - 1, 2, 3,
-                                           m_matrix->background->color565(alienBulletColor.r, alienBulletColor.g, alienBulletColor.b));
+            drawGameRect(x - 1, y - 1, 2, 3, alienBulletColor);
         }
     }
 }
@@ -708,61 +849,59 @@ void SpaceInvadersEffect::drawBullets() {
 void SpaceInvadersEffect::drawPlayer() {
     int16_t x = (int16_t)playerX;
     int16_t y = (int16_t)playerY;
-    
-    // Choose color based on state
-    CRGB color;
+    const uint8_t (*sprite)[20] = kPlayerSpriteMoveIdx;
     if (playerHitTimer > 0) {
-        // Flash red when hit
-        if ((playerHitTimer / 3) % 2 == 0) {
-            hsv2rgb_rainbow(CHSV(0, 255, 255), color);
-        } else {
-            hsv2rgb_rainbow(CHSV(0, 255, 128), color);
-        }
-    } else if (topRowActive) {
-        // Brighter when shooting
-        hsv2rgb_rainbow(CHSV(96, 200, 255), color);
-    } else {
-        // Normal green
-        hsv2rgb_rainbow(CHSV(96, 180, 200), color);
+        sprite = kPlayerSpriteHitIdx;
+    } else if (handsRaised) {
+        sprite = kPlayerSpriteShootIdx;
     }
-    
-    // Draw simple ship shape (triangle-ish)
-    int16_t hw = playerWidth / 2;
-    int16_t hh = playerHeight / 2;
-    
-    // Main body
-    m_matrix->background->fillRect(x - hw, y - hh + 1, playerWidth, playerHeight - 1,
-                                   m_matrix->background->color565(color.r, color.g, color.b));
-    
-    // Cockpit (top point)
-    m_matrix->background->drawPixel(x, y - hh, color);
-    m_matrix->background->drawPixel(x - 1, y - hh, color);
-    m_matrix->background->drawPixel(x + 1, y - hh, color);
+
+    const int16_t spriteW = 20;
+    const int16_t spriteH = 20;
+    int16_t drawW = max<int16_t>(1, playerWidth);
+    int16_t drawH = max<int16_t>(1, playerHeight);
+    int16_t left = x - drawW / 2;
+    int16_t top = y - drawH / 2;
+
+    // Render with nearest-neighbor scaling from 20x20 RRRGGGBB sprite data.
+    for (int16_t sy = 0; sy < drawH; sy++) {
+        int16_t srcY = (sy * spriteH) / drawH;
+        for (int16_t sx = 0; sx < drawW; sx++) {
+            int16_t srcX = (sx * spriteW) / drawW;
+            uint8_t px = sprite[srcY][srcX];
+            if (px == 0) continue;  // transparent
+
+            uint8_t r3 = (px >> 5) & 0x07;
+            uint8_t g3 = (px >> 2) & 0x07;
+            uint8_t b2 = px & 0x03;
+
+            CRGB color(
+                (uint8_t)((r3 * 255) / 7),
+                (uint8_t)((g3 * 255) / 7),
+                (uint8_t)((b2 * 255) / 3)
+            );
+            drawGamePixel(left + sx, top + sy, color);
+        }
+    }
 }
 
 void SpaceInvadersEffect::drawHUD() {
-    // Score in top-left (simplified - just draw colored pixels for score indicator)
-    // Each 100 points = 1 dot
     uint8_t scoreDots = min(10, (int)(score / 50));
     CRGB scoreColor = CRGB::White;
     for (uint8_t i = 0; i < scoreDots; i++) {
-        m_matrix->background->drawPixel(1 + i * 2, 1, scoreColor);
+        drawGamePixel(1 + i * 2, 1, scoreColor);
     }
     
-    // Lives in top-right (green dots)
     CRGB lifeColor;
     hsv2rgb_rainbow(CHSV(96, 200, 230), lifeColor);
     for (uint8_t i = 0; i < lives; i++) {
-        m_matrix->background->fillRect(playWidth - 3 - i * 4, 1, 2, 2,
-                                       m_matrix->background->color565(lifeColor.r, lifeColor.g, lifeColor.b));
+        drawGameRect(playWidth - 3 - i * 4, 1, 2, 2, lifeColor);
     }
 }
 
 void SpaceInvadersEffect::drawGameOver() {
-    // Dim background
     m_matrix->background->dim(128);
     
-    // Red "X" pattern in center
     CRGB color;
     hsv2rgb_rainbow(CHSV(0, 255, 255), color);
     
@@ -770,27 +909,25 @@ void SpaceInvadersEffect::drawGameOver() {
     int16_t cy = playHeight / 2;
     
     for (int8_t i = -4; i <= 4; i++) {
-        m_matrix->background->drawPixel(cx + i, cy + i, color);
-        m_matrix->background->drawPixel(cx + i, cy - i, color);
+        drawGamePixel(cx + i, cy + i, color);
+        drawGamePixel(cx + i, cy - i, color);
     }
 }
 
 void SpaceInvadersEffect::drawWinScreen() {
-    // Green checkmark or victory pattern
     CRGB color;
     hsv2rgb_rainbow(CHSV(96, 255, 255), color);
     
     int16_t cx = playWidth / 2;
     int16_t cy = playHeight / 2;
     
-    // Simple checkmark
-    m_matrix->background->drawPixel(cx - 3, cy, color);
-    m_matrix->background->drawPixel(cx - 2, cy + 1, color);
-    m_matrix->background->drawPixel(cx - 1, cy + 2, color);
-    m_matrix->background->drawPixel(cx, cy + 1, color);
-    m_matrix->background->drawPixel(cx + 1, cy, color);
-    m_matrix->background->drawPixel(cx + 2, cy - 1, color);
-    m_matrix->background->drawPixel(cx + 3, cy - 2, color);
+    drawGamePixel(cx - 3, cy, color);
+    drawGamePixel(cx - 2, cy + 1, color);
+    drawGamePixel(cx - 1, cy + 2, color);
+    drawGamePixel(cx, cy + 1, color);
+    drawGamePixel(cx + 1, cy, color);
+    drawGamePixel(cx + 2, cy - 1, color);
+    drawGamePixel(cx + 3, cy - 2, color);
 }
 
 void SpaceInvadersEffect::update() {
@@ -839,11 +976,9 @@ void SpaceInvadersEffect::update() {
         }
     }
     
-    // Draw blob indicator at bottom
     if (blob.valid) {
         CRGB indicatorColor;
         hsv2rgb_rainbow(CHSV(40, 200, 230), indicatorColor);
-        m_matrix->background->fillCircle((int16_t)blob.x, playHeight - 2, 1,
-                                         m_matrix->background->color565(indicatorColor.r, indicatorColor.g, indicatorColor.b));
+        drawGameCircle((int16_t)blob.x, playHeight - 2, 1, indicatorColor);
     }
 }

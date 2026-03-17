@@ -83,37 +83,11 @@ class Motion {
 
       lastBlobPos = blobPos;
 
-      switch (interactionState) {
-        case InteractionState::IDLE:
-          // Blob just appeared -- go ALERT
-          interactionState = InteractionState::ALERT;
-          stateStartTime = now;
-          break;
-
-        case InteractionState::ALERT:
-          // After freeze duration, transition to SCARED
-          if (now - stateStartTime >= STATE_ALERT_DURATION_MS) {
-            interactionState = InteractionState::SCARED;
-            stateStartTime = now;
-          }
-          break;
-
-        case InteractionState::SCARED:
-          // If blob is calm for long enough, transition to CURIOUS
-          if (interaction.velocityMag < STATE_SCARED_CALM_VELOCITY &&
-              interaction.presenceDuration >= STATE_SCARED_CALM_DURATION_S) {
-            interactionState = InteractionState::CURIOUS;
-            stateStartTime = now;
-          }
-          break;
-
-        case InteractionState::CURIOUS:
-          // Sudden fast movement snaps back to SCARED
-          if (interaction.velocityMag > STATE_CURIOUS_SCARE_VELOCITY) {
-            interactionState = InteractionState::SCARED;
-            stateStartTime = now;
-          }
-          break;
+      // For low-resolution TOF input, direct-follow interaction is more readable
+      // than freeze/fear transitions that get retriggered by velocity noise.
+      if (interactionState != InteractionState::CURIOUS) {
+        interactionState = InteractionState::CURIOUS;
+        stateStartTime = now;
       }
     } else {
       // No blob -- start recovery timer
@@ -160,46 +134,28 @@ class Motion {
           break;
 
         case InteractionState::ALERT:
-          // Freeze: dampen velocity, skip doMotion
-          vel *= STATE_ALERT_DAMPING;
+          // ALERT is currently bypassed by updateInteractionState(); keep fallback behavior stable.
+          doMotion();
           break;
 
         case InteractionState::SCARED: {
-          // Dart away from blob
-          PVector away = pos - lastBlobPos;
-          if (away.mag() > INTERACTION_DISTANCE_EPSILON) {
-            away.setMag(STATE_SCARED_REPEL_FORCE);
-            applyForce(away);
-          }
-          // No doMotion -- pure directional dart
+          // SCARED is currently bypassed by updateInteractionState(); keep fallback behavior stable.
+          doMotion();
           break;
         }
 
         case InteractionState::CURIOUS: {
-          // Check for curious pauses
-          if (now - curiousLastPauseCheck > STATE_CURIOUS_PAUSE_INTERVAL_MS) {
-            curiousLastPauseCheck = now;
-            if (random(STATE_CURIOUS_PAUSE_CHANCE) < 1) {
-              curiousPauseUntil = now + random(STATE_CURIOUS_PAUSE_MIN_MS,
-                                               STATE_CURIOUS_PAUSE_MAX_MS);
-            }
+          // Deterministic follow (no random pause) keeps hand-tracking readable.
+          PVector toBlob = lastBlobPos - pos;
+          float distToBlob = toBlob.mag();
+          if (distToBlob > INTERACTION_DISTANCE_EPSILON &&
+              distToBlob > CURIOUS_ATTRACTION_STOP_DISTANCE) {
+            toBlob.setMag(FOOD_FORCE * STATE_CURIOUS_FOLLOW_FORCE_FRAC);
+            applyForce(toBlob);
           }
 
-          if (now < curiousPauseUntil) {
-            // Pausing -- gentle drift
-            vel *= STATE_CURIOUS_PAUSE_DAMPING;
-          } else {
-            // Gentle follow toward blob; stop attracting when close to avoid clustering
-            PVector toBlob = lastBlobPos - pos;
-            float distToBlob = toBlob.mag();
-            if (distToBlob > INTERACTION_DISTANCE_EPSILON &&
-                distToBlob > CURIOUS_ATTRACTION_STOP_DISTANCE) {
-              toBlob.setMag(FOOD_FORCE * STATE_CURIOUS_FOLLOW_FORCE_FRAC);
-              applyForce(toBlob);
-            }
-            // Reduced organic motion (still alive, just subtle)
-            doMotionScaled(STATE_CURIOUS_SIN_SCALE, STATE_CURIOUS_NOISE_SCALE);
-          }
+          // Keep tiny organic motion so fish still feel alive without overpowering follow.
+          doMotionScaled(0.2f, 0.15f);
           break;
         }
       }
@@ -301,6 +257,10 @@ class Motion {
   }
 
  public:
+  void applyExternalForce(const PVector& force) {
+    applyForce(force);
+  }
+
   void followFood(PVector foodPos) {
     foodDirection = foodPos;
     followingFood = true;

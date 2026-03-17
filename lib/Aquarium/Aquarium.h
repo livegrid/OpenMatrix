@@ -403,38 +403,26 @@ class Aquarium {
     InteractionData interactionData;
     if (interactionManager) {
       interactionData = interactionManager->getInteractionData();
-      // Depth-map fallback: when blob detection fails, use centroid of valid depth cells
-      if (!interactionData.hasBlob) {
-        float sumX = 0, sumY = 0;
-        int count = 0;
-        for (uint8_t y = 0; y < 8; y++) {
-          for (uint8_t x = 0; x < 8; x++) {
-            int16_t d = interactionData.depthMap[y][x];
-            if (d >= TOF_MIN_DETECTION_DIST && d <= TOF_MAX_DETECTION_DIST) {
-              sumX += x + 0.5f;
-              sumY += y + 0.5f;
-              count++;
-            }
-          }
-        }
-        if (count > 0) {
-          interactionData.hasBlob = true;
-          interactionData.blobX = (sumX / count) / 8.0f;
-          interactionData.blobY = (sumY / count) / 8.0f;
-          interactionData.velocityMag = 0.0f;
-          // presenceDuration already set by getInteractionData()
-        }
-      }
       interaction = &interactionData;
     }
+
+    // Snapshot school positions for lightweight separation logic inside Fish::update.
+    std::vector<PVector> schoolPositions;
+    schoolPositions.reserve(fishArray.size());
+    for (const auto& fish : fishArray) {
+      schoolPositions.push_back(fish->getPosition());
+    }
+
+    int fishIndex = 0;
     for (auto it = fishArray.begin(); it != fishArray.end();) {
-      bool destroy = (*it)->update(co2, demoMode, interaction);
+      bool destroy = (*it)->update(co2, demoMode, interaction, &schoolPositions, fishIndex);
       if (destroy) {
         it = fishArray.erase(it);
       } else {
         (*it)->display();
         ++it;
       }
+      fishIndex++;
     }
 
     // Population control

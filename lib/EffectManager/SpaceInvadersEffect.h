@@ -109,21 +109,28 @@ private:
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
-    uint16_t tofRotation;
     bool topRowActive;  // Used for shooting trigger
+    bool handsRaised;
+    uint8_t handRaiseFrames;
+    uint8_t handLowerFrames;
     
     // Blob detection parameters
     uint8_t minBlobCells;
     uint8_t missingBlobRecentFrames;
     uint32_t lastBlobFrame;
     uint8_t lastBlobSize;
+    float filteredBlobX;
     
     // Timing
     uint32_t frameCount;
     
-    // Play area dimensions (may differ from matrix for portrait orientation)
+    // Play area dimensions (portrait: width < height)
     uint16_t playWidth;
     uint16_t playHeight;
+    
+    // Actual matrix dimensions (landscape)
+    uint16_t matrixWidth;
+    uint16_t matrixHeight;
     
     // Alien pixel patterns (8x8)
     static const uint8_t alienPatternA[3][8];
@@ -155,6 +162,11 @@ private:
     void spawnPlanet();
     void updatePlanets();
     
+    // Portrait→landscape rotation helpers: game coords → matrix coords
+    void drawGamePixel(int16_t gx, int16_t gy, const CRGB& color);
+    void drawGameRect(int16_t gx, int16_t gy, int16_t gw, int16_t gh, const CRGB& color);
+    void drawGameCircle(int16_t gx, int16_t gy, int16_t r, const CRGB& color);
+    
     // Helper methods - Drawing
     void drawGradientBackground();
     void drawStars();
@@ -179,6 +191,5 @@ public:
     
     // Configuration
     void setTofSensor(TOFSensor* sensor);
-    void setDetectionRange(int16_t minDist, int16_t maxDist);
     void setTofRotation(uint16_t rotation);
 };

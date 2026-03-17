@@ -125,7 +125,8 @@ class Fish {
   }
   // ~Fish(); // Destructor
 
-  bool update(long co2 = 600, bool stayInside = false, InteractionData* interaction = nullptr) {
+  bool update(long co2 = 600, bool stayInside = false, InteractionData* interaction = nullptr,
+              const std::vector<PVector>* schoolPositions = nullptr, int selfIndex = -1) {
     if (!motion) {
       log_e(
           "Error: motion is null in Fish::update for fish type: %s, motion "
@@ -154,6 +155,37 @@ class Fish {
       motion->updateInteractionState(*interaction,
           matrix->getXResolution() * PHYSICS_SCALE,
           matrix->getYResolution() * PHYSICS_SCALE);
+    }
+
+    // Keep fish from collapsing into a single point while following TOF.
+    if (interaction && schoolPositions && selfIndex >= 0 &&
+        motion->getInteractionState() == Motion::InteractionState::CURIOUS &&
+        selfIndex < (int)schoolPositions->size()) {
+      PVector selfPosPhysics = (*schoolPositions)[selfIndex] * PHYSICS_SCALE;
+      PVector separation(0, 0);
+      int neighborCount = 0;
+      float desiredDist = CURIOUS_SEPARATION_DISTANCE;
+      float desiredDistSq = desiredDist * desiredDist;
+
+      for (size_t i = 0; i < schoolPositions->size(); ++i) {
+        if ((int)i == selfIndex) continue;
+        PVector otherPosPhysics = (*schoolPositions)[i] * PHYSICS_SCALE;
+        PVector diff = selfPosPhysics - otherPosPhysics;
+        float dSq = diff.magSq();
+        if (dSq <= INTERACTION_DISTANCE_EPSILON || dSq >= desiredDistSq) continue;
+
+        float d = sqrtf(dSq);
+        diff /= d;         // unit vector away from neighbor
+        diff /= d;         // stronger push for very close neighbors
+        separation += diff;
+        neighborCount++;
+      }
+
+      if (neighborCount > 0 && separation.magSq() > INTERACTION_DISTANCE_EPSILON) {
+        separation /= (float)neighborCount;
+        separation.setMag(CURIOUS_SEPARATION_FORCE);
+        motion->applyExternalForce(separation);
+      }
     }
     
     motion->update(age, co2, stayInside);

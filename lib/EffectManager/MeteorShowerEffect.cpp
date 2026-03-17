@@ -25,7 +25,7 @@ void Meteor::init(float x, float y, float targetSpeed) {
     speedMultiplier = 0.9f + randomFloat() * 0.3f;
     velocity.set(-targetSpeed * speedMultiplier, randomFloat() - 0.5f);
     acceleration.set(0, 0);
-    size = 2.0f + randomFloat() * 4.0f;
+    size = 1.8f + randomFloat() * 3.2f;
     noiseOffset = randomFloat() * 1000.0f;
     
     // Black hole accretion disk color palette: warm yellows, oranges, and reds
@@ -194,7 +194,7 @@ void Planet::spawn(uint8_t maxWidth, uint8_t maxHeight) {
         vel.y = (Meteor::randomFloat() - 0.5f) * 0.1f;
     }
     
-    size = 8 + Meteor::randomFloat() * 12;  // 8-20 pixels for 64x64
+    size = 10 + Meteor::randomFloat() * 14;  // 10-24 pixels for 64x64
     hue = 120 + (uint8_t)(Meteor::randomFloat() * 80);  // Blue to purple hues
     hasRings = Meteor::randomFloat() > 0.5f;
     ringRotation = Meteor::randomFloat() * 6.28f;
@@ -203,6 +203,7 @@ void Planet::spawn(uint8_t maxWidth, uint8_t maxHeight) {
 void Planet::update() {
     pos.x += vel.x;
     pos.y += vel.y;
+    ringRotation += 0.01f;
 }
 
 bool Planet::isOffScreen(uint8_t maxWidth, uint8_t maxHeight) {
@@ -217,38 +218,45 @@ MeteorShowerEffect::MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor)
     : Effect(matrix), tofSensor(sensor) {
     
     // Initialize parameters
-    baseMeteorSpeed = 1.5f;
-    boostedMeteorSpeed = 3.0f;
+    baseMeteorSpeed = 1.35f;
+    boostedMeteorSpeed = 2.4f;
     currentMeteorSpeed = baseMeteorSpeed;
-    baseSpawnRate = 2;
-    boostedSpawnRate = 1;
+    baseSpawnRate = 3;
+    boostedSpawnRate = 2;
     currentSpawnRate = baseSpawnRate;
-    baseMaxMeteors = 40;
-    boostedMaxMeteors = 55;
+    baseSpawnBurst = 1;
+    boostedSpawnBurst = 1;
+    currentSpawnBurst = baseSpawnBurst;
+    baseMaxMeteors = 45;
+    boostedMaxMeteors = 60;
     currentMaxMeteors = baseMaxMeteors;
     
     // Motion parameters (scaled for matrix resolution)
-    flowCorrectionStrength = 0.05f;
-    wobbleStrength = 0.1f;
+    flowCorrectionStrength = 0.06f;
+    wobbleStrength = 0.12f;
     wobbleSpeed = 0.004f;
-    separationDistance = 8.0f;  // Scaled for 64px
-    separationStrength = 0.5f;
-    maxVerticalSpeed = 1.5f;
-    trailFadeAmount = 20;
-    attractorStrength = 0.08f;
-    attractorRadius = 20.0f;
-    centerAttractorStrength = 0.15f;
-    centerAttractorRadius = 40.0f;
-    forwardAcceleration = 0.02f;
+    separationDistance = 10.0f;
+    separationStrength = 0.6f;
+    maxVerticalSpeed = 1.8f;
+    trailFadeAmount = 12;
+    attractorStrength = 0.1f;
+    attractorRadius = 22.0f;
+    centerAttractorStrength = 0.0f;
+    centerAttractorRadius = 48.0f;
+    forwardAcceleration = 0.03f;
     
     // ToF parameters
     tofGridReady = false;
-    minDetectionDistance = 1000;
-    maxDetectionDistance = 2000;
-    tofRotation = 180;
+    minDetectionDistance = TOF_MIN_DETECTION_DIST;
+    maxDetectionDistance = TOF_MAX_DETECTION_DIST;
     topRowActive = false;
     
     frameCount = 0;
+    rotateEffect180 = true;
+    spawnHistoryIndex = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        recentSpawnY[i] = -1000.0f;
+    }
     meteorCount = 0;
     spawnCounter = 0;
     planetCount = 0;
@@ -270,6 +278,10 @@ void MeteorShowerEffect::reset() {
     planetCount = 0;
     planetSpawnCounter = 0;
     frameCount = 0;
+    spawnHistoryIndex = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        recentSpawnY[i] = -1000.0f;
+    }
     
     initMeteors();
     initTofAttractors();
@@ -292,7 +304,9 @@ void MeteorShowerEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
 }
 
 void MeteorShowerEffect::setTofRotation(uint8_t rotation) {
-    tofRotation = rotation;
+    if (tofSensor) {
+        tofSensor->setRotation(rotation);
+    }
 }
 
 void MeteorShowerEffect::initMeteors() {
@@ -329,7 +343,10 @@ void MeteorShowerEffect::initPlanets() {
 }
 
 void MeteorShowerEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    switch (tofRotation) {
+    uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
+    // Keep Meteor visual orientation, but rotate ToF mapping underneath by 180 degrees.
+    rotation = (rotation + 180) % 360;
+    switch (rotation) {
         case 90:
             outX = 7 - y;
             outY = x;
@@ -367,9 +384,18 @@ void MeteorShowerEffect::updateTofData() {
 }
 
 void MeteorShowerEffect::updateTofAttractors() {
-    if (!tofGridReady) return;
-    
+    if (!tofGridReady) {
+        topRowActive = false;
+        for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
+            for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
+                tofAttractors[y][x].active = false;
+            }
+        }
+        return;
+    }
+
     topRowActive = false;
+    uint8_t topRowHitCount = 0;
     
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
@@ -379,10 +405,13 @@ void MeteorShowerEffect::updateTofAttractors() {
             
             // Check if top row (x == 7 after rotation means "top" in the original p5.js)
             if (isActive && x == 7) {
-                topRowActive = true;
+                topRowHitCount++;
             }
         }
     }
+
+    // Require at least 2 active cells to enter boosted stream mode.
+    topRowActive = topRowHitCount >= 2;
 }
 
 void MeteorShowerEffect::spawnMeteor() {
@@ -390,9 +419,29 @@ void MeteorShowerEffect::spawnMeteor() {
     
     uint8_t width = m_matrix->getXResolution();
     uint8_t height = m_matrix->getYResolution();
-    
-    float x = width;
-    float y = Meteor::randomFloat() * height;
+
+    // Natural stream: always start outside the right edge.
+    float x = (float)width + 1.5f + Meteor::randomFloat() * 3.0f;
+    float y = Meteor::randomFloat() * (float)height;
+
+    // Anti-clump spawn distribution: keep recent spawn Y positions separated.
+    const float minGap = (float)height * 0.14f;
+    for (uint8_t attempt = 0; attempt < 6; attempt++) {
+        float candidateY = Meteor::randomFloat() * (float)height;
+        bool tooClose = false;
+        for (uint8_t i = 0; i < 4; i++) {
+            if (fabsf(candidateY - recentSpawnY[i]) < minGap) {
+                tooClose = true;
+                break;
+            }
+        }
+        if (!tooClose) {
+            y = candidateY;
+            break;
+        }
+    }
+    recentSpawnY[spawnHistoryIndex] = y;
+    spawnHistoryIndex = (spawnHistoryIndex + 1) & 0x03;
     
     meteors[meteorCount].init(x, y, currentMeteorSpeed);
     meteorCount++;
@@ -462,7 +511,7 @@ void MeteorShowerEffect::updateMeteors() {
         }
         
         // If no ToF attractors active, use center attractor for Y-axis
-        if (activeCount == 0) {
+        if (activeCount == 0 && centerAttractorStrength > 0.001f) {
             m->applyAttractorY(centerAttractor, centerAttractorStrength, centerAttractorRadius);
         }
         
@@ -507,20 +556,18 @@ void MeteorShowerEffect::drawGradientBackground() {
     uint8_t width = m_matrix->getXResolution();
     uint8_t height = m_matrix->getYResolution();
     
-    // Deep space gradient - purple to blue from top to bottom
+    // Deep space gradient with subtle horizontal nebula variation.
     for (uint8_t y = 0; y < height; y++) {
         float gradientFactor = (float)y / height;
-        
-        // HSV: purple (260) to blue (220), increasing saturation and brightness
-        uint8_t hue = 170 - (uint8_t)(gradientFactor * 25);  // ~170 to ~145 in FastLED
-        uint8_t sat = 100 + (uint8_t)(gradientFactor * 75);
-        uint8_t val = 20 + (uint8_t)(gradientFactor * 40);
-        
-        CRGB color;
-        hsv2rgb_rainbow(CHSV(hue, sat, val), color);
-        
         for (uint8_t x = 0; x < width; x++) {
-            m_matrix->background->drawPixel(x, y, color);
+            float wave = 0.5f + 0.5f * sinf(0.19f * x + 0.11f * y + frameCount * 0.015f);
+            uint8_t hue = 176 - (uint8_t)(gradientFactor * 32) + (uint8_t)(wave * 3.0f);
+            uint8_t sat = 80 + (uint8_t)(gradientFactor * 130) + (uint8_t)(wave * 20.0f);
+            uint8_t val = 8 + (uint8_t)(gradientFactor * 67) + (uint8_t)(wave * 12.0f);
+
+            CRGB color;
+            hsv2rgb_rainbow(CHSV(hue, sat, val), color);
+            drawEffectPixel(x, y, color);
         }
     }
 }
@@ -534,24 +581,41 @@ void MeteorShowerEffect::drawPlanets() {
         
         // Planet glow (outer)
         CRGB glowColor;
-        hsv2rgb_rainbow(CHSV(p.hue, 50, 50), glowColor);
-        glowColor.nscale8(50);  // Dim the glow
-        m_matrix->background->fillCircle(x, y, r + 2, m_matrix->background->color565(glowColor.r, glowColor.g, glowColor.b));
+        hsv2rgb_rainbow(CHSV(p.hue, 45, 70), glowColor);
+        glowColor.nscale8(65);
+        drawEffectCircle(x, y, r + 2, glowColor);
         
         // Planet body
         CRGB bodyColor;
         hsv2rgb_rainbow(CHSV(p.hue, 100, 80), bodyColor);
-        bodyColor.nscale8(150);  // Dim distant planets
-        m_matrix->background->fillCircle(x, y, r, m_matrix->background->color565(bodyColor.r, bodyColor.g, bodyColor.b));
+        bodyColor.nscale8(155);
+        drawEffectCircle(x, y, r, bodyColor);
+
+        if (p.hasRings && r > 2) {
+            CRGB ringColor;
+            hsv2rgb_rainbow(CHSV(p.hue + 10, 100, 95), ringColor);
+            ringColor.nscale8(120);
+            float ringCos = cosf(p.ringRotation);
+            float ringSin = sinf(p.ringRotation);
+            float rx = r + 3.0f;
+            float ry = r * 0.45f;
+            for (float t = 0; t < 6.28318f; t += 0.28f) {
+                float ex = cosf(t) * rx;
+                float ey = sinf(t) * ry;
+                int16_t px = (int16_t)(x + ex * ringCos - ey * ringSin);
+                int16_t py = (int16_t)(y + ex * ringSin + ey * ringCos);
+                drawEffectPixel(px, py, ringColor);
+            }
+        }
         
         // Highlight
         CRGB highlightColor;
-        hsv2rgb_rainbow(CHSV(p.hue, 50, 150), highlightColor);
+        hsv2rgb_rainbow(CHSV(p.hue, 40, 170), highlightColor);
         int16_t hx = x - r / 3;
         int16_t hy = y - r / 3;
         int16_t hr = r / 3;
         if (hr > 0) {
-            m_matrix->background->fillCircle(hx, hy, hr, m_matrix->background->color565(highlightColor.r, highlightColor.g, highlightColor.b));
+            drawEffectCircle(hx, hy, hr, highlightColor);
         }
     }
 }
@@ -560,25 +624,72 @@ void MeteorShowerEffect::drawMeteors() {
     for (uint8_t i = 0; i < meteorCount; i++) {
         Meteor& m = meteors[i];
         
-        CRGB color;
-        hsv2rgb_rainbow(CHSV(m.hue, m.saturation, m.brightness), color);
+        CRGB headColor;
+        hsv2rgb_rainbow(CHSV(m.hue, m.saturation, m.brightness), headColor);
         
         int16_t x = (int16_t)m.position.x;
         int16_t y = (int16_t)m.position.y;
-        int16_t r = (int16_t)(m.size / 2);
-        
-        if (r < 1) r = 1;
-        
-        if (r <= 1) {
-            m_matrix->background->drawPixel(x, y, color);
-        } else {
-            m_matrix->background->fillCircle(x, y, r, m_matrix->background->color565(color.r, color.g, color.b));
+        drawEffectPixel(x, y, headColor);
+
+        // Small core hot spot to avoid "ball-only" look.
+        CRGB coreColor = headColor;
+        coreColor.nscale8_video(245);
+        drawEffectPixel(x, y, coreColor);
+
+        // Velocity-aligned tail.
+        float vx = m.velocity.x;
+        float vy = m.velocity.y;
+        float vmag = sqrtf(vx * vx + vy * vy);
+        if (vmag > 0.01f) {
+            float invMag = 1.0f / vmag;
+            float tailDirX = -vx * invMag;
+            float tailDirY = -vy * invMag;
+            int16_t tailLen = (int16_t)constrain((int)(vmag * 1.3f + m.size), 3, 7);
+            for (int16_t t = 1; t <= tailLen; t++) {
+                int16_t tx = (int16_t)(m.position.x + tailDirX * t);
+                int16_t ty = (int16_t)(m.position.y + tailDirY * t);
+                CRGB trailColor = headColor;
+                uint8_t fade = 210 - (uint8_t)(t * (165 / tailLen));
+                trailColor.nscale8_video(fade);
+                drawEffectPixel(tx, ty, trailColor);
+            }
         }
     }
 }
 
 void MeteorShowerEffect::fadeTrails() {
     m_matrix->background->dim(255 - trailFadeAmount);
+}
+
+void MeteorShowerEffect::transformEffectCoordinate(int16_t inX, int16_t inY, int16_t& outX, int16_t& outY) const {
+    if (!rotateEffect180) {
+        outX = inX;
+        outY = inY;
+        return;
+    }
+
+    int16_t width = m_matrix->getXResolution();
+    int16_t height = m_matrix->getYResolution();
+    outX = (width - 1) - inX;
+    outY = (height - 1) - inY;
+}
+
+void MeteorShowerEffect::drawEffectPixel(int16_t x, int16_t y, const CRGB& color) {
+    int16_t width = m_matrix->getXResolution();
+    int16_t height = m_matrix->getYResolution();
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+        return;
+    }
+
+    int16_t tx, ty;
+    transformEffectCoordinate(x, y, tx, ty);
+    m_matrix->background->drawPixel(tx, ty, color);
+}
+
+void MeteorShowerEffect::drawEffectCircle(int16_t x, int16_t y, int16_t r, const CRGB& color) {
+    int16_t tx, ty;
+    transformEffectCoordinate(x, y, tx, ty);
+    m_matrix->background->fillCircle(tx, ty, r, m_matrix->background->color565(color.r, color.g, color.b));
 }
 
 void MeteorShowerEffect::update() {

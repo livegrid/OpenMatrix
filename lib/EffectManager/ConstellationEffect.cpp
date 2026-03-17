@@ -73,9 +73,8 @@ ConstellationEffect::ConstellationEffect(Matrix* matrix, TOFSensor* sensor)
     screenHeight = m_matrix->getYResolution();
 
     tofGridReady = false;
-    minDetectionDistance = 1000;
-    maxDetectionDistance = 2000;
-    tofRotation = 270;
+    minDetectionDistance = TOF_MIN_DETECTION_DIST;
+    maxDetectionDistance = TOF_MAX_DETECTION_DIST;
 
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
@@ -110,7 +109,9 @@ void ConstellationEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
 }
 
 void ConstellationEffect::setTofRotation(uint16_t rotation) {
-    tofRotation = rotation;
+    if (tofSensor) {
+        tofSensor->setRotation(rotation);
+    }
 }
 
 void ConstellationEffect::initStars() {
@@ -130,7 +131,8 @@ void ConstellationEffect::initStars() {
 // ============================================================================
 
 void ConstellationEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    switch (tofRotation) {
+    uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
+    switch (rotation) {
         case 90:  outX = 7 - y; outY = x;     break;
         case 180: outX = 7 - x; outY = 7 - y; break;
         case 270: outX = y;     outY = 7 - x; break;
