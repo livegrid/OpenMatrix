@@ -30,26 +30,39 @@ void drawSegment(uint8_t i, PVector vin, uint8_t r, uint8_t g, uint8_t b, bool d
     }
 
     PVector dv = vin - segmentPositions[i];
-    float segmentAngle = dv.heading();
+    float dvMagSq = dv.x * dv.x + dv.y * dv.y;
+    
+    // Pre-compute normalized direction (avoids atan2 + cos/sin pattern)
+    float cosAngle, sinAngle;
+    if (dvMagSq > 0.0001f) {
+        float invMag = 1.0f / sqrt(dvMagSq);
+        cosAngle = dv.x * invMag;
+        sinAngle = dv.y * invMag;
+    } else {
+        cosAngle = 1.0f;
+        sinAngle = 0.0f;
+    }
 
     // Use updated size for each segment
     float currentSegmentSize = segments[i] * size;
 
     if (i == 0) {
-        segmentPositions[i].x = vin.x - cos(segmentAngle) * currentSegmentSize;
-        segmentPositions[i].y = vin.y - sin(segmentAngle) * currentSegmentSize;
+        segmentPositions[i].x = vin.x - cosAngle * currentSegmentSize;
+        segmentPositions[i].y = vin.y - sinAngle * currentSegmentSize;
     } else if (i > 0 && i < segments.size()) {  // Add bounds check for i-1
         float maxSegmentSize = std::max(segments[i-1], segments[i]) * size * gapBetweenSegments;
-        segmentPositions[i].x = vin.x - cos(segmentAngle) * maxSegmentSize;
-        segmentPositions[i].y = vin.y - sin(segmentAngle) * maxSegmentSize;
+        segmentPositions[i].x = vin.x - cosAngle * maxSegmentSize;
+        segmentPositions[i].y = vin.y - sinAngle * maxSegmentSize;
     }
 
-    // Add null checks for fin and tail pointers
+    // Add null checks for fin and tail pointers - only compute angle when needed
     if (drawExtras && (i == 1 || i == 3) && fin != nullptr) {
+        float segmentAngle = atan2(sinAngle, cosAngle);  // Faster than atan2(dv.y, dv.x)
         fin->display(segmentPositions[i], segmentAngle, currentSegmentSize, r, g, b);
     }
 
     if (drawExtras && i == segments.size() - 1 && tail != nullptr) {
+        float segmentAngle = atan2(sinAngle, cosAngle);
         tail->display(segmentPositions[i], segmentAngle, currentSegmentSize * 2, r, g, b);
     } else {
         // Add null check for matrix pointer

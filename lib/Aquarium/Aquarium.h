@@ -15,6 +15,7 @@
 #include "Fish.h"
 #include "Food.h"
 #include "Plants.h"
+#include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
 
@@ -28,6 +29,7 @@ class Aquarium {
   std::vector<std::unique_ptr<Plants>> plantArray;
   std::vector<std::unique_ptr<Food>> foodArray;
   BoidManager boidManager;
+  SeaFloor seaFloor;
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
@@ -55,12 +57,14 @@ class Aquarium {
         stateManager(stateManager),
         water(matrix),
         boidManager(m),
+        seaFloor(m),
         demoMode(false),
         demoStep(0),
         demoFinished(false) {}
 
   void begin() {
     loadState();
+    seaFloor.generate();
     initializePlants();
     boidManager.initializeBoids();
   }
