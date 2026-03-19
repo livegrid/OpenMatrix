@@ -19,6 +19,26 @@ void WebServerManager::begin() {
   setupUniqueHostname();
 }
 
+void WebServerManager::initWiFi() {
+  // Initialize WiFi early (in setup) before DisplayTask to preserve heap.
+  // NetWizard's autoConnect triggers esp_wifi_init which needs ~30KB free internal RAM.
+  // If called after aquarium.begin(), heap may be too low causing ESP_ERR_NO_MEM (error 257).
+  log_i("[WiFi] Initializing WiFi early (heap=%u, internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  setupNetWizard();
+  log_i("[WiFi] WiFi initialized (heap=%u, internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+}
+
+void WebServerManager::setupAfterWiFi() {
+  // Called from ServerTask after display is initialized
+  setupInterface();
+  startServer();
+  setupUniqueHostname();
+}
+
 void WebServerManager::handleClient() {
   server.handleClient();
   ElegantOTA.loop();

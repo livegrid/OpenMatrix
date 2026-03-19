@@ -19,11 +19,13 @@ public:
                      ImageDraw* imageDraw, StateManager* stateManager,
                      TaskManager* taskManager);
     void begin();
+    void initWiFi();  // Call early in setup() before DisplayTask to preserve heap
+    void setupAfterWiFi();  // Call later in ServerTask after display is initialized
     void handleClient();
     void setupUniqueHostname();
     NetWizard nw;
     void setupNetWizard();
-    
+
 private:
     WebServer server;
     UI interface;

@@ -1,6 +1,7 @@
 #include "GeneralSettings.h"
 #include "StateManager.h"
 #include "TaskManager.h"
+#include <esp_heap_caps.h>
 
 #ifdef WIFI_ENABLED
 #include <Edmx.h>
@@ -100,6 +101,14 @@ void demoTask(void* parameter) {
 #endif
 
 void displayTask(void* parameter) {
+  // Give time for WiFi to stabilize after init in setup()
+  vTaskDelay(pdMS_TO_TICKS(1000));
+
+  // Initialize matrix in this task (after WiFi init has claimed its memory)
+  log_i("Initializing matrix display...");
+  matrix.init();
+  matrix.setBrightness(stateManager.getState()->brightness);
+
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -108,7 +117,6 @@ void displayTask(void* parameter) {
   unsigned long lastRefreshTime = 0;
   const unsigned long refreshInterval = 300000;  // 5 mins
 
-  static unsigned long lastLogTime = 0;
   static unsigned long frameCount = 0;
 
   uint8_t currentMode =
@@ -119,6 +127,19 @@ void displayTask(void* parameter) {
   effectManager.setEffect(stateManager.getState()->effects.selected - 1);
   imageDraw.begin();
   stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+
+  // Route large allocations (Fish, Plants, Boids) to PSRAM so internal heap
+  // stays free for WiFi, E1.31/AsyncUDP, and mDNS.
+  log_i("Aquarium begin: routing heap allocs >= 64 B to PSRAM (internal free=%u)",
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  heap_caps_malloc_extmem_enable(64);
+  aquarium.begin();
+  heap_caps_malloc_extmem_enable(0);  // Restore default — only explicitly large allocs go to PSRAM
+  log_i("Aquarium begin done (internal free=%u)",
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+  stateManager.save();
+
   esp_task_wdt_add(NULL);
 
   for (;;) {
@@ -146,7 +167,7 @@ void displayTask(void* parameter) {
             break;
         }
       }
-      
+
       if (stateManager.getState()->firstBoot && aquarium.isDemoFinished()) {
         stateManager.getState()->firstBoot = false;
         stateManager.save();
@@ -199,10 +220,17 @@ void displayTask(void* parameter) {
 
       frameCount++;
 
-      if (millis() - lastLogTime >= MATRIX_REFRESH_INTERVAL) {
-        float framerate = frameCount / ((currentTime - lastLogTime) / 1000.0);
-        // TaskManager::getInstance().printTaskInfo();
-        lastLogTime = currentTime;
+      static unsigned long lastFramerateLogTime = 0;
+      static unsigned long lastFramerateCheckTime = 0;
+
+      if (millis() - lastFramerateLogTime >= MATRIX_REFRESH_INTERVAL) {
+        unsigned long now = millis();
+        float secondsElapsed = (now - lastFramerateCheckTime) / 1000.0f;
+        float framerate = secondsElapsed > 0 ? (frameCount / secondsElapsed) : 0.0f;
+        log_i("Framerate: %.2f", framerate);
+
+        lastFramerateLogTime = now;
+        lastFramerateCheckTime = now;
         frameCount = 0;
       }
 
@@ -237,12 +265,30 @@ void touchTask(void* parameter) {
 }
 #endif
 
+#ifdef WIFI_ENABLED
 void serverTask(void* parameter) {
+  // WiFi is already initialized in setup() (before DisplayTask) to avoid heap exhaustion.
+  // Delay for DisplayTask to init matrix and aquarium.
+  vTaskDelay(pdMS_TO_TICKS(3000));
+
+  log_i("[ServerTask] Starting network services (heap=%u, internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+  // Initialize DMX after display is ready
+  dmx.begin(&matrix, &stateManager);
+
+  // Setup the web interface and start server
+  webServerManager.setupAfterWiFi();
+
+  log_i("[ServerTask] All services started.");
+
   for (;;) {
     webServerManager.handleClient();
-    vTaskDelay(1);  // Small delay to prevent watchdog timer issues
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
+#endif
 
 void mqttTask(void* parameter) {
   MQTTManager& mqttManager = MQTTManager::getInstance();
@@ -338,8 +384,7 @@ void sensorTask(void* parameter) {
 }
 
 void restartTask(void* parameter) {
-  const unsigned long RESTART_INTERVAL = 11UL * 60UL * 60UL * 1000UL; // 23 hours in milliseconds
-  // const unsigned long RESTART_INTERVAL = 5UL * 60UL * 1000UL; // 23 hours in milliseconds
+  const unsigned long RESTART_INTERVAL = 23UL * 60UL * 60UL * 1000UL; // 23 hours in milliseconds
   const TickType_t xFrequency = pdMS_TO_TICKS(60000); // Check every minute
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -347,6 +392,7 @@ void restartTask(void* parameter) {
     if (millis() >= RESTART_INTERVAL) {
       log_i("Scheduled restart triggered after 23 hours");
       stateManager.save(); // Save state before restart
+      aquarium.saveState();
       delay(100); // Small delay to ensure state is saved
       ESP.restart();
     }
@@ -354,13 +400,11 @@ void restartTask(void* parameter) {
   }
 }
 
-
 void setup(void) {
-  // Serial.begin(115200);
   log_i("\n");
 
   log_i(R""""(
- _     _            ____      _     _ 
+ _     _            ____      _     _
 | |   (_)_   _____ / ___|_ __(_) __| |
 | |   | \ \ / / _ \ |  _| '__| |/ _` |
 | |___| |\ V /  __/ |_| | |  | | (_| |
@@ -375,12 +419,11 @@ void setup(void) {
   pinMode(2, OUTPUT);
   digitalWrite(2, LOW);
 
-  matrix.init();
-
+  // Watchdog timer
   esp_task_wdt_config_t config = {
-      .timeout_ms = 5000, // Set timeout to 5 seconds (5000 ms)
-      .idle_core_mask = 0, // No specific core mask (0 means all cores)
-      .trigger_panic = true // Trigger panic on timeout
+      .timeout_ms = 5000,
+      .idle_core_mask = 0,
+      .trigger_panic = true
   };
 
   esp_err_t err = esp_task_wdt_init(&config);
@@ -412,41 +455,48 @@ void setup(void) {
 
   // Start LittleFS
   LittleFS.begin(true);
-  
+
   // Restore State
   stateManager.restore();
-  matrix.setBrightness(stateManager.getState()->brightness);
   // Start periodic save task
   stateManager.startPeriodicSave();
 
-  aquarium.begin();
-  
   #ifdef RUN_DEMO
   if(stateManager.getState()->firstBoot) {
     aquarium.startDemo();
   }
   #endif
 
+  // === CRITICAL: WiFi init MUST run before DisplayTask ===
+  // DisplayTask allocates matrix buffers + aquarium (~40KB+). If WiFi init runs
+  // after that, heap drops too low and esp_wifi_init fails with ESP_ERR_NO_MEM.
+  // Initialize WiFi here in setup() when heap is still ~75KB+.
+#ifdef WIFI_ENABLED
+  log_i("Phase 0: Initializing WiFi (before DisplayTask to preserve heap)...");
+  log_i("Free heap before WiFi: %u bytes (internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  webServerManager.initWiFi();
+  log_i("WiFi phase complete. Free heap: %u bytes (internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+#endif
+
+  // === Create tasks ===
+  // DisplayTask initializes matrix and aquarium (with PSRAM routing)
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
 
 #ifdef WIFI_ENABLED
-  // Start server task
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0);
+  // ServerTask: PSRAM stack frees ~30KB internal heap for AsyncUDP
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, true);
 #endif
 
 #ifdef TOUCH_ENABLED
   TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
 #endif
 
-#ifdef WIFI_ENABLED
-  webServerManager.begin();
-  dmx.begin(&matrix,
-            &stateManager);  // Initialize E1.31 after WiFi is connected
-#endif
-
   // Initialize MQTT
   TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
-  // text topic will default to device-scoped topic if not customized
 
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
@@ -454,8 +504,18 @@ void setup(void) {
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);
-  
-  // DebugMonitor::init(); // Initialize the debug monitor
+
+  // Post-init heap snapshot
+  {
+    const size_t internalFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    const size_t internalLargest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+    const size_t psramFree = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    const size_t psramLargest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    log_i("Heap after init: internal free=%u largest_block=%u | PSRAM free=%u largest_block=%u",
+          (unsigned)internalFree, (unsigned)internalLargest, (unsigned)psramFree, (unsigned)psramLargest);
+  }
+
+  DebugMonitor::init();
 }
 
 void loop(void) {
