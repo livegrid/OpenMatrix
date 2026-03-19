@@ -5,19 +5,16 @@
 #include <Matrix.h>
 #include "AquariumSettings.h"
 
-// Define the palette at global scope
-DEFINE_GRADIENT_PALETTE( waterPalette ) {
-    0,    0,  20,  80,  // 10°C: Cold
-  112,    0, 100,  80,  // 24°C: Normal
-  176,    0, 100,  80,  // 28°C: Normal (extended)
-  255,   100,   0,  20   // 35°C: Warm
-};
-
 class Water {
   Matrix* matrix = nullptr;
 
   CRGB simplexColor = CRGB(0, 100, 100);
-  CRGBPalette16 palette = waterPalette;
+  CRGBPalette16 palette = CRGBPalette16(
+      CRGB(0, 20, 80),   // cold
+      CRGB(0, 100, 80),  // normal low
+      CRGB(0, 100, 80),  // normal high
+      CRGB(100, 0, 20)   // warm
+  );
 
   FastNoiseLite noise;
   size_t currentRow = 0;
@@ -67,9 +64,13 @@ class Water {
                     ? currentRow + rowsPerUpdate : totalRows;
     size_t batchRows = endRow - currentRow;
 
-    noise.FillNoise2D(batchNoise, (int)batchCols, (int)batchRows,
-                     0.0f, (float)(currentRow * scale), timeZ,
-                     (float)scale, (float)scale);
+    for (size_t by = 0; by < batchRows; ++by) {
+      for (size_t bx = 0; bx < batchCols; ++bx) {
+        float nx = (float)(bx * scale);
+        float ny = (float)((currentRow + by) * scale);
+        batchNoise[bx + by * batchCols] = noise.GetNoise(nx, ny, timeZ);
+      }
+    }
 
     for (size_t row = currentRow; row < endRow; ++row) {
       size_t batchRow = row - currentRow;
