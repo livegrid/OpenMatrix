@@ -18,6 +18,9 @@
 #include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
+#ifdef VL53L8CX_ENABLED
+#include "../TOFSensor/TOFInteractionManager.h"
+#endif
 
 class Aquarium {
  private:
@@ -47,6 +50,11 @@ class Aquarium {
   bool touchActive = false;
   unsigned long lastFoodTime = 0;
   const unsigned long FOOD_INTERVAL = 200; // Add food every 200ms while touched
+#ifdef VL53L8CX_ENABLED
+  TOFInteractionManager* tofInteractionManager = nullptr;
+  unsigned long lastTOFFoodTime = 0;
+  const unsigned long TOF_FOOD_INTERVAL = 450;
+#endif
 
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
@@ -253,6 +261,11 @@ class Aquarium {
 
   void addFood() {
     float x = random(0, matrix->getXResolution());
+    addFoodAt(x);
+  }
+
+  void addFoodAt(float x) {
+    x = constrain(x, 0.0f, (float)(matrix->getXResolution() - 1));
     foodArray.emplace_back(std::make_unique<Food>(matrix, x));
 
     float minDistance = std::numeric_limits<float>::max();
@@ -273,6 +286,36 @@ class Aquarium {
       closestFish->setFood(foodArray.back().get());
     }
   }
+
+#ifdef VL53L8CX_ENABLED
+  void setTOFInteractionManager(TOFInteractionManager* manager) {
+    tofInteractionManager = manager;
+  }
+
+  void handleTOFInput() {
+    if (!tofInteractionManager || !tofInteractionManager->isBaselineReady()) {
+      return;
+    }
+
+    InteractionData interaction = tofInteractionManager->getInteractionData();
+    if (!interaction.hasBlob) {
+      return;
+    }
+
+    const float targetX = interaction.blobX * matrix->getXResolution();
+    const float targetY = interaction.blobY * matrix->getYResolution();
+
+    // Gently bias aquarium boids toward detected presence.
+    boidManager.applyAttractor(targetX, targetY, 0.12f);
+
+    // Presence acts like "feeding point" at a controlled cadence.
+    unsigned long now = millis();
+    if (now - lastTOFFoodTime >= TOF_FOOD_INTERVAL) {
+      addFoodAt(targetX);
+      lastTOFFoodTime = now;
+    }
+  }
+#endif
 
   // Update all plants in the aquarium
   void updatePlants() {
@@ -398,6 +441,9 @@ class Aquarium {
   // General update function that updates all components of the aquarium
   void update(bool showSensorData = false) {
     handleTouchInput();
+#ifdef VL53L8CX_ENABLED
+    handleTOFInput();
+#endif
 
     if (demoMode) {
       updateDemo();

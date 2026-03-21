@@ -34,6 +34,15 @@ StateManager stateManager(STATE_SAVE_INTERVAL);
 #include "SCD40.h"
 SCD40 scd40;
 
+#ifdef VL53L8CX_ENABLED
+#include "TOFSensor.h"
+#include "TOFVisualizer.h"
+#include "TOFInteractionManager.h"
+TOFSensor tofSensor(TOF_PWREN_PIN_1, TOF_SENSOR_1_ADDRESS);
+TOFVisualizer tofVisualizer(&tofSensor, &matrix);
+TOFInteractionManager tofInteractionManager(&tofSensor);
+#endif
+
 #include "Aquarium.h"
 Aquarium aquarium(&matrix, &scd40, &stateManager);
 
@@ -147,7 +156,9 @@ void displayTask(void* parameter) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
+#ifndef VL53L8CX_ENABLED
       digitalWrite(2, LOW);
+#endif
       if (currentMode != stateManager.getState()->mode) {
         if (currentMode == OpenMatrixMode::IMAGE) {
           imageDraw.closeGIF();
@@ -244,7 +255,9 @@ void displayTask(void* parameter) {
       }
     }
     else {
+#ifndef VL53L8CX_ENABLED
       digitalWrite(2, HIGH);
+#endif
       matrix.clearScreen();
       matrix.update();
     }
@@ -328,6 +341,33 @@ void mqttTask(void* parameter) {
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
+
+#ifdef VL53L8CX_ENABLED
+void tofTask(void* parameter) {
+  // Let the rest of the system settle before bringing up TOF.
+  vTaskDelay(pdMS_TO_TICKS(7000));
+
+  log_i("TOF Task: init start (heap=%u)", (unsigned)ESP.getFreeHeap());
+  if (!tofSensor.begin()) {
+    log_e("TOF Task: sensor init failed");
+    vTaskDelete(NULL);
+    return;
+  }
+
+  log_i("TOF Task: sensor init OK (heap=%u)", (unsigned)ESP.getFreeHeap());
+  tofInteractionManager.calibrateBaseline();
+
+  const TickType_t xFrequency = pdMS_TO_TICKS(33);  // ~30 Hz poll
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (;;) {
+    // Keep fresh frames available for future effect/aquarium hooks.
+    if (tofSensor.update()) {
+      tofInteractionManager.update();
+    }
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+#endif
 
 void sensorTask(void* parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(1000);  // 1 second
@@ -418,6 +458,10 @@ void setup(void) {
 
   pinMode(2, OUTPUT);
   digitalWrite(2, LOW);
+#ifdef VL53L8CX_ENABLED
+  // Pin 2 is used for TOF power when sensor support is enabled.
+  // Display pin toggling is disabled in displayTask via compile guards.
+#endif
 
   // Watchdog timer
   esp_task_wdt_config_t config = {
@@ -467,6 +511,10 @@ void setup(void) {
   }
   #endif
 
+#ifdef VL53L8CX_ENABLED
+  aquarium.setTOFInteractionManager(&tofInteractionManager);
+#endif
+
   // === CRITICAL: WiFi init MUST run before DisplayTask ===
   // DisplayTask allocates matrix buffers + aquarium (~40KB+). If WiFi init runs
   // after that, heap drops too low and esp_wifi_init fails with ESP_ERR_NO_MEM.
@@ -502,6 +550,10 @@ void setup(void) {
 // Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
   TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
+#endif
+
+#ifdef VL53L8CX_ENABLED
+  TaskManager::getInstance().createTask("TOFTask", tofTask, 7168, 1, 0);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);

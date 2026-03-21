@@ -85,11 +85,6 @@ bool TOFSensor::initSensorWithRetry() {
 }
 
 bool TOFSensor::begin() {
-    pinMode(TOF_PWREN_PIN_2, OUTPUT);
-    digitalWrite(TOF_PWREN_PIN_2, LOW);
-    pinMode(TOF_PWREN_PIN_3, OUTPUT);
-    digitalWrite(TOF_PWREN_PIN_3, LOW);
-    
     log_i("TOF: Initializing sensor...");
     
     // Set up power pin - POWER ON FIRST like the working example

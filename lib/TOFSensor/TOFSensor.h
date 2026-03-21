@@ -4,12 +4,10 @@
 #include <vl53l8cx.h>
 #include <Wire.h>
 
-// Pin definitions for sensor 1
+// LPN is unused for current wiring (-1 = not connected)
+#ifndef TOF_LPN_PIN
 #define TOF_LPN_PIN -1
-#define TOF_PWREN_PIN_1 12
-#define TOF_PWREN_PIN_2 13
-#define TOF_PWREN_PIN_3 11
-#define TOF_SENSOR_1_ADDRESS 0x52
+#endif
 
 // Sensor configuration
 #define TOF_MAX_INIT_RETRIES 3

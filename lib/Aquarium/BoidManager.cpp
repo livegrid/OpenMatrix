@@ -32,6 +32,17 @@ void BoidManager::updateBoids(long co2) {
   }
 }
 
+void BoidManager::applyAttractor(float x, float y, float strength) {
+  PVector target(x, y);
+  for (auto& group : boidGroups) {
+    for (auto& boid : group) {
+      PVector steer = boid.seek(target);
+      steer *= strength;
+      boid.applyForce(steer);
+    }
+  }
+}
+
 void BoidManager::renderBoids() {
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
