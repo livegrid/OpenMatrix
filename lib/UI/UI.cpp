@@ -92,6 +92,16 @@ void UI::begin() {
     }
   });
 
+  // Aquarium fish data (served from persisted state file)
+  _server->on("/openmatrix/aquarium", HTTP_GET, [&]() {
+    File file = LittleFS.open("/aquarium_state.json", "r");
+    if (!file) {
+      return _server->send(200, "application/json", "{\"fishes\":[]}");
+    }
+    _server->streamFile(file, "application/json");
+    file.close();
+  });
+
   // OpenMatrix Switch Modes
   _server->on("/openmatrix/mode", HTTP_POST, [&]() {
     JsonDocument json;
@@ -368,7 +378,9 @@ void UI::begin() {
             json["multicast"].as<bool>(),
             json["start_universe"].as<uint16_t>(),
             json["start_address"].as<uint16_t>(),
-            json["timeout"].as<uint16_t>());
+            json["timeout"].as<uint16_t>(),
+            json["udp_enabled"] | true,
+            json["udp_port"] | static_cast<uint16_t>(4510));
         log_i("DMX settings updated.");
       }
       return _server->send(200, "application/json", ok_response);

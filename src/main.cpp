@@ -487,8 +487,9 @@ void setup(void) {
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
 
 #ifdef WIFI_ENABLED
-  // ServerTask: PSRAM stack frees ~30KB internal heap for AsyncUDP
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, true);
+  // Run ServerTask on internal RAM stack for better web/network stability.
+  // PSRAM stacks can be fragile under bursty HTTP callback load.
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, false);
 #endif
 
 #ifdef TOUCH_ENABLED

@@ -280,6 +280,12 @@ class Aquarium {
         demoMode
             ? demoHumidity
             : (scd40->isFirstReadingReceived() ? scd40->getHumidity() : 50);
+
+    // New visuals from SeaFloor (rocks, coral, seagrass, anemones).
+    // Draw before plants so legacy plants can still layer above where needed.
+    seaFloor.update(humidity);
+    seaFloor.draw();
+
     for (auto& plant : plantArray) {
       plant->update(humidity);
     }

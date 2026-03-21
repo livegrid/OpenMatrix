@@ -26,16 +26,16 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 
 #define NUM_FISH_START 5
 #define NUM_FISH_IDEAL 20
-#define NUM_PLANTS 3
+#define NUM_PLANTS 0
 
 // SeaFloor element counts (tuned for 78x78 display)
 #if defined(PANEL_UPCYCLED)
-  #define NUM_ROCKS 3
-  #define NUM_MOSS_CLUSTERS 4
-  #define NUM_SEAGRASS 8
-  #define NUM_BRANCHING_PLANTS 2
-  #define NUM_CORAL 3
-  #define NUM_ANEMONES 2
+  #define NUM_ROCKS 0
+  #define NUM_MOSS_CLUSTERS 0
+  #define NUM_SEAGRASS 0
+  #define NUM_BRANCHING_PLANTS 0
+  #define NUM_CORAL 0
+  #define NUM_ANEMONES 0
   #define MAX_SCREEN_WIDTH 78
 #else
   #define NUM_ROCKS 3
@@ -47,7 +47,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
   #define MAX_SCREEN_WIDTH 64
 #endif
 
-#define MAX_CORAL_SEGMENTS 16
+#define MAX_CORAL_SEGMENTS 12
 #define GROUND_SUBSTRATE_HEIGHT 0
 #define GROUND_MAX_HEIGHT 12
 #define MAX_BRANCHES_PER_PLANT 8

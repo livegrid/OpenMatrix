@@ -1,0 +1,18 @@
+---
+description: Enforce upload-first firmware validation and risk-based serial checks
+alwaysApply: true
+---
+
+# Firmware Upload Validation
+
+When making code changes in this repository:
+
+1. Use the `firmware-upload-verify` skill workflow.
+2. Default to `pio run -t upload` validation for non-trivial changes.
+3. Allow compile-only checks only for clearly minor/non-behavioral edits.
+4. For high-risk runtime changes (memory, timing, ISR, sensor/effect pipeline), run a serial monitor check after upload and confirm no crash/reset signatures.
+5. Track terminal ownership during validation:
+   - Keep one upload terminal and one serial terminal (or explicitly reuse one).
+   - If upload is blocked by serial port lock, stop serial, upload, then restart serial.
+   - Report which terminals were used so workflow continuity is preserved.
+

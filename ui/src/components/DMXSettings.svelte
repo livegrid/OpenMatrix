@@ -9,7 +9,19 @@
     export let initialValues = {};
     let loading = false;
     let dirty = false;
-    let data = initialValues;
+
+    const edmxDefaults = {
+      protocol: 0,
+      mode: 0,
+      multicast: true,
+      start_universe: 1,
+      start_address: 1,
+      timeout: 5000,
+      udp_enabled: true,
+      udp_port: 4510,
+    };
+
+    let data = { ...edmxDefaults, ...(initialValues || {}) };
     
     const evaluate = () => {
       // dirty = JSON.stringify(get(state)?.settings?.mqtt) !== JSON.stringify(data);
@@ -34,7 +46,16 @@
       e.preventDefault();
       try {
         loading = true;
-        const req = await updateDMXSettings(data);
+        const payload = {
+          ...data,
+          protocol: Number(data.protocol),
+          mode: Number(data.mode),
+          start_universe: Number(data.start_universe),
+          start_address: Number(data.start_address),
+          timeout: Number(data.timeout),
+          udp_port: Number(data.udp_port),
+        };
+        const req = await updateDMXSettings(payload);
         if (req.status === 200) {
           const st = get(state);
           state.set({
@@ -43,7 +64,7 @@
               ...st?.settings,
               edmx: {
                 ...st?.settings?.edmx,
-                ...data
+                ...payload
               },
             }
           });
@@ -120,6 +141,22 @@
       </div>
       <div>
         <input on:keyup={evaluate} bind:value={data.timeout} type="text" class={`bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:border-blue-500 block w-full px-2.5 py-1.5 dark:bg-zinc-900 dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white dark:focus:border-blue-500 ${ $state?.settings?.edmx?.timeout !== data.timeout ? "!border-yellow-500" : "" }`}>
+      </div>
+    </div>
+    <div class="flex flex-row items-center gap-x-3 justify-between" title="Accept OpenMatrix OM v1 pixel frames over UDP (e.g. Livegrid stream). Independent of sACN/Art-Net.">
+      <div class="truncate text-sm font-medium text-zinc-800 dark:text-zinc-300">
+        UDP pixel stream
+      </div>
+      <div>
+        <Toggle checked={data.udp_enabled} on:change={(v) => { data.udp_enabled = v.detail; evaluate(); }} />
+      </div>
+    </div>
+    <div class="flex flex-row items-center gap-x-3 justify-between" title="UDP listen port for OM v1 frames (default 4510).">
+      <div class="truncate text-sm font-medium text-zinc-800 dark:text-zinc-300">
+        UDP port
+      </div>
+      <div>
+        <input on:keyup={evaluate} bind:value={data.udp_port} type="number" min="1" max="65535" disabled={!data.udp_enabled} class={`bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm rounded-lg focus:border-blue-500 block w-full px-2.5 py-1.5 dark:bg-zinc-900 dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white dark:focus:border-blue-500 disabled:opacity-50 ${ Number($state?.settings?.edmx?.udp_port) !== Number(data.udp_port) ? "!border-yellow-500" : "" }`}>
       </div>
     </div>
   </SettingsCard>
