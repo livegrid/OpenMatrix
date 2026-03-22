@@ -1,4 +1,5 @@
 #include "TOFSensor.h"
+#include "I2CMutex.h"
 
 TOFSensor::TOFSensor(uint8_t pwrenPin, uint8_t address) 
     : pwren_pin(pwrenPin), sensor_address(address), is_active(false), rotation(270) {
@@ -40,12 +41,14 @@ bool TOFSensor::initSensorWithRetry() {
             delay(200);  // Extra time after power cycle for sensor to stabilize
         }
         
+        i2cLock();
         // Begin communication
         sensor->begin();
         
         // Initialize sensor
         status = sensor->init();
         if (status != VL53L8CX_STATUS_OK) {
+            i2cUnlock();
             log_e("TOF: Init failed with status: %d", status);
             continue;
         }
@@ -54,6 +57,7 @@ bool TOFSensor::initSensorWithRetry() {
         // Set resolution to 8x8
         status = sensor->set_resolution(resolution);
         if (status != VL53L8CX_STATUS_OK) {
+            i2cUnlock();
             log_e("TOF: Failed to set resolution");
             continue;
         }
@@ -62,6 +66,7 @@ bool TOFSensor::initSensorWithRetry() {
         // Set ranging frequency
         status = sensor->set_ranging_frequency_hz(TOF_RANGING_FREQUENCY);
         if (status != VL53L8CX_STATUS_OK) {
+            i2cUnlock();
             log_e("TOF: Failed to set ranging frequency");
             continue;
         }
@@ -70,10 +75,12 @@ bool TOFSensor::initSensorWithRetry() {
         // Start ranging
         status = sensor->start_ranging();
         if (status != VL53L8CX_STATUS_OK) {
+            i2cUnlock();
             log_e("TOF: Failed to start ranging");
             continue;
         }
         log_i("TOF: Ranging started successfully!");
+        i2cUnlock();
         
         return true;  // Success!
     }
@@ -92,10 +99,12 @@ bool TOFSensor::begin() {
     digitalWrite(pwren_pin, HIGH);  // Power on immediately
     delay(100);  // Give sensor time to power up
     
-    // Initialize I2C (use higher speed for faster data transfers)
-    Wire.begin();
+    // Do NOT call Wire.begin() here — SCD40/BH1750/ADXL345 already own the bus.
+    // Re-initializing Wire from another task corrupts active I2C sessions.
+    i2cLock();
     Wire.setClock(400000);  // 400kHz: within datasheet fast-mode, reduces read latency
-    log_i("TOF: I2C initialized at 400kHz");
+    i2cUnlock();
+    log_i("TOF: I2C clock set to 400kHz (shared bus)");
     
     // Initialize sensor
     is_active = initSensorWithRetry();
@@ -115,15 +124,17 @@ bool TOFSensor::update() {
     }
     
     uint8_t NewDataReady = 0;
+    i2cLock();
     uint8_t status = sensor->check_data_ready(&NewDataReady);
-    
     if (status != VL53L8CX_STATUS_OK) {
+        i2cUnlock();
         log_e("TOF: Check data ready failed");
         return false;
     }
     
     if (NewDataReady) {
         status = sensor->get_ranging_data(&results);
+        i2cUnlock();
         if (status != VL53L8CX_STATUS_OK) {
             log_e("TOF: Get ranging data failed");
             return false;
@@ -131,6 +142,7 @@ bool TOFSensor::update() {
         return true;  // New data available
     }
     
+    i2cUnlock();
     return false;  // No new data yet
 }
 

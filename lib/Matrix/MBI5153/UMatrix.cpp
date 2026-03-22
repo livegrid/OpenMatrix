@@ -110,6 +110,8 @@ void UMatrix::init() {
   update();
 
   initialized = true;
+  // If rotation was updated earlier (e.g. ADXL in SensorTask before init), sync hardware now.
+  refreshMatrixConfig();
 }
 
 uint8_t UMatrix::getXResolution() {
@@ -158,7 +160,11 @@ uint8_t UMatrix::getBrightness() const {
 void UMatrix::setRotation(uint8_t newRotation) {
   if (newRotation < 4 && newRotation != rotation) {
     rotation = newRotation;
-    refreshMatrixConfig();
+    // SensorTask can call setRotation before DisplayTask finishes init(); DMA
+    // buffers are not allocated until then — skip hardware refresh until ready.
+    if (initialized) {
+      refreshMatrixConfig();
+    }
   }
 }
 

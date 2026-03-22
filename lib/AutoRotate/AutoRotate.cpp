@@ -1,16 +1,20 @@
 #include "AutoRotate.h"
+#include "I2CMutex.h"
 
 AutoRotate::AutoRotate(Matrix* matrix) : matrix(matrix), accel(12345), sensorWorking(false), x(0), y(0), z(0), currentRotation(5) { // Initialize with an invalid rotation
 }
 
 void AutoRotate::init() {
+  i2cLock();
   if (!accel.begin()) {
     log_e("Ooops, no ADXL345 detected ... Check your wiring!");
     sensorWorking = false;
+    i2cUnlock();
     return;
   }
   sensorWorking = true;
   accel.setRange(ADXL345_RANGE_16_G);
+  i2cUnlock();
 }
 
 uint8_t AutoRotate::getCurrentRotation() {
@@ -53,7 +57,9 @@ void AutoRotate::setRange(int range) {
 void AutoRotate::updateSensorValues() {
   if (sensorWorking) {
     sensors_event_t event; 
+    i2cLock();
     accel.getEvent(&event);
+    i2cUnlock();
     x = event.acceleration.x;
     y = event.acceleration.y;
     z = event.acceleration.z;

@@ -71,19 +71,6 @@ const state = {
     },
 };
 
-const aquarium = {
-    fishes: [
-        { age: 0.6, health: 0.95, bodyType: "Fish", headType: "TriangleHead", tailType: "CurvyTail", finType: "TriangleFin", motionType: "Fish", colors: [{h: 120, s: 200, v: 230}, {h: 140, s: 180, v: 200}] },
-        { age: 0.3, health: 0.8, bodyType: "Fish", headType: "FrogHead", tailType: "WavyTail", finType: "EllipseFin", motionType: "Fish", colors: [{h: 200, s: 220, v: 240}, {h: 180, s: 200, v: 220}] },
-        { age: 0.05, health: 1.0, bodyType: "Fish", headType: "NeedleHead", tailType: "TriangleTail", finType: "RoundFin", motionType: "Fish", colors: [{h: 30, s: 240, v: 255}] },
-        { age: 0.75, health: 0.6, bodyType: "Star", headType: "TriangleHead", tailType: "CurvyTail", finType: "TriangleFin", motionType: "Star", colors: [{h: 40, s: 255, v: 255}, {h: 50, s: 230, v: 240}] },
-        { age: 0.55, health: 0.9, bodyType: "Turtle", headType: "TriangleHead", tailType: "CurvyTail", finType: "TriangleFin", motionType: "Turtle", colors: [{h: 90, s: 180, v: 200}, {h: 100, s: 160, v: 180}] },
-        { age: 0.4, health: 0.85, bodyType: "Snake", headType: "TriangleHead", tailType: "CurvyTail", finType: "TriangleFin", motionType: "Snake", colors: [{h: 160, s: 200, v: 220}] },
-        { age: 0.65, health: 0.7, bodyType: "Octopus", headType: "TriangleHead", tailType: "CurvyTail", finType: "TriangleFin", motionType: "Octopus", colors: [{h: 240, s: 180, v: 230}, {h: 260, s: 200, v: 210}] },
-        { age: 0.2, health: 1.0, bodyType: "Fish", headType: "TriangleHead", tailType: "WavyTail", finType: "LegFin", motionType: "Fish", colors: [{h: 0, s: 240, v: 255}, {h: 15, s: 220, v: 240}] },
-    ]
-};
-
 const images = [
     {
         id: 1,
@@ -115,13 +102,6 @@ const images = [
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default [
-    {
-        url: '/openmatrix/aquarium',
-        method: 'get',
-        response: () => {
-            return { ...aquarium }
-        }
-    },
     {
         url: '/openmatrix/state',
         method: 'get',

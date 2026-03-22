@@ -92,16 +92,6 @@ void UI::begin() {
     }
   });
 
-  // Aquarium fish data (served from persisted state file)
-  _server->on("/openmatrix/aquarium", HTTP_GET, [&]() {
-    File file = LittleFS.open("/aquarium_state.json", "r");
-    if (!file) {
-      return _server->send(200, "application/json", "{\"fishes\":[]}");
-    }
-    _server->streamFile(file, "application/json");
-    file.close();
-  });
-
   // OpenMatrix Switch Modes
   _server->on("/openmatrix/mode", HTTP_POST, [&]() {
     JsonDocument json;

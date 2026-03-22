@@ -1,4 +1,5 @@
 #include "GeneralSettings.h"
+#include "I2CMutex.h"
 #include "StateManager.h"
 #include "TaskManager.h"
 #include <esp_heap_caps.h>
@@ -442,6 +443,9 @@ void restartTask(void* parameter) {
 
 void setup(void) {
   log_i("\n");
+
+  // Must exist before any task touches TwoWire (SCD40, BH1750, ADXL345, TOF).
+  i2cMutexInit();
 
   log_i(R""""(
  _     _            ____      _     _

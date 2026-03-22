@@ -1,5 +1,6 @@
 #include "SCD40.h"
 #include "SCD40Settings.h"
+#include "I2CMutex.h"
 
 String SCD40::uint16ToHex(uint16_t value) {
   String hexString = "";
@@ -55,43 +56,33 @@ void SCD40::runMeasurementTask() {
   int retries = 0;
   uint16_t error;
 
+  i2cLock();
   Wire.begin();
-  
+  i2cUnlock();
+
   while (retries < MAX_RETRIES) {
     log_i("Attempting to initialize SCD40 sensor (attempt %d of %d)", retries + 1, MAX_RETRIES);
 
+    uint16_t sensorStatus = 0;
+    i2cLock();
     scd4x.begin(Wire);
-    
-    // Stop any ongoing measurement
     error = scd4x.stopPeriodicMeasurement();
+    if (!error) {
+      error = scd4x.performSelfTest(sensorStatus);
+    }
+    if (!error) {
+      log_i("Sensor status: %d", sensorStatus);
+      error = scd4x.startPeriodicMeasurement();
+    }
+    i2cUnlock();
+
     if (error) {
-      log_e("Error stopping periodic measurement: %u", error);
+      log_e("SCD40 init step failed: %u", error);
       retries++;
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
 
-    // Perform self-test
-    uint16_t sensorStatus;
-    error = scd4x.performSelfTest(sensorStatus);
-    if (error) {
-      log_e("Error performing self-test: %u", error);
-      retries++;
-      vTaskDelay(pdMS_TO_TICKS(1000));
-      continue;
-    }
-    log_i("Sensor status: %d", sensorStatus);
-
-    // Start periodic measurement
-    error = scd4x.startPeriodicMeasurement();
-    if (error) {
-      log_e("Error starting periodic measurement: %u", error);
-      retries++;
-      vTaskDelay(pdMS_TO_TICKS(1000));
-      continue;
-    }
-
-    // If we've reached here, initialization was successful
     log_i("SCD40 sensor initialized successfully");
     sensorAvailable = true;
     break;
@@ -105,7 +96,9 @@ void SCD40::runMeasurementTask() {
   }
 
   // Set automatic self-calibration
+  i2cLock();
   error = scd4x.setAutomaticSelfCalibration(true);
+  i2cUnlock();
   if (error) {
     log_w("Error setting automatic self-calibration: %u", error);
   }
@@ -117,7 +110,9 @@ void SCD40::runMeasurementTask() {
   // Main measurement loop
   for (;;) {
     bool isDataReady = false;
+    i2cLock();
     error = scd4x.getDataReadyFlag(isDataReady);
+    i2cUnlock();
     if (error) {
       log_e("Error checking data ready flag: %u", error);
       sensorAvailable = false;
@@ -126,7 +121,9 @@ void SCD40::runMeasurementTask() {
     }
 
     if (isDataReady) {
+      i2cLock();
       error = scd4x.readMeasurement(co2, temperature, humidity);
+      i2cUnlock();
       if (error) {
         log_e("Error reading measurement: %u", error);
         sensorAvailable = false;

@@ -24,6 +24,7 @@ class Water {
 
   uint8_t scale = 5;
   float simplexSpeed = .002f;
+  static constexpr uint8_t kOverallBrightness = 150;
 
  public:
   Water(Matrix* matrix): matrix(matrix) {
@@ -78,16 +79,15 @@ class Water {
       // Depth factor: 0.0 at top → 1.0 at bottom
       float depthT = (float)row / (float)(totalRows - 1);
 
-      // Light attenuation with depth (bright at surface, dark at floor)
-      uint8_t depthScale = (uint8_t)(255.0f * (1.0f - depthT * 0.55f));
+      uint8_t depthScale = (uint8_t)(255.0f * (1.0f - depthT * 0.36f));
 
-      // God rays fade out toward the bottom (gone past ~70% depth)
-      float rayDepthFade = 1.0f - depthT * 1.45f;
+      float rayDepthFade = 1.0f - depthT * 1.15f;
       if (rayDepthFade < 0.0f) rayDepthFade = 0.0f;
 
       for (size_t col = 0; col < totalCols; ++col) {
         float n = batchNoise[col + batchRow * batchCols];
-        uint8_t noiseFactor = (uint8_t)((n + 1.0f) * 127.5f);
+        float nt = (n + 1.0f) * 0.5f;
+        uint8_t noiseFactor = (uint8_t)(78.0f + nt * 177.0f);
         CRGB color = simplexColor;
         color.nscale8(noiseFactor);
 
@@ -111,6 +111,7 @@ class Water {
           color.b = qadd8(color.b, boost);
         }
 
+        color.nscale8(kOverallBrightness);
         matrix->background->drawPixel((uint16_t)col, (uint16_t)row, color);
       }
     }

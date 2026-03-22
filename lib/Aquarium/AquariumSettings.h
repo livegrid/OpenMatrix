@@ -26,7 +26,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 
 #define NUM_FISH_START 5
 #define NUM_FISH_IDEAL 20
-#define NUM_PLANTS 0
+#define NUM_PLANTS 3
 
 // SeaFloor element counts (tuned for 78x78 display)
 #if defined(PANEL_UPCYCLED)
