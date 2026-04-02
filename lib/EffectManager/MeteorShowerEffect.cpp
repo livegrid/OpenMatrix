@@ -88,21 +88,25 @@ void Meteor::applySeparation(Meteor* meteors, uint8_t count, uint8_t selfIndex, 
     PVector steering;
     steering.set(0, 0);
     int total = 0;
+    const float separationDistanceSq = separationDistance * separationDistance;
+    const uint8_t maxNeighbors = 8;
     
     for (uint8_t i = 0; i < count; i++) {
         if (i == selfIndex) continue;
         
         float dx = position.x - meteors[i].position.x;
         float dy = position.y - meteors[i].position.y;
-        float distance = sqrtf(dx * dx + dy * dy);
+        float distanceSq = dx * dx + dy * dy;
         
-        if (distance > 0 && distance < separationDistance) {
+        if (distanceSq > 0.0001f && distanceSq < separationDistanceSq) {
+            float distance = sqrtf(distanceSq);
             float strength = ((separationDistance - distance) / separationDistance) * separationStrength;
             // Normalize and scale
             float invDist = 1.0f / distance;
             steering.x += dx * invDist * strength;
             steering.y += dy * invDist * strength;
             total++;
+            if (total >= maxNeighbors) break;
         }
     }
     
@@ -244,6 +248,10 @@ MeteorShowerEffect::MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor)
     centerAttractorStrength = 0.0f;
     centerAttractorRadius = 48.0f;
     forwardAcceleration = 0.03f;
+    maxActiveAttractors = 14;
+    maxSeparationNeighbors = 8;
+    trailPersistence = 180;
+    meteorCompositeThreshold = 5;
     
     // ToF parameters
     tofGridReady = false;
@@ -288,6 +296,9 @@ void MeteorShowerEffect::reset() {
     initPlanets();
     
     m_matrix->background->fillScreen(0);
+    if (m_matrix->foreground) {
+        m_matrix->foreground->clear();
+    }
 }
 
 const char* MeteorShowerEffect::getName() const {
@@ -337,27 +348,9 @@ void MeteorShowerEffect::initPlanets() {
 }
 
 void MeteorShowerEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
-    // Keep Meteor visual orientation, but rotate ToF mapping underneath by 180 degrees.
-    rotation = (rotation + 180) % 360;
-    switch (rotation) {
-        case 90:
-            outX = 7 - y;
-            outY = x;
-            break;
-        case 180:
-            outX = 7 - x;
-            outY = 7 - y;
-            break;
-        case 270:
-            outX = y;
-            outY = 7 - x;
-            break;
-        default:
-            outX = x;
-            outY = y;
-            break;
-    }
+    // Same effect-only remap as ConstellationEffect; sensor rotation is in TOFSensor::getDistance().
+    outX = 7 - y;
+    outY = x;
 }
 
 void MeteorShowerEffect::updateTofData() {
@@ -399,7 +392,7 @@ void MeteorShowerEffect::updateTofAttractors() {
             bool isActive = depth > minDetectionDistance && depth < maxDetectionDistance;
             tofAttractors[y][x].active = isActive;
             
-            // Check if top row (x == 7 after rotation means "top" in the original p5.js)
+            // Boost when the high-x edge of the effect 8x8 grid is active (p5.js port convention).
             if (isActive && x == 7) {
                 topRowHitCount++;
             }
@@ -479,7 +472,7 @@ void MeteorShowerEffect::updateMeteors() {
     if (tofGridReady) {
         for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
             for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-                if (tofAttractors[y][x].active && activeCount < 64) {
+                if (tofAttractors[y][x].active && activeCount < maxActiveAttractors) {
                     activeAttractors[activeCount] = tofAttractors[y][x].position;
                     activeCount++;
                 }
@@ -499,7 +492,9 @@ void MeteorShowerEffect::updateMeteors() {
         m->resetForces();
         m->applyBaseFlow(currentMeteorSpeed, flowCorrectionStrength, forwardAcceleration);
         m->applyWobble(frameCount, wobbleStrength, wobbleSpeed);
-        m->applySeparation(meteors, meteorCount, i, separationDistance, separationStrength);
+        if (maxSeparationNeighbors > 0 && meteorCount > 1) {
+            m->applySeparation(meteors, meteorCount, i, separationDistance, separationStrength);
+        }
         
         // Apply ToF attractors
         for (uint8_t j = 0; j < activeCount; j++) {
@@ -625,31 +620,17 @@ void MeteorShowerEffect::drawMeteors() {
         
         int16_t x = (int16_t)m.position.x;
         int16_t y = (int16_t)m.position.y;
-        drawEffectPixel(x, y, headColor);
+        int16_t radius = (int16_t)constrain((int)(m.size * 0.35f), 1, 2);
 
-        // Small core hot spot to avoid "ball-only" look.
+        // Soft glow + core drawn on foreground layer. Trails emerge from persistence.
+        CRGB glowColor = headColor;
+        glowColor.nscale8_video(110);
+        drawLayerCircle(m_matrix->foreground, x, y, radius + 1, glowColor);
+        drawLayerCircle(m_matrix->foreground, x, y, radius, headColor);
+
         CRGB coreColor = headColor;
         coreColor.nscale8_video(245);
-        drawEffectPixel(x, y, coreColor);
-
-        // Velocity-aligned tail.
-        float vx = m.velocity.x;
-        float vy = m.velocity.y;
-        float vmag = sqrtf(vx * vx + vy * vy);
-        if (vmag > 0.01f) {
-            float invMag = 1.0f / vmag;
-            float tailDirX = -vx * invMag;
-            float tailDirY = -vy * invMag;
-            int16_t tailLen = (int16_t)constrain((int)(vmag * 1.3f + m.size), 3, 7);
-            for (int16_t t = 1; t <= tailLen; t++) {
-                int16_t tx = (int16_t)(m.position.x + tailDirX * t);
-                int16_t ty = (int16_t)(m.position.y + tailDirY * t);
-                CRGB trailColor = headColor;
-                uint8_t fade = 210 - (uint8_t)(t * (165 / tailLen));
-                trailColor.nscale8_video(fade);
-                drawEffectPixel(tx, ty, trailColor);
-            }
-        }
+        drawLayerPixel(m_matrix->foreground, x, y, coreColor);
     }
 }
 
@@ -671,6 +652,11 @@ void MeteorShowerEffect::transformEffectCoordinate(int16_t inX, int16_t inY, int
 }
 
 void MeteorShowerEffect::drawEffectPixel(int16_t x, int16_t y, const CRGB& color) {
+    drawLayerPixel(m_matrix->background, x, y, color);
+}
+
+void MeteorShowerEffect::drawLayerPixel(GFX_Layer* layer, int16_t x, int16_t y, const CRGB& color) {
+    if (!layer) return;
     int16_t width = m_matrix->getXResolution();
     int16_t height = m_matrix->getYResolution();
     if (x < 0 || y < 0 || x >= width || y >= height) {
@@ -679,13 +665,18 @@ void MeteorShowerEffect::drawEffectPixel(int16_t x, int16_t y, const CRGB& color
 
     int16_t tx, ty;
     transformEffectCoordinate(x, y, tx, ty);
-    m_matrix->background->drawPixel(tx, ty, color);
+    layer->drawPixel(tx, ty, color);
 }
 
 void MeteorShowerEffect::drawEffectCircle(int16_t x, int16_t y, int16_t r, const CRGB& color) {
+    drawLayerCircle(m_matrix->background, x, y, r, color);
+}
+
+void MeteorShowerEffect::drawLayerCircle(GFX_Layer* layer, int16_t x, int16_t y, int16_t r, const CRGB& color) {
+    if (!layer) return;
     int16_t tx, ty;
     transformEffectCoordinate(x, y, tx, ty);
-    m_matrix->background->fillCircle(tx, ty, r, m_matrix->background->color565(color.r, color.g, color.b));
+    layer->fillCircle(tx, ty, r, layer->color565(color.r, color.g, color.b));
 }
 
 void MeteorShowerEffect::update() {
@@ -702,10 +693,18 @@ void MeteorShowerEffect::update() {
     updatePlanets();
     drawPlanets();
     
-    // Apply fade for meteor trails
-    fadeTrails();
-    
-    // Update and draw meteors
+    // Update meteors and render them on the foreground persistence layer.
     updateMeteors();
+    if (m_matrix->foreground && m_matrix->gfx_compositor) {
+        m_matrix->foreground->dim(trailPersistence);
+    }
     drawMeteors();
+    if (m_matrix->foreground && m_matrix->gfx_compositor) {
+        m_matrix->gfx_compositor->StackWithThreshold(
+            *m_matrix->background,
+            *m_matrix->foreground,
+            meteorCompositeThreshold,
+            true
+        );
+    }
 }

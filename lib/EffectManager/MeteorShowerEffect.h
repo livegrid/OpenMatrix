@@ -119,6 +119,10 @@ private:
     bool rotateEffect180;
     float recentSpawnY[4];
     uint8_t spawnHistoryIndex;
+    uint8_t maxActiveAttractors;
+    uint8_t maxSeparationNeighbors;
+    uint8_t trailPersistence;
+    uint8_t meteorCompositeThreshold;
     
     // Helper methods
     void initMeteors();
@@ -137,6 +141,8 @@ private:
     void transformEffectCoordinate(int16_t inX, int16_t inY, int16_t& outX, int16_t& outY) const;
     void drawEffectPixel(int16_t x, int16_t y, const CRGB& color);
     void drawEffectCircle(int16_t x, int16_t y, int16_t r, const CRGB& color);
+    void drawLayerPixel(GFX_Layer* layer, int16_t x, int16_t y, const CRGB& color);
+    void drawLayerCircle(GFX_Layer* layer, int16_t x, int16_t y, int16_t r, const CRGB& color);
     
     // Coordinate rotation for ToF
     void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
