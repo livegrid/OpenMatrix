@@ -371,7 +371,9 @@ void MeteorShowerEffect::updateTofData() {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
             uint8_t rx, ry;
             rotateCoordinates(x, y, rx, ry);
-            tofGrid[y][x] = tofSensor->getDistance(rx, ry);
+            uint8_t dx, dy;
+            tofSensor->toDisplayAligned(rx, ry, dx, dy);
+            tofGrid[y][x] = tofSensor->getDistance(dx, dy);
         }
     }
     tofGridReady = true;

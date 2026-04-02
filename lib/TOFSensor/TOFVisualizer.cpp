@@ -86,35 +86,6 @@ void TOFVisualizer::draw() {
     drawWithBlockSizes(blockSizeX, blockSizeY);
 }
 
-void TOFVisualizer::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Rotate coordinates based on sensor rotation setting
-    // For 8x8 grid, valid rotations are 0, 90, 180, 270 degrees
-    uint16_t rotation = sensor->getRotation();
-    switch (rotation) {
-        case 90:
-            // 90° clockwise: (x, y) -> (7-y, x)
-            outX = 7 - y;
-            outY = x;
-            break;
-        case 180:
-            // 180°: (x, y) -> (7-x, 7-y)
-            outX = 7 - x;
-            outY = 7 - y;
-            break;
-        case 270:
-            // 270° clockwise (90° counter-clockwise): (x, y) -> (y, 7-x)
-            outX = y;
-            outY = 7 - x;
-            break;
-        case 0:
-        default:
-            // No rotation: (x, y) -> (x, y)
-            outX = x;
-            outY = y;
-            break;
-    }
-}
-
 void TOFVisualizer::drawWithBlockSize(uint8_t blockSize) {
     // Deprecated - use draw() for auto-scaling or drawWithBlockSizes() for custom scaling
     drawWithBlockSizes(blockSize, blockSize);
@@ -137,22 +108,15 @@ void TOFVisualizer::drawWithBlockSizes(uint8_t blockSizeX, uint8_t blockSizeY) {
     // Clear the background
     matrix->background->fillScreen(matrix->background->color565(0, 0, 0));
     
-    // Draw each sensor zone as a block on the matrix
+    // Draw each sensor zone as a block on the matrix (getDistance is display-aligned; rotation is in TOFSensor)
     for (uint8_t y = 0; y < 8; y++) {
         for (uint8_t x = 0; x < 8; x++) {
-            // Get distance for this zone
             int16_t distance = sensor->getDistance(x, y);
             
-            // Convert distance to color
             uint16_t color = distanceToColor(distance);
             
-            // Apply rotation to display coordinates
-            uint8_t px, py;
-            rotateCoordinates(x, y, px, py);
-            
-            // Draw block on matrix with separate X and Y sizes
-            uint16_t blockX = px * blockSizeX;
-            uint16_t blockY = py * blockSizeY;
+            uint16_t blockX = x * blockSizeX;
+            uint16_t blockY = y * blockSizeY;
             
             // Fill the block (now can be non-square to fill full display)
             matrix->background->fillRect(blockX, blockY, blockSizeX, blockSizeY, color);

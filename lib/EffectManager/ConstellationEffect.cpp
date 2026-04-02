@@ -125,13 +125,9 @@ void ConstellationEffect::initStars() {
 // ============================================================================
 
 void ConstellationEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
-    switch (rotation) {
-        case 90:  outX = 7 - y; outY = x;     break;
-        case 180: outX = 7 - x; outY = 7 - y; break;
-        case 270: outX = y;     outY = 7 - x; break;
-        default:  outX = x;     outY = y;      break;
-    }
+    // Constellation-specific TOF orientation tweak: 180 degrees.
+    outX = 7 - y;
+    outY = x;
 }
 
 void ConstellationEffect::updateTofData() {
@@ -149,7 +145,9 @@ void ConstellationEffect::updateTofData() {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
             uint8_t rx, ry;
             rotateCoordinates(x, y, rx, ry);
-            tofGrid[y][x] = tofSensor->getDistance(rx, ry);
+            uint8_t dx, dy;
+            tofSensor->toDisplayAligned(rx, ry, dx, dy);
+            tofGrid[y][x] = tofSensor->getDistance(dx, dy);
         }
     }
     tofGridReady = true;

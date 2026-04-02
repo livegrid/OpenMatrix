@@ -154,6 +154,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define BOID_TOF_ATTRACTION_RADIUS_FRACTION 1.0f  // Attraction active within this fraction of min(width,height)
 
 //TOF Interaction Settings
+#define AQUARIUM_TOF_ROTATION_OFFSET 90  // Extra Aquarium-only rotation in degrees (0/90/180/270)
 #define TOF_BASELINE_ADAPT_RATE 0.01f  // How fast baseline adapts (0-1)
 #define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
 #define TOF_MIN_BLOB_CELLS 2          // Minimum cells to count as valid blob

@@ -1,5 +1,53 @@
 #include "TOFSensor.h"
 
+namespace {
+
+// Forward: native sample grid (x,y) -> display-aligned cell (matches former TOFVisualizer mapping).
+void forwardRotate8x8(uint8_t x, uint8_t y, uint16_t rotDeg, uint8_t& outX, uint8_t& outY) {
+    switch (rotDeg % 360) {
+        case 90:
+            outX = 7 - y;
+            outY = x;
+            break;
+        case 180:
+            outX = 7 - x;
+            outY = 7 - y;
+            break;
+        case 270:
+            outX = y;
+            outY = 7 - x;
+            break;
+        default:
+            outX = x;
+            outY = y;
+            break;
+    }
+}
+
+// Inverse: display-aligned (lx,ly) -> native sample indices for zone lookup.
+void inverseRotate8x8(uint8_t lx, uint8_t ly, uint16_t rotDeg, uint8_t& sx, uint8_t& sy) {
+    switch (rotDeg % 360) {
+        case 90:
+            sx = ly;
+            sy = 7 - lx;
+            break;
+        case 180:
+            sx = 7 - lx;
+            sy = 7 - ly;
+            break;
+        case 270:
+            sx = 7 - ly;
+            sy = lx;
+            break;
+        default:
+            sx = lx;
+            sy = ly;
+            break;
+    }
+}
+
+}  // namespace
+
 TOFSensor::TOFSensor(uint8_t pwrenPin, uint8_t address) 
     : pwren_pin(pwrenPin), sensor_address(address), is_active(false), rotation(TOF_DEFAULT_ROTATION) {
     // VL53L8CX object must be in internal RAM (contains hardware pointers for I2C)
@@ -139,14 +187,19 @@ bool TOFSensor::update() {
     return false;  // No new data yet
 }
 
+void TOFSensor::toDisplayAligned(uint8_t nativeX, uint8_t nativeY, uint8_t& outX, uint8_t& outY) const {
+    forwardRotate8x8(nativeX, nativeY, rotation, outX, outY);
+}
+
 int16_t TOFSensor::getDistance(uint8_t x, uint8_t y) {
     if (!is_active || x >= 8 || y >= 8) {
         return -1;
     }
     
-    // Convert x,y to zone index
-    // The sensor data is organized in a specific way
-    uint8_t zone = y * 8 + (7 - x);  // Mirror x axis
+    uint8_t sx, sy;
+    inverseRotate8x8(x, y, rotation, sx, sy);
+    // Convert native x,y to zone index (VL53L8CX ordering + mirror)
+    uint8_t zone = sy * 8 + (7 - sx);
     
     if (results.nb_target_detected[zone] > 0) {
         return results.distance_mm[zone * VL53L8CX_NB_TARGET_PER_ZONE];

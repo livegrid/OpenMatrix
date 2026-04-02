@@ -19,9 +19,6 @@ private:
     // Map a value from one range to another
     float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
     
-    // Rotate coordinates based on sensor rotation setting
-    void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
-    
 public:
     TOFVisualizer(TOFSensor* tofSensor, Matrix* matrixDisplay = nullptr);
     

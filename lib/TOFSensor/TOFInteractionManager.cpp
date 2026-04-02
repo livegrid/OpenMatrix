@@ -27,7 +27,9 @@ TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
 }
 
 void TOFInteractionManager::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    uint16_t rotation = sensor->getRotation();
+    // TOFSensor owns physical sensor orientation. Aquarium may apply an additional
+    // view-space offset to keep interactions aligned with Aquarium's presentation.
+    uint16_t rotation = AQUARIUM_TOF_ROTATION_OFFSET % 360;
     switch (rotation) {
         case 90:
             outX = 7 - y;
@@ -75,7 +77,9 @@ void TOFInteractionManager::updateBaseline() {
                 for (uint8_t x = 0; x < 8; x++) {
                     uint8_t rx, ry;
                     rotateCoordinates(x, y, rx, ry);
-                    int16_t dist = sensor->getDistance(rx, ry);
+                    uint8_t dx, dy;
+                    sensor->toDisplayAligned(rx, ry, dx, dy);
+                    int16_t dist = sensor->getDistance(dx, dy);
                     if (dist > 0) {
                         baseline[y][x] = (baseline[y][x] + dist) / 2; // Running average
                     }
@@ -90,7 +94,9 @@ void TOFInteractionManager::updateBaseline() {
             for (uint8_t x = 0; x < 8; x++) {
                 uint8_t rx, ry;
                 rotateCoordinates(x, y, rx, ry);
-                int16_t dist = sensor->getDistance(rx, ry);
+                uint8_t dx, dy;
+                sensor->toDisplayAligned(rx, ry, dx, dy);
+                int16_t dist = sensor->getDistance(dx, dy);
                 if (dist > 0) {
                     // Only adapt if no significant change (no person present)
                     int16_t diff = abs(dist - baseline[y][x]);
@@ -126,7 +132,9 @@ void TOFInteractionManager::detectActiveCells() {
         for (uint8_t x = 0; x < 8; x++) {
             uint8_t rx, ry;
             rotateCoordinates(x, y, rx, ry);
-            int16_t dist = sensor->getDistance(rx, ry);
+            uint8_t dx, dy;
+            sensor->toDisplayAligned(rx, ry, dx, dy);
+            int16_t dist = sensor->getDistance(dx, dy);
             currentDepth[y][x] = dist;
             
             if (dist < 0 || dist < TOF_MIN_DETECTION_DIST || dist > TOF_MAX_DETECTION_DIST) {

@@ -158,14 +158,14 @@ void displayTask(void* parameter) {
 #endif
 
   // Set mode to EFFECT with Constellation as default
-  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0
 
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
 
   // Route large allocations (Fish, Plants, Boids) to PSRAM so internal heap
   // stays free for WiFi, E1.31/AsyncUDP, and mDNS.

@@ -16,8 +16,8 @@
 #define TOF_RANGING_FREQUENCY 15  // 15 Hz
 
 // Shared detection range configuration (mm)
-#define TOF_MIN_DETECTION_DIST 500
-#define TOF_MAX_DETECTION_DIST 2000
+#define TOF_MIN_DETECTION_DIST 1000
+#define TOF_MAX_DETECTION_DIST 3000
 
 // Shared TOF coordinate rotation (degrees)
 #define TOF_DEFAULT_ROTATION 270
@@ -30,7 +30,7 @@ private:
     bool is_active;
     uint8_t resolution;
     VL53L8CX_ResultsData results;  // Back to direct member for now (I2C/DMA may need internal RAM)
-    uint16_t rotation;  // Display rotation in degrees (0, 90, 180, 270)
+    uint16_t rotation;  // Physical mounting rotation in degrees (0, 90, 180, 270)
     
     void powerCycleSensor();
     bool initSensorWithRetry();
@@ -43,12 +43,15 @@ public:
     bool update();
     bool isActive() { return is_active; }
     
-    // Coordinate rotation (0, 90, 180, 270 degrees) - used by visualizer and interaction manager
+    // Physical mounting rotation (0, 90, 180, 270). Applied inside getDistance().
     uint16_t getRotation() const { return rotation; }
     void setRotation(uint16_t rot) { rotation = rot; }
     
-    // Get distance data for visualization
+    // Display-aligned grid (0..7): same layout as TOFVisualizer / panel. Rotation is applied here.
     int16_t getDistance(uint8_t x, uint8_t y);
+    // Legacy/native 8x8 indices (pre-rotation convention) -> pass through toDisplayAligned()
+    // before getDistance() when composing effect-specific offsets written for the old API.
+    void toDisplayAligned(uint8_t nativeX, uint8_t nativeY, uint8_t& outX, uint8_t& outY) const;
     uint8_t getNumZones();
     uint8_t getZonesPerLine();
     
