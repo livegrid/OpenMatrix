@@ -303,12 +303,6 @@ void MeteorShowerEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
     maxDetectionDistance = maxDist;
 }
 
-void MeteorShowerEffect::setTofRotation(uint8_t rotation) {
-    if (tofSensor) {
-        tofSensor->setRotation(rotation);
-    }
-}
-
 void MeteorShowerEffect::initMeteors() {
     meteorCount = 0;
     // Start with a few meteors

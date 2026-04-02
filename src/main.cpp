@@ -124,7 +124,7 @@ void displayTask(void* parameter) {
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setRotation(2);
-  matrix.setBrightness(250);
+  matrix.setBrightness(200);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
@@ -146,7 +146,9 @@ void displayTask(void* parameter) {
 #ifdef VL53L8CX_ENABLED
   // Initialize TOF visualizer after matrix is initialized (static allocation)
   tofVisualizer->setMatrix(&matrix);
-  tofVisualizer->setDistanceRange(100, 2000);  // 100mm to 2000mm range
+  tofVisualizer->setDistanceRange(TOF_MIN_DETECTION_DIST,
+                                  TOF_MAX_DETECTION_DIST);
+  tofSensor.setRotation(TOF_DEFAULT_ROTATION);
   
   // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders)
   effectManager.setTofSensor(&tofSensor);
@@ -228,13 +230,7 @@ void displayTask(void* parameter) {
             matrix.background->display();
             break;
           case OpenMatrixMode::AQUARIUM:
-#ifdef VL53L8CX_ENABLED
-            // Show aquarium with TOF interaction (fish react to hand movements)
-            // To see raw TOF heatmap, uncomment the visualizer code below
-            aquarium.update(touchMenu.showSensorData());
-            aquarium.display();
-            
-            /* Debug: Show TOF heatmap instead of aquarium
+#ifdef TOF_DEBUG_ENABLED
             if (tofVisualizer && tofSensor.isActive()) {
               static bool tofShownLogged = false;
               if (!tofShownLogged) {
@@ -247,7 +243,6 @@ void displayTask(void* parameter) {
               aquarium.update(touchMenu.showSensorData());
               aquarium.display();
             }
-            */
 #else
             aquarium.update(touchMenu.showSensorData());
             aquarium.display();

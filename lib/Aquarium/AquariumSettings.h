@@ -182,6 +182,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define FOLLOW_DIRECTION_MIN_VELOCITY 0.15f    // Blob velocity below this = "stationary" (use position bias only)
 #define FOLLOW_IDLE_WOBBLE_SIN 0.3f            // Organic sine wobble during follow
 #define FOLLOW_IDLE_WOBBLE_NOISE 0.2f          // Organic noise wobble during follow
+#define CURIOUS_ATTRACTION_STOP_DISTANCE (10 * PHYSICS_SCALE)  // Stop direct attraction when close to hand blob
+#define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.6f                  // Follow force = FOOD_FORCE * this in CURIOUS state
 #define CURIOUS_SEPARATION_DISTANCE (20 * PHYSICS_SCALE)  // Fish-to-fish personal space (~20 px)
 #define CURIOUS_SEPARATION_FORCE 6.0f                     // Repulsion force between neighbors
 

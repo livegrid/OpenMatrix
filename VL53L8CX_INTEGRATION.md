@@ -44,7 +44,7 @@ This document describes the integration of the VL53L8CX Time-of-Flight (TOF) sen
 - **Integration Time**: 20ms
 - **Ranging Frequency**: 15Hz
 - **Update Rate**: 10Hz (100ms per update)
-- **Distance Range**: 100mm to 2000mm (configurable)
+- **Distance Range**: Uses shared `TOF_MIN_DETECTION_DIST` to `TOF_MAX_DETECTION_DIST` defaults (configurable)
 
 ### Error Handling
 - Automatic retry on initialization failure (3 attempts)
@@ -66,7 +66,7 @@ When the sensor is active, the TOF visualization replaces the Aquarium mode disp
 ### Distance Range Adjustment
 To adjust the distance mapping range, modify the values in `main.cpp`:
 ```cpp
-tofVisualizer->setDistanceRange(100, 2000);  // min, max in mm
+tofVisualizer->setDistanceRange(TOF_MIN_DETECTION_DIST, TOF_MAX_DETECTION_DIST);
 ```
 
 ## Task Management

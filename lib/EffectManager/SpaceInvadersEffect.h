@@ -191,5 +191,4 @@ public:
     
     // Configuration
     void setTofSensor(TOFSensor* sensor);
-    void setTofRotation(uint16_t rotation);
 };

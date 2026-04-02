@@ -2,9 +2,9 @@
 
 TOFVisualizer::TOFVisualizer(TOFSensor* tofSensor, Matrix* matrixDisplay) 
     : sensor(tofSensor), matrix(matrixDisplay) {
-    // Default range: 100mm (close) to 2000mm (far)
-    minDistance = 100;
-    maxDistance = 2000;
+    // Keep visualizer defaults aligned with shared TOF detection range.
+    minDistance = TOF_MIN_DETECTION_DIST;
+    maxDistance = TOF_MAX_DETECTION_DIST;
 }
 
 void TOFVisualizer::setMatrix(Matrix* matrixDisplay) {

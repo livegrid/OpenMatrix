@@ -186,12 +186,6 @@ void SpaceInvadersEffect::setTofSensor(TOFSensor* sensor) {
     tofSensor = sensor;
 }
 
-void SpaceInvadersEffect::setTofRotation(uint16_t rotation) {
-    if (tofSensor) {
-        tofSensor->setRotation(rotation);
-    }
-}
-
 void SpaceInvadersEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
     uint16_t rotation = tofSensor ? tofSensor->getRotation() : 0;
     // Match ConstellationEffect rotation handling exactly.

@@ -108,12 +108,6 @@ void ConstellationEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
     maxDetectionDistance = maxDist;
 }
 
-void ConstellationEffect::setTofRotation(uint16_t rotation) {
-    if (tofSensor) {
-        tofSensor->setRotation(rotation);
-    }
-}
-
 void ConstellationEffect::initStars() {
     starCount = MAX_STARS;
 

@@ -151,5 +151,4 @@ public:
     // Configuration
     void setTofSensor(TOFSensor* sensor);
     void setDetectionRange(int16_t minDist, int16_t maxDist);
-    void setTofRotation(uint8_t rotation);
 };
