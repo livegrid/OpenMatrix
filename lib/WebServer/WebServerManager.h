@@ -16,16 +16,16 @@
 #include "Edmx.h"
 
 // WiFi credentials
-// #define WIFI_SSID "Tardigrade"
-// #define WIFI_PASSWORD "chocolate-milk"
+#define WIFI_SSID "Tardigrade"
+#define WIFI_PASSWORD "chocolate-milk"
 // #define WIFI_SSID "Pixel6"
 // #define WIFI_PASSWORD "yellow22"
 // #define WIFI_SSID "LivegridHotspot"
 // #define WIFI_PASSWORD "livegrid22"
 // #define WIFI_SSID "Hone Wifi 2.4Ghz"
 // #define WIFI_PASSWORD "Findyouredge"
-#define WIFI_SSID "IRVINA_4G_EXT"
-#define WIFI_PASSWORD "raj230661"
+// #define WIFI_SSID "IRVINA_4G_EXT"
+// #define WIFI_PASSWORD "raj230661"
 
 class WebServerManager {
 public:

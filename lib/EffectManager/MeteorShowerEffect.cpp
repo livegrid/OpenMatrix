@@ -1,6 +1,10 @@
 #include "MeteorShowerEffect.h"
 #include "../TOFSensor/TOFSensor.h"
 
+namespace {
+constexpr int16_t kTofEffectRotationDeg = 90;  // Set effect remap here: 0/90/180/270
+}
+
 // Simple pseudo-random for consistent behavior
 static uint32_t noiseSeed = 12345;
 
@@ -348,9 +352,8 @@ void MeteorShowerEffect::initPlanets() {
 }
 
 void MeteorShowerEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Same effect-only remap as ConstellationEffect; sensor rotation is in TOFSensor::getDistance().
-    outX = 7 - y;
-    outY = x;
+    // Effect-only 8x8 remap (easy to tune by degrees).
+    TOFSensor::rotateGrid8x8(x, y, kTofEffectRotationDeg, outX, outY);
 }
 
 void MeteorShowerEffect::updateTofData() {

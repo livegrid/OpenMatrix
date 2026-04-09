@@ -49,7 +49,8 @@ void inverseRotate8x8(uint8_t lx, uint8_t ly, uint16_t rotDeg, uint8_t& sx, uint
 }  // namespace
 
 TOFSensor::TOFSensor(uint8_t pwrenPin, uint8_t address) 
-    : pwren_pin(pwrenPin), sensor_address(address), is_active(false), rotation(TOF_DEFAULT_ROTATION) {
+    : pwren_pin(pwrenPin), sensor_address(address), is_active(false), rotation(TOF_DEFAULT_ROTATION),
+      ranging_frame_id(0) {
     // VL53L8CX object must be in internal RAM (contains hardware pointers for I2C)
     sensor = new VL53L8CX(&Wire, TOF_LPN_PIN);
     resolution = VL53L8CX_RESOLUTION_8X8;
@@ -181,6 +182,7 @@ bool TOFSensor::update() {
             log_e("TOF: Get ranging data failed");
             return false;
         }
+        ++ranging_frame_id;
         return true;  // New data available
     }
     
@@ -189,6 +191,12 @@ bool TOFSensor::update() {
 
 void TOFSensor::toDisplayAligned(uint8_t nativeX, uint8_t nativeY, uint8_t& outX, uint8_t& outY) const {
     forwardRotate8x8(nativeX, nativeY, rotation, outX, outY);
+}
+
+void TOFSensor::rotateGrid8x8(uint8_t x, uint8_t y, int16_t rotDeg, uint8_t& outX, uint8_t& outY) {
+    int16_t normalized = rotDeg % 360;
+    if (normalized < 0) normalized += 360;
+    forwardRotate8x8(x, y, (uint16_t)normalized, outX, outY);
 }
 
 int16_t TOFSensor::getDistance(uint8_t x, uint8_t y) {

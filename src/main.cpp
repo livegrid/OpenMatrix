@@ -124,7 +124,7 @@ void displayTask(void* parameter) {
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setRotation(2);
-  matrix.setBrightness(200);
+  matrix.setBrightness(100);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
@@ -157,15 +157,15 @@ void displayTask(void* parameter) {
   aquarium.setTofSensor(&tofSensor);
 #endif
 
+  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   // Set mode to EFFECT with Constellation as default
-  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0
 
-  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
 
   // Route large allocations (Fish, Plants, Boids) to PSRAM so internal heap
   // stays free for WiFi, E1.31/AsyncUDP, and mDNS.
@@ -230,13 +230,8 @@ void displayTask(void* parameter) {
             matrix.background->display();
             break;
           case OpenMatrixMode::AQUARIUM:
-#ifdef TOF_DEBUG_ENABLED
+#ifdef VL53L8CX_ENABLED
             if (tofVisualizer && tofSensor.isActive()) {
-              static bool tofShownLogged = false;
-              if (!tofShownLogged) {
-                log_i("Display: Showing TOF visualizer heatmap");
-                tofShownLogged = true;
-              }
               tofVisualizer->draw();
               matrix.background->display();
             } else {

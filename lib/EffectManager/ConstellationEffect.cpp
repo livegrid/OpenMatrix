@@ -1,6 +1,10 @@
 #include "ConstellationEffect.h"
 #include "../TOFSensor/TOFSensor.h"
 
+namespace {
+constexpr int16_t kTofEffectRotationDeg = 180;  // Set effect remap here: 0/90/180/270
+}
+
 // Sin lookup: 0-255 phase -> twinkle multiplier ~64-255 (0.25 to 1.0 of base)
 const uint8_t ConstellationEffect::SIN_TABLE[256] = {
     160, 163, 166, 169, 172, 175, 178, 181, 184, 187, 190, 193, 196, 198, 201, 204,
@@ -125,9 +129,8 @@ void ConstellationEffect::initStars() {
 // ============================================================================
 
 void ConstellationEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Constellation-specific TOF orientation tweak: 180 degrees.
-    outX = 7 - y;
-    outY = x;
+    // Effect-only 8x8 remap (easy to tune by degrees).
+    TOFSensor::rotateGrid8x8(x, y, kTofEffectRotationDeg, outX, outY);
 }
 
 void ConstellationEffect::updateTofData() {
