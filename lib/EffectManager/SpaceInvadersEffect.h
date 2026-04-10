@@ -3,8 +3,8 @@
 #include "Effect.h"
 #include "PVector.h"
 #include <Arduino.h>
+#include "../TOFSensor/TOFInteractionManager.h"
 
-// Forward declaration
 class TOFSensor;
 
 // Bullet structure
@@ -53,7 +53,6 @@ private:
     static constexpr uint8_t MAX_ALIENS = 30;  // 5 columns x 4 rows max
     static constexpr uint8_t MAX_STARS = 20;
     static constexpr uint8_t MAX_PLANETS = 2;
-    static constexpr uint8_t TOF_GRID_SIZE = 8;
     
     // Alien configuration
     uint8_t alienRows;
@@ -105,20 +104,16 @@ private:
     
     // ToF sensor integration
     TOFSensor* tofSensor;
-    int16_t tofGrid[TOF_GRID_SIZE][TOF_GRID_SIZE];
+    TOFInteractionManager* tofInteraction;
+    InteractionData tofInteractionData;
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
-    bool topRowActive;  // Used for shooting trigger
     bool handsRaised;
-    uint8_t handRaiseFrames;
-    uint8_t handLowerFrames;
     
-    // Blob detection parameters
     uint8_t minBlobCells;
     uint8_t missingBlobRecentFrames;
     uint32_t lastBlobFrame;
-    uint8_t lastBlobSize;
     float filteredBlobX;
     
     // Timing
@@ -137,12 +132,8 @@ private:
     static const uint8_t alienPatternB[3][8];
     static const uint8_t alienHues[4];
     
-    // Helper methods - ToF
     void updateTofData();
-    void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
-    BlobResult findLargestBlob();
-    void updateTopRowActive();
-    
+
     // Helper methods - Game logic
     void resetGame();
     void resetPlayer();

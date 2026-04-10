@@ -3,8 +3,8 @@
 #include "Effect.h"
 #include "PVector.h"
 #include <Arduino.h>
+#include "../TOFSensor/TOFInteractionManager.h"
 
-// Forward declaration for optional TOF sensor integration
 class TOFSensor;
 
 // Meteor particle class - similar to p5.js Boid
@@ -101,8 +101,9 @@ private:
     
     // ToF sensor integration
     TOFSensor* tofSensor;
+    TOFInteractionManager* tofInteraction;
     TOFAttractor tofAttractors[TOF_GRID_SIZE][TOF_GRID_SIZE];
-    int16_t tofGrid[TOF_GRID_SIZE][TOF_GRID_SIZE];
+    InteractionData tofInteractionData;
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
@@ -143,9 +144,6 @@ private:
     void drawEffectCircle(int16_t x, int16_t y, int16_t r, const CRGB& color);
     void drawLayerPixel(GFX_Layer* layer, int16_t x, int16_t y, const CRGB& color);
     void drawLayerCircle(GFX_Layer* layer, int16_t x, int16_t y, int16_t r, const CRGB& color);
-    
-    // Coordinate rotation for ToF
-    void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
 
 public:
     MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor = nullptr);

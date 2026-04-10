@@ -11,6 +11,7 @@
 #include "LSystemEffect.h"
 #include "MeteorShowerEffect.h"
 #include "SpaceInvadersEffect.h"
+#include "GravityFlapEffect.h"
 #include "ConstellationEffect.h"
 
 #include <vector>
@@ -47,4 +48,5 @@ private:
     ConstellationEffect* m_constellation = nullptr;
     MeteorShowerEffect* m_meteorShower = nullptr;
     SpaceInvadersEffect* m_spaceInvaders = nullptr;
+    GravityFlapEffect* m_gravityFlap = nullptr;
 };

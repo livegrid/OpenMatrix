@@ -11,6 +11,9 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
     
     m_spaceInvaders = new SpaceInvadersEffect(matrix);
     m_effects.push_back(m_spaceInvaders);
+
+    m_gravityFlap = new GravityFlapEffect(matrix);
+    m_effects.push_back(m_gravityFlap);
     
     // Other effects
     // m_effects.push_back(new SimplexNoiseEffect(matrix));
@@ -98,5 +101,8 @@ void EffectManager::setTofSensor(TOFSensor* sensor) {
     }
     if (m_spaceInvaders) {
         m_spaceInvaders->setTofSensor(sensor);
+    }
+    if (m_gravityFlap) {
+        m_gravityFlap->setTofSensor(sensor);
     }
 }

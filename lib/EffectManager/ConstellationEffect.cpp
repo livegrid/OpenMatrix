@@ -2,8 +2,17 @@
 #include "../TOFSensor/TOFSensor.h"
 
 namespace {
-constexpr int16_t kTofEffectRotationDeg = 180;  // Set effect remap here: 0/90/180/270
+/** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
+constexpr int16_t kTofEffectRotationDeg = 90;  // 0 / 90 / 180 / 270
+
+static int16_t depthAtEffectCell(const InteractionData& d, TOFSensor& sensor, uint8_t effectX, uint8_t effectY) {
+    uint8_t rx, ry;
+    TOFSensor::rotateGrid8x8(effectX, effectY, kTofEffectRotationDeg, rx, ry);
+    uint8_t gx, gy;
+    sensor.toDisplayAligned(rx, ry, gx, gy);
+    return d.depthMap[gy][gx];
 }
+}  // namespace
 
 // Sin lookup: 0-255 phase -> twinkle multiplier ~64-255 (0.25 to 1.0 of base)
 const uint8_t ConstellationEffect::SIN_TABLE[256] = {
@@ -71,7 +80,7 @@ uint8_t ConstellationEffect::getTwinklePhase(uint16_t i, uint32_t time) const {
 // ============================================================================
 
 ConstellationEffect::ConstellationEffect(Matrix* matrix, TOFSensor* sensor)
-    : Effect(matrix), tofSensor(sensor), starCount(0) {
+    : Effect(matrix), tofSensor(sensor), tofInteraction(nullptr), starCount(0) {
 
     screenWidth = m_matrix->getXResolution();
     screenHeight = m_matrix->getYResolution();
@@ -82,10 +91,10 @@ ConstellationEffect::ConstellationEffect(Matrix* matrix, TOFSensor* sensor)
 
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            tofGrid[y][x] = 0;
             depthField[y][x] = 0;
         }
     }
+    tofInteractionData = {};
 
     for (uint8_t i = 0; i < MAX_SHOOTING_STARS; i++) {
         shootingStars[i].active = false;
@@ -105,11 +114,22 @@ const char* ConstellationEffect::getName() const {
 
 void ConstellationEffect::setTofSensor(TOFSensor* sensor) {
     tofSensor = sensor;
+    if (tofInteraction) {
+        delete tofInteraction;
+        tofInteraction = nullptr;
+    }
+    if (tofSensor) {
+        tofInteraction = new TOFInteractionManager(tofSensor);
+        tofInteraction->setDistanceRange(minDetectionDistance, maxDetectionDistance);
+    }
 }
 
 void ConstellationEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
     minDetectionDistance = minDist;
     maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
 }
 
 void ConstellationEffect::initStars() {
@@ -128,13 +148,8 @@ void ConstellationEffect::initStars() {
 // TOF sensor
 // ============================================================================
 
-void ConstellationEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Effect-only 8x8 remap (easy to tune by degrees).
-    TOFSensor::rotateGrid8x8(x, y, kTofEffectRotationDeg, outX, outY);
-}
-
 void ConstellationEffect::updateTofData() {
-    if (!tofSensor || !tofSensor->isActive()) {
+    if (!tofSensor || !tofSensor->isActive() || !tofInteraction) {
         tofGridReady = false;
         for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
             for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
@@ -143,16 +158,8 @@ void ConstellationEffect::updateTofData() {
         }
         return;
     }
-
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            uint8_t rx, ry;
-            rotateCoordinates(x, y, rx, ry);
-            uint8_t dx, dy;
-            tofSensor->toDisplayAligned(rx, ry, dx, dy);
-            tofGrid[y][x] = tofSensor->getDistance(dx, dy);
-        }
-    }
+    tofInteraction->update();
+    tofInteractionData = tofInteraction->getInteractionData();
     tofGridReady = true;
 }
 
@@ -171,7 +178,8 @@ void ConstellationEffect::buildDepthField() {
 
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            int16_t depth = tofGrid[y][x];
+            int16_t depth =
+                tofSensor ? depthAtEffectCell(tofInteractionData, *tofSensor, x, y) : 0;
             float value = 0;
             if (depth > minDetectionDistance && depth < maxDetectionDistance) {
                 // Gradient: closer = stronger (1.0 at min, 0.0 at max)

@@ -193,10 +193,20 @@ void TOFSensor::toDisplayAligned(uint8_t nativeX, uint8_t nativeY, uint8_t& outX
     forwardRotate8x8(nativeX, nativeY, rotation, outX, outY);
 }
 
+void TOFSensor::fromDisplayAligned(uint8_t dispX, uint8_t dispY, uint8_t& nativeX, uint8_t& nativeY) const {
+    inverseRotate8x8(dispX, dispY, rotation, nativeX, nativeY);
+}
+
 void TOFSensor::rotateGrid8x8(uint8_t x, uint8_t y, int16_t rotDeg, uint8_t& outX, uint8_t& outY) {
     int16_t normalized = rotDeg % 360;
     if (normalized < 0) normalized += 360;
     forwardRotate8x8(x, y, (uint16_t)normalized, outX, outY);
+}
+
+void TOFSensor::inverseRotateGrid8x8(uint8_t x, uint8_t y, int16_t rotDeg, uint8_t& outX, uint8_t& outY) {
+    int16_t normalized = rotDeg % 360;
+    if (normalized < 0) normalized += 360;
+    inverseRotate8x8(x, y, (uint16_t)normalized, outX, outY);
 }
 
 int16_t TOFSensor::getDistance(uint8_t x, uint8_t y) {

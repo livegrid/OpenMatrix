@@ -1,10 +1,12 @@
 #include "SpaceInvadersEffect.h"
+#include "SpacemanSprites.h"
 #include "../TOFSensor/TOFSensor.h"
 #include <math.h>
 
 namespace {
-constexpr int16_t kTofEffectRotationDeg = 180;  // Set effect remap here: 0/90/180/270
-}
+/** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
+constexpr int16_t kTofEffectRotationDeg = 180;  // 0 / 90 / 180 / 270
+}  // namespace
 
 // Static random seed
 static uint32_t gameNoiseSeed = 54321;
@@ -38,78 +40,8 @@ const uint8_t SpaceInvadersEffect::alienPatternB[3][8] = {
 // Alien colors by row (FastLED hue values: 0=red, 32=orange, 96=green, 160=blue)
 const uint8_t SpaceInvadersEffect::alienHues[4] = {0, 24, 96, 192};
 
-// User-provided indexed sprites (RGB332, 0 = transparent)
-static const uint8_t kPlayerSpriteShootIdx[20][20] PROGMEM = {
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001010, 0b00000000, 0b00000000, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b00000000, 0b00000000, 0b01001010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b10101101, 0b11010110, 0b11011010, 0b11011010, 0b11010110, 0b10101101, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00101011, 0b10101101, 0b11111100, 0b11011010, 0b11011010, 0b11111100, 0b10101101, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b10101101, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b10101101, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000}
-};
-
-static const uint8_t kPlayerSpriteMoveIdx[20][20] PROGMEM = {
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11001101, 0b11001101, 0b11001101, 0b11001101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11001001, 0b11001101, 0b11001101, 0b11001101, 0b11001101, 0b11001101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10101101, 0b11001101, 0b10101101, 0b11010110, 0b11010110, 0b11011010, 0b10101101, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10101101, 0b10101101, 0b11010110, 0b11111100, 0b11011010, 0b11111100, 0b10101101, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10101101, 0b10101101, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b10101101, 0b00000000, 0b11011010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10101101, 0b10101101, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b10101101, 0b11011010, 0b11011010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11001101, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001010, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000}
-};
-
-static const uint8_t kPlayerSpriteHitIdx[20][20] PROGMEM = {
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00101011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b01001011, 0b10101101, 0b10101101, 0b10101101, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b01001011, 0b10101101, 0b11011010, 0b11011010, 0b10101101, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001011, 0b10101101, 0b11011010, 0b11011010, 0b11111100, 0b11011010, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b10101101, 0b11011010, 0b11011010, 0b11011010, 0b11011010, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b10101101, 0b11011010, 0b11111100, 0b11011010, 0b11011010, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b10101101, 0b10101101, 0b11010110, 0b11011010, 0b11001101, 0b10101101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00100101, 0b11001101, 0b11001101, 0b11001101, 0b11001101, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b01001010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b01001011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000}
-};
-
 SpaceInvadersEffect::SpaceInvadersEffect(Matrix* matrix, TOFSensor* sensor)
-    : Effect(matrix), tofSensor(sensor) {
+    : Effect(matrix), tofSensor(sensor), tofInteraction(nullptr), tofInteractionData{} {
     
     // Matrix is landscape; game plays in portrait (rotated 90°)
     matrixWidth = m_matrix->getXResolution();
@@ -150,26 +82,15 @@ SpaceInvadersEffect::SpaceInvadersEffect(Matrix* matrix, TOFSensor* sensor)
     tofGridReady = false;
     minDetectionDistance = TOF_MIN_DETECTION_DIST;
     maxDetectionDistance = TOF_MAX_DETECTION_DIST;
-    topRowActive = false;
     handsRaised = false;
-    handRaiseFrames = 0;
-    handLowerFrames = 0;
     minBlobCells = 3;
     missingBlobRecentFrames = 20;
     lastBlobFrame = 0;
-    lastBlobSize = 0;
     filteredBlobX = playWidth * 0.5f;
     
     frameCount = 0;
     planetCount = 0;
     planetSpawnCounter = 0;
-    
-    // Initialize ToF grid
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            tofGrid[y][x] = 0;
-        }
-    }
     
     reset();
 }
@@ -188,11 +109,14 @@ const char* SpaceInvadersEffect::getName() const {
 
 void SpaceInvadersEffect::setTofSensor(TOFSensor* sensor) {
     tofSensor = sensor;
-}
-
-void SpaceInvadersEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Effect-only 8x8 remap (easy to tune by degrees).
-    TOFSensor::rotateGrid8x8(x, y, kTofEffectRotationDeg, outX, outY);
+    if (tofInteraction) {
+        delete tofInteraction;
+        tofInteraction = nullptr;
+    }
+    if (tofSensor) {
+        tofInteraction = new TOFInteractionManager(tofSensor);
+        tofInteraction->setDistanceRange(minDetectionDistance, maxDetectionDistance);
+    }
 }
 
 // Portrait game coordinate (gx, gy) → landscape matrix coordinate.
@@ -220,154 +144,16 @@ void SpaceInvadersEffect::drawGameCircle(int16_t gx, int16_t gy, int16_t r, cons
 }
 
 void SpaceInvadersEffect::updateTofData() {
-    if (!tofSensor || !tofSensor->isActive()) {
+    if (!tofSensor || !tofSensor->isActive() || !tofInteraction) {
         tofGridReady = false;
+        handsRaised = false;
         return;
     }
-    
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            uint8_t rx, ry;
-            rotateCoordinates(x, y, rx, ry);
-            uint8_t dx, dy;
-            tofSensor->toDisplayAligned(rx, ry, dx, dy);
-            tofGrid[y][x] = tofSensor->getDistance(dx, dy);
-        }
-    }
+
+    tofInteraction->update();
+    tofInteractionData = tofInteraction->getInteractionData();
     tofGridReady = true;
-    updateTopRowActive();
-}
-
-void SpaceInvadersEffect::updateTopRowActive() {
-    // Gesture edge used by this effect's control mapping.
-    uint8_t activeTopCells = 0;
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        int16_t depth = tofGrid[y][7];
-        if (depth > minDetectionDistance && depth < maxDetectionDistance) {
-            activeTopCells++;
-        }
-    }
-
-    // Require at least 2 active cells to qualify as a hand raise region hit.
-    topRowActive = activeTopCells >= 2;
-
-    // Debounce / hysteresis so shooting does not flicker with sensor noise.
-    if (topRowActive) {
-        handRaiseFrames = min<uint8_t>(255, handRaiseFrames + 1);
-        handLowerFrames = 0;
-        if (handRaiseFrames >= 2) {
-            handsRaised = true;
-        }
-    } else {
-        handLowerFrames = min<uint8_t>(255, handLowerFrames + 1);
-        handRaiseFrames = 0;
-        if (handLowerFrames >= 3) {
-            handsRaised = false;
-        }
-    }
-}
-
-BlobResult SpaceInvadersEffect::findLargestBlob() {
-    BlobResult result = {0, 0, false};
-    
-    if (!tofGridReady) return result;
-    
-    // Movement tracking should be more tolerant than strict gameplay range.
-    // This reduces "closer/farther controls X" artifacts caused by range clipping.
-    int16_t trackingMin = max<int16_t>(0, minDetectionDistance - 350);
-    int16_t trackingMax = maxDetectionDistance + 700;
-
-    // Check if cell is active (in tolerant movement tracking range)
-    auto isActive = [this, trackingMin, trackingMax](uint8_t x, uint8_t y) -> bool {
-        int16_t d = tofGrid[y][x];
-        return d > trackingMin && d < trackingMax;
-    };
-    
-    bool visited[TOF_GRID_SIZE][TOF_GRID_SIZE] = {false};
-    
-    // BFS flood fill to find connected components
-    uint8_t bestSize = 0;
-    float bestCenterX = 0;
-    
-    for (uint8_t sy = 0; sy < TOF_GRID_SIZE; sy++) {
-        for (uint8_t sx = 0; sx < TOF_GRID_SIZE; sx++) {
-            if (visited[sy][sx] || !isActive(sx, sy)) continue;
-            
-            // Found a new blob, flood fill it
-            uint8_t queue[64][2];  // x, y pairs
-            uint8_t qHead = 0, qTail = 0;
-            uint8_t count = 0;
-            float sumX = 0;
-            float closestX = sx + 0.5f;
-            int16_t minDepthInBlob = INT16_MAX;
-            
-            queue[qTail][0] = sx;
-            queue[qTail][1] = sy;
-            qTail++;
-            visited[sy][sx] = true;
-            
-            while (qHead < qTail) {
-                uint8_t cx = queue[qHead][0];
-                uint8_t cy = queue[qHead][1];
-                qHead++;
-                
-                count++;
-                sumX += cx + 0.5f;
-
-                int16_t depth = tofGrid[cy][cx];
-                if (depth > 0 && depth < minDepthInBlob) {
-                    minDepthInBlob = depth;
-                    closestX = cx + 0.5f;
-                }
-                
-                // Check 4 neighbors
-                const int8_t dx[] = {1, -1, 0, 0};
-                const int8_t dy[] = {0, 0, 1, -1};
-                
-                for (uint8_t d = 0; d < 4; d++) {
-                    int8_t nx = cx + dx[d];
-                    int8_t ny = cy + dy[d];
-                    
-                    if (nx < 0 || nx >= TOF_GRID_SIZE || ny < 0 || ny >= TOF_GRID_SIZE) continue;
-                    if (visited[ny][nx] || !isActive(nx, ny)) continue;
-                    
-                    visited[ny][nx] = true;
-                    if (qTail < 64) {
-                        queue[qTail][0] = nx;
-                        queue[qTail][1] = ny;
-                        qTail++;
-                    }
-                }
-            }
-            
-            // Check if this blob is the largest
-            if (count >= minBlobCells && count > bestSize) {
-                bestSize = count;
-                float avgCellX = sumX / count;  // 0.5..7.5 (centroid)
-                // Bias toward closest point for more intuitive hand steering.
-                // Helps when depth changes alter blob shape.
-                constexpr float CLOSEST_WEIGHT = 0.7f;
-                float trackingX = closestX * CLOSEST_WEIGHT + avgCellX * (1.0f - CLOSEST_WEIGHT);
-                float normalizedX = (trackingX - 0.5f) / 7.0f;
-                normalizedX = constrain(normalizedX, 0.0f, 1.0f);
-
-                // Expand hand control near the edges so movement reaches both sides.
-                constexpr float EDGE_STRETCH = 1.35f;
-                normalizedX = (normalizedX - 0.5f) * EDGE_STRETCH + 0.5f;
-                normalizedX = constrain(normalizedX, 0.0f, 1.0f);
-
-                bestCenterX = normalizedX * (playWidth - 1);
-            }
-        }
-    }
-    
-    if (bestSize >= minBlobCells) {
-        result.x = bestCenterX;
-        result.size = bestSize;
-        result.valid = true;
-    }
-    
-    return result;
+    handsRaised = tofInteractionData.handsRaised;
 }
 
 void SpaceInvadersEffect::resetGame() {
@@ -525,7 +311,6 @@ void SpaceInvadersEffect::updatePlayer(BlobResult& blob) {
 
         playerTargetX = filteredBlobX;
         lastBlobFrame = frameCount;
-        lastBlobSize = blob.size;
     } else if (frameCount - lastBlobFrame > missingBlobRecentFrames) {
         // Return to center if no blob detected for a while
         playerTargetX = playWidth / 2.0f;
@@ -831,40 +616,17 @@ void SpaceInvadersEffect::drawBullets() {
 void SpaceInvadersEffect::drawPlayer() {
     int16_t x = (int16_t)playerX;
     int16_t y = (int16_t)playerY;
-    const uint8_t (*sprite)[20] = kPlayerSpriteMoveIdx;
+    const uint8_t (*sprite)[20] = kSpacemanSpriteMove;
     if (playerHitTimer > 0) {
-        sprite = kPlayerSpriteHitIdx;
+        sprite = kSpacemanSpriteHit;
     } else if (handsRaised) {
-        sprite = kPlayerSpriteShootIdx;
+        sprite = kSpacemanSpriteBoost;
     }
 
-    const int16_t spriteW = 20;
-    const int16_t spriteH = 20;
-    int16_t drawW = max<int16_t>(1, playerWidth);
-    int16_t drawH = max<int16_t>(1, playerHeight);
-    int16_t left = x - drawW / 2;
-    int16_t top = y - drawH / 2;
-
-    // Render with nearest-neighbor scaling from 20x20 RRRGGGBB sprite data.
-    for (int16_t sy = 0; sy < drawH; sy++) {
-        int16_t srcY = (sy * spriteH) / drawH;
-        for (int16_t sx = 0; sx < drawW; sx++) {
-            int16_t srcX = (sx * spriteW) / drawW;
-            uint8_t px = sprite[srcY][srcX];
-            if (px == 0) continue;  // transparent
-
-            uint8_t r3 = (px >> 5) & 0x07;
-            uint8_t g3 = (px >> 2) & 0x07;
-            uint8_t b2 = px & 0x03;
-
-            CRGB color(
-                (uint8_t)((r3 * 255) / 7),
-                (uint8_t)((g3 * 255) / 7),
-                (uint8_t)((b2 * 255) / 3)
-            );
-            drawGamePixel(left + sx, top + sy, color);
-        }
-    }
+    int16_t drawW = max<int16_t>(1, (int16_t)playerWidth);
+    int16_t drawH = max<int16_t>(1, (int16_t)playerHeight);
+    drawSpacemanSpriteScaled(sprite, x, y, drawW, drawH,
+                             [this](int16_t gx, int16_t gy, const CRGB& c) { drawGamePixel(gx, gy, c); });
 }
 
 void SpaceInvadersEffect::drawHUD() {
@@ -917,9 +679,23 @@ void SpaceInvadersEffect::update() {
     
     // Update ToF sensor data
     updateTofData();
-    
-    // Find blob for player control
-    BlobResult blob = findLargestBlob();
+
+    BlobResult blob = {0, 0, false};
+    if (tofGridReady && tofInteractionData.hasBlob && tofSensor) {
+        float xNorm = constrain(tofInteractionData.blobX, 0.0f, 1.0f);
+        float yNorm = constrain(tofInteractionData.blobY, 0.0f, 1.0f);
+        uint8_t gx = (uint8_t)constrain((int)(xNorm * 7.999f), 0, 7);
+        uint8_t gy = (uint8_t)constrain((int)(yNorm * 7.999f), 0, 7);
+        uint8_t nx, ny;
+        tofSensor->fromDisplayAligned(gx, gy, nx, ny);
+        uint8_t ex, ey;
+        TOFSensor::inverseRotateGrid8x8(nx, ny, kTofEffectRotationDeg, ex, ey);
+        float effectNormX = (ex + 0.5f) / 8.0f;
+        effectNormX = constrain(effectNormX, 0.0f, 1.0f);
+        blob.x = effectNormX * (playWidth - 1);
+        blob.size = tofInteractionData.blobSize;
+        blob.valid = tofInteractionData.blobSize >= minBlobCells;
+    }
     
     // Game logic
     if (!gameOver && !gameWon) {

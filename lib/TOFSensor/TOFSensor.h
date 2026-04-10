@@ -16,7 +16,7 @@
 #define TOF_RANGING_FREQUENCY 15  // 15 Hz
 
 // Shared detection range configuration (mm)
-#define TOF_MIN_DETECTION_DIST 800
+#define TOF_MIN_DETECTION_DIST 600
 #define TOF_MAX_DETECTION_DIST 1800
 
 // Shared TOF coordinate rotation (degrees)
@@ -56,8 +56,12 @@ public:
     // Legacy/native 8x8 indices (pre-rotation convention) -> pass through toDisplayAligned()
     // before getDistance() when composing effect-specific offsets written for the old API.
     void toDisplayAligned(uint8_t nativeX, uint8_t nativeY, uint8_t& outX, uint8_t& outY) const;
+    /** Inverse of toDisplayAligned — display indices → native grid before physical rotation. */
+    void fromDisplayAligned(uint8_t dispX, uint8_t dispY, uint8_t& nativeX, uint8_t& nativeY) const;
     // Generic 8x8 coordinate rotation helper for effects (rotDeg: 0/90/180/270).
     static void rotateGrid8x8(uint8_t x, uint8_t y, int16_t rotDeg, uint8_t& outX, uint8_t& outY);
+    /** Inverse of rotateGrid8x8 — undo an effect-local rotation. */
+    static void inverseRotateGrid8x8(uint8_t x, uint8_t y, int16_t rotDeg, uint8_t& outX, uint8_t& outY);
     uint8_t getNumZones();
     uint8_t getZonesPerLine();
     

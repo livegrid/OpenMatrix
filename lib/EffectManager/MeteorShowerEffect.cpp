@@ -2,8 +2,17 @@
 #include "../TOFSensor/TOFSensor.h"
 
 namespace {
-constexpr int16_t kTofEffectRotationDeg = 90;  // Set effect remap here: 0/90/180/270
+/** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
+constexpr int16_t kTofEffectRotationDeg = 270;  // 0 / 90 / 180 / 270
+
+static int16_t depthAtEffectCell(const InteractionData& d, TOFSensor& sensor, uint8_t effectX, uint8_t effectY) {
+    uint8_t rx, ry;
+    TOFSensor::rotateGrid8x8(effectX, effectY, kTofEffectRotationDeg, rx, ry);
+    uint8_t gx, gy;
+    sensor.toDisplayAligned(rx, ry, gx, gy);
+    return d.depthMap[gy][gx];
 }
+}  // namespace
 
 // Simple pseudo-random for consistent behavior
 static uint32_t noiseSeed = 12345;
@@ -223,7 +232,7 @@ bool Planet::isOffScreen(uint8_t maxWidth, uint8_t maxHeight) {
 // ============================================================================
 
 MeteorShowerEffect::MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor) 
-    : Effect(matrix), tofSensor(sensor) {
+    : Effect(matrix), tofSensor(sensor), tofInteraction(nullptr) {
     
     // Initialize parameters
     baseMeteorSpeed = 1.35f;
@@ -274,13 +283,8 @@ MeteorShowerEffect::MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor)
     planetCount = 0;
     planetSpawnCounter = 0;
     
-    // Initialize ToF grid
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            tofGrid[y][x] = 0;
-        }
-    }
-    
+    tofInteractionData = {};
+
     reset();
 }
 
@@ -311,11 +315,22 @@ const char* MeteorShowerEffect::getName() const {
 
 void MeteorShowerEffect::setTofSensor(TOFSensor* sensor) {
     tofSensor = sensor;
+    if (tofInteraction) {
+        delete tofInteraction;
+        tofInteraction = nullptr;
+    }
+    if (tofSensor) {
+        tofInteraction = new TOFInteractionManager(tofSensor);
+        tofInteraction->setDistanceRange(minDetectionDistance, maxDetectionDistance);
+    }
 }
 
 void MeteorShowerEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
     minDetectionDistance = minDist;
     maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
 }
 
 void MeteorShowerEffect::initMeteors() {
@@ -351,27 +366,13 @@ void MeteorShowerEffect::initPlanets() {
     }
 }
 
-void MeteorShowerEffect::rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY) {
-    // Effect-only 8x8 remap (easy to tune by degrees).
-    TOFSensor::rotateGrid8x8(x, y, kTofEffectRotationDeg, outX, outY);
-}
-
 void MeteorShowerEffect::updateTofData() {
-    if (!tofSensor || !tofSensor->isActive()) {
+    if (!tofSensor || !tofSensor->isActive() || !tofInteraction) {
         tofGridReady = false;
         return;
     }
-    
-    // Read data from sensor
-    for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
-        for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            uint8_t rx, ry;
-            rotateCoordinates(x, y, rx, ry);
-            uint8_t dx, dy;
-            tofSensor->toDisplayAligned(rx, ry, dx, dy);
-            tofGrid[y][x] = tofSensor->getDistance(dx, dy);
-        }
-    }
+    tofInteraction->update();
+    tofInteractionData = tofInteraction->getInteractionData();
     tofGridReady = true;
 }
 
@@ -391,7 +392,8 @@ void MeteorShowerEffect::updateTofAttractors() {
     
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
-            int16_t depth = tofGrid[y][x];
+            int16_t depth =
+                tofSensor ? depthAtEffectCell(tofInteractionData, *tofSensor, x, y) : 0;
             bool isActive = depth > minDetectionDistance && depth < maxDetectionDistance;
             tofAttractors[y][x].active = isActive;
             

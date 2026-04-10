@@ -150,18 +150,19 @@ void displayTask(void* parameter) {
                                   TOF_MAX_DETECTION_DIST);
   tofSensor.setRotation(TOF_DEFAULT_ROTATION);
   
-  // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders)
+  // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders, GravityFlap)
   effectManager.setTofSensor(&tofSensor);
   
   // Connect TOF sensor to Aquarium for interactive fish behavior
   aquarium.setTofSensor(&tofSensor);
 #endif
 
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   // Set mode to EFFECT with Constellation as default
-  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
   // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
+  stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0

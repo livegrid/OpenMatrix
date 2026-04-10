@@ -3,7 +3,8 @@
 #include "Effect.h"
 #include <Arduino.h>
 
-// Forward declaration
+#include "../TOFSensor/TOFInteractionManager.h"
+
 class TOFSensor;
 
 // Shooting star data
@@ -57,7 +58,8 @@ private:
 
     // TOF sensor integration
     TOFSensor* tofSensor;
-    int16_t tofGrid[TOF_GRID_SIZE][TOF_GRID_SIZE];
+    TOFInteractionManager* tofInteraction;
+    InteractionData tofInteractionData;
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
@@ -71,7 +73,6 @@ private:
     // TOF helpers
     void updateTofData();
     void buildDepthField();
-    void rotateCoordinates(uint8_t x, uint8_t y, uint8_t& outX, uint8_t& outY);
     float getDepthBoostAt(float x, float y);
 
     // Star helpers

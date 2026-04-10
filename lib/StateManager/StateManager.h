@@ -37,6 +37,7 @@ typedef enum {
     CONSTELLATION,
     METEOR_SHOWER,
     SPACE_INVADERS,
+    GRAVITY_FLAP,
     SIMPLEX_NOISE,
     SNAKE,
     FLOCKING,
