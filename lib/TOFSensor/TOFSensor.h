@@ -16,8 +16,8 @@
 #define TOF_RANGING_FREQUENCY 15  // 15 Hz
 
 // Shared detection range configuration (mm)
-#define TOF_MIN_DETECTION_DIST 600
-#define TOF_MAX_DETECTION_DIST 1800
+#define TOF_MIN_DETECTION_DIST 500
+#define TOF_MAX_DETECTION_DIST 1600
 
 // Shared TOF coordinate rotation (degrees)
 #define TOF_DEFAULT_ROTATION 270

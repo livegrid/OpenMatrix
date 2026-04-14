@@ -14,6 +14,12 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
 
     m_gravityFlap = new GravityFlapEffect(matrix);
     m_effects.push_back(m_gravityFlap);
+
+    m_asteroidHopper = new AsteroidHopperEffect(matrix);
+    m_effects.push_back(m_asteroidHopper);
+
+    m_spaceDrift = new SpaceDriftEffect(matrix);
+    m_effects.push_back(m_spaceDrift);
     
     // Other effects
     // m_effects.push_back(new SimplexNoiseEffect(matrix));
@@ -104,5 +110,11 @@ void EffectManager::setTofSensor(TOFSensor* sensor) {
     }
     if (m_gravityFlap) {
         m_gravityFlap->setTofSensor(sensor);
+    }
+    if (m_asteroidHopper) {
+        m_asteroidHopper->setTofSensor(sensor);
+    }
+    if (m_spaceDrift) {
+        m_spaceDrift->setTofSensor(sensor);
     }
 }

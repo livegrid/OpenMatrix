@@ -162,7 +162,9 @@ void displayTask(void* parameter) {
   stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
   // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
-  stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
+  // stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
+  // stateManager.getState()->effects.selected = Effects::ASTEROID_HOPPER;
+  stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0

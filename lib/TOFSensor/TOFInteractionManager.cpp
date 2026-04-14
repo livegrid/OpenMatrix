@@ -46,6 +46,21 @@ int countInBandInTopRows(const int16_t grid[8][8], int16_t minD, int16_t maxD, i
     return n;
 }
 
+// Hand-raise band along physical "up" when the sensor grid is rotated 90° CW vs row-major
+// "top" (using left columns = 90° CCW from top rows).
+int countInBandInLeftColumns(const int16_t grid[8][8], int16_t minD, int16_t maxD, int numCols) {
+    if (numCols <= 0) return 0;
+    int n = 0;
+    int maxX = numCols < 8 ? numCols : 8;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < maxX; x++) {
+            int16_t d = grid[y][x];
+            if (d > minD && d < maxD) n++;
+        }
+    }
+    return n;
+}
+
 }  // namespace
 
 TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
@@ -455,7 +470,7 @@ void TOFInteractionManager::stepHandRaise(const int16_t grid[8][8], const BlobIn
         return;
     }
 
-    int topMass = countInBandInTopRows(grid, minDistance, maxDistance, kHandRaiseTopRows);
+    int topMass = countInBandInLeftColumns(grid, minDistance, maxDistance, kHandRaiseTopRows);
     float cy = b.cy;
 
     if (!baseline_hand_raise_init) {

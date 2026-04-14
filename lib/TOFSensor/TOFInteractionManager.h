@@ -56,6 +56,7 @@ private:
     static constexpr uint8_t kPalmOffFrames = 2;
     static constexpr int kBlobMinCells = 3;
     static constexpr bool kHandRaiseEnabled = true;
+    // Depth (cells) of the raised-hand band along physical up (left columns; see TOFInteractionManager.cpp).
     static constexpr int kHandRaiseTopRows = 2;
     static constexpr float kHandRaiseMassExcess = 1.25f;
     static constexpr uint8_t kHandRaiseOnFrames = 2;
