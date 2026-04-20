@@ -149,7 +149,7 @@ void displayTask(void* parameter) {
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setRotation(2);
-  matrix.setBrightness(100);
+  matrix.setBrightness(200);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);

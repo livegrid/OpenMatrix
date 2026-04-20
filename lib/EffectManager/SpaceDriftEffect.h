@@ -6,6 +6,16 @@
 
 class TOFSensor;
 
+/** Visual "species" for drift bodies — drives both palette and draw treatment. */
+enum class DriftBodyKind : uint8_t {
+    Generic = 0,
+    GasGiant,
+    Ocean,
+    Ice,
+    Lava,
+    Count_
+};
+
 struct DriftStar {
     float x;
     float y;
@@ -30,6 +40,7 @@ struct DriftBody {
     float vy;
     float radius;
     uint8_t hue;
+    uint8_t kind;  // DriftBodyKind
     bool ringed;
     uint16_t ttl;
 };
@@ -54,6 +65,7 @@ struct DriftFarBody {
     float radius;
     float parallax;
     uint8_t hue;
+    uint8_t kind;  // DriftBodyKind
     bool ringed;
     uint16_t textureSeed;
 };
@@ -133,6 +145,8 @@ private:
     void drawGameRect(int16_t gx, int16_t gy, int16_t gw, int16_t gh, const CRGB& color);
     void drawGameCircle(int16_t gx, int16_t gy, int16_t r, const CRGB& color);
     void drawGameCircleClipped(int16_t gx, int16_t gy, int16_t r, const CRGB& color);
+    // Draw a single horizontal row of a circle (for banded gas giants etc.).
+    void drawCircleRow(int16_t sx, int16_t sy, int16_t r, int16_t y, const CRGB& color);
 
     void drawBackground();
     void drawFarBodies();
@@ -143,6 +157,23 @@ private:
     void drawAliens();
     void drawSpaceman();
     void drawAmbientHud();
+
+    // Per-kind draw treatments for small bodies.
+    void drawBodyGeneric(const DriftBody& b, int16_t sx, int16_t sy, int16_t r);
+    void drawBodyGasGiant(const DriftBody& b, int16_t sx, int16_t sy, int16_t r);
+    void drawBodyOcean(const DriftBody& b, int16_t sx, int16_t sy, int16_t r, uint8_t idx);
+    void drawBodyIce(const DriftBody& b, int16_t sx, int16_t sy, int16_t r);
+    void drawBodyLava(const DriftBody& b, int16_t sx, int16_t sy, int16_t r, uint8_t idx);
+
+    // Per-kind draw treatments for far/huge bodies.
+    void drawFarBodyGeneric(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r, int16_t pulse, uint8_t idx);
+    void drawFarBodyGasGiant(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r, int16_t pulse);
+    void drawFarBodyOcean(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r, int16_t pulse, uint8_t idx);
+    void drawFarBodyIce(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r, int16_t pulse);
+    void drawFarBodyLava(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r, int16_t pulse, uint8_t idx);
+
+    // Pick a visual kind and a kind-appropriate hue for a new body.
+    void pickBodyKindAndHue(uint8_t& kind, uint8_t& hue);
 
 public:
     SpaceDriftEffect(Matrix* matrix, TOFSensor* sensor = nullptr);

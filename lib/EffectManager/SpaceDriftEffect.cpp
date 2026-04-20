@@ -120,9 +120,28 @@ void SpaceDriftEffect::resetWorld() {
     }
 }
 
+void SpaceDriftEffect::pickBodyKindAndHue(uint8_t& kind, uint8_t& hue) {
+    // Even-ish distribution across all 5 kinds; Generic absorbs any clamp overflow.
+    uint8_t roll = (uint8_t)(randomFloat() * (float)(uint8_t)DriftBodyKind::Count_);
+    if (roll >= (uint8_t)DriftBodyKind::Count_) roll = 0;
+    kind = roll;
+    switch ((DriftBodyKind)kind) {
+        // Warm amber/tan bands like Jupiter/Saturn.
+        case DriftBodyKind::GasGiant: hue = (uint8_t)(18 + randomFloat() * 28.0f); break;
+        // Deep blues with a little teal drift.
+        case DriftBodyKind::Ocean:    hue = (uint8_t)(140 + randomFloat() * 28.0f); break;
+        // Cool icy hues — pale blues & cyans (palette is mostly desaturated anyway).
+        case DriftBodyKind::Ice:      hue = (uint8_t)(130 + randomFloat() * 40.0f); break;
+        // Reds/oranges; the vein shading pushes into bright amber separately.
+        case DriftBodyKind::Lava:     hue = (uint8_t)(0 + randomFloat() * 16.0f); break;
+        // Keep the original rainbow palette for the generic kind.
+        default:                      hue = (uint8_t)(8 + randomFloat() * 220.0f); break;
+    }
+}
+
 void SpaceDriftEffect::respawnBodyNearCamera(DriftBody& b) {
     b.radius = 3.0f + randomFloat() * 9.5f;
-    b.hue = (uint8_t)(8 + randomFloat() * 220.0f);
+    pickBodyKindAndHue(b.kind, b.hue);
     b.ringed = randomFloat() > 0.55f;
     b.vx = (randomFloat() - 0.5f) * 0.045f;
     b.vy = (randomFloat() - 0.5f) * 0.040f;
@@ -135,7 +154,7 @@ void SpaceDriftEffect::respawnFarBody(DriftFarBody& fb) {
     // Slightly smaller far bodies reduce clipping artifacts and feel more natural on this panel size.
     fb.radius = 16.0f + randomFloat() * 24.0f;
     fb.parallax = 0.10f + randomFloat() * 0.08f;
-    fb.hue = (uint8_t)(4 + randomFloat() * 230.0f);
+    pickBodyKindAndHue(fb.kind, fb.hue);
     fb.ringed = randomFloat() > 0.42f;
     fb.textureSeed = (uint16_t)(randomFloat() * 65535.0f);
     fb.vx = 0.0f;
@@ -502,6 +521,18 @@ void SpaceDriftEffect::drawGameCircleClipped(int16_t gx, int16_t gy, int16_t r, 
     }
 }
 
+void SpaceDriftEffect::drawCircleRow(int16_t sx, int16_t sy, int16_t r, int16_t y, const CRGB& color) {
+    if (r <= 0) return;
+    int16_t dy = y - sy;
+    if (dy < -r || dy > r) return;
+    int32_t xx = (int32_t)r * (int32_t)r - (int32_t)dy * (int32_t)dy;
+    if (xx < 0) return;
+    int16_t dx = (int16_t)sqrtf((float)xx);
+    int16_t xStart = sx - dx;
+    int16_t xEnd = sx + dx;
+    for (int16_t x = xStart; x <= xEnd; x++) drawGamePixel(x, y, color);
+}
+
 void SpaceDriftEffect::drawBackground() {
     for (uint16_t gy = 0; gy < playHeight; gy++) {
         float t = (float)gy / (float)playHeight;
@@ -529,41 +560,13 @@ void SpaceDriftEffect::drawFarBodies() {
             continue;
 
         int16_t pulse = (int16_t)(6.0f * sinf((frameCount + i * 31u) * 0.04f));
-        uint8_t vOuter = (uint8_t)constrain(15 + pulse, 8, 32);
-        uint8_t vDisk = (uint8_t)constrain(21 + pulse, 12, 44);
-        uint8_t vMid = (uint8_t)constrain(30 + pulse, 18, 58);
-        uint8_t vCore = (uint8_t)constrain(38 + pulse, 22, 72);
 
-        CRGB outerGlow, outerDisk, midDisk, coreDisk;
-        hsv2rgb_rainbow(CHSV(farBodies[i].hue, 105, vOuter), outerGlow);
-        hsv2rgb_rainbow(CHSV(farBodies[i].hue + 2, 120, vDisk), outerDisk);
-        hsv2rgb_rainbow(CHSV(farBodies[i].hue + 7, 94, vMid), midDisk);
-        hsv2rgb_rainbow(CHSV(farBodies[i].hue + 12, 82, vCore), coreDisk);
-
-        // Use clipped circle raster for far bodies so they remain visible when center is offscreen.
-        drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
-        drawGameCircleClipped(sx, sy, r, outerDisk);
-        int16_t offA = (r / 7 > 0) ? r / 7 : 1;
-        int16_t offB = (r / 9 > 0) ? r / 9 : 1;
-        int16_t offC = (r / 4 > 0) ? r / 4 : 1;
-        int16_t offD = (r / 5 > 0) ? r / 5 : 1;
-        drawGameCircleClipped(sx - offA, sy - offB, (int16_t)(r * 0.70f), midDisk);
-        drawGameCircleClipped(sx - offC, sy - offD, (int16_t)(r * 0.40f), coreDisk);
-
-        // Sparse stable mottling texture: brighter/lighter inclusions like the small body style.
-        uint32_t rng = (uint32_t)farBodies[i].textureSeed + ((uint32_t)i << 16);
-        uint8_t patchCount = (uint8_t)(2 + r / 12);
-        CRGB patch;
-        hsv2rgb_rainbow(CHSV(farBodies[i].hue + 16, 70, (uint8_t)constrain(vCore + 12, 0, 90)), patch);
-        for (uint8_t c = 0; c < patchCount; c++) {
-            rng = rng * 1664525u + 1013904223u;
-            float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f);
-            rng = rng * 1664525u + 1013904223u;
-            float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.55f);
-            int16_t tx = sx + (int16_t)(cosf(ang) * rr2);
-            int16_t ty = sy + (int16_t)(sinf(ang) * rr2);
-            int16_t tr = (r / 14 > 0) ? r / 14 : 1;
-            drawGameCircleClipped(tx, ty, tr, patch);
+        switch ((DriftBodyKind)farBodies[i].kind) {
+            case DriftBodyKind::GasGiant: drawFarBodyGasGiant(farBodies[i], sx, sy, r, pulse); break;
+            case DriftBodyKind::Ocean:    drawFarBodyOcean(farBodies[i], sx, sy, r, pulse, i); break;
+            case DriftBodyKind::Ice:      drawFarBodyIce(farBodies[i], sx, sy, r, pulse); break;
+            case DriftBodyKind::Lava:     drawFarBodyLava(farBodies[i], sx, sy, r, pulse, i); break;
+            default:                      drawFarBodyGeneric(farBodies[i], sx, sy, r, pulse, i); break;
         }
 
         if (farBodies[i].ringed) {
@@ -575,6 +578,180 @@ void SpaceDriftEffect::drawFarBodies() {
             for (int16_t x = sx - r - 4; x <= sx + r + 4; x++) drawGamePixel(x, y0, ring);
             for (int16_t x = sx - r - 3; x <= sx + r + 3; x++) drawGamePixel(x, y1, ring);
         }
+    }
+}
+
+void SpaceDriftEffect::drawFarBodyGeneric(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r,
+                                          int16_t pulse, uint8_t idx) {
+    uint8_t vOuter = (uint8_t)constrain(15 + pulse, 8, 32);
+    uint8_t vDisk = (uint8_t)constrain(21 + pulse, 12, 44);
+    uint8_t vMid = (uint8_t)constrain(30 + pulse, 18, 58);
+    uint8_t vCore = (uint8_t)constrain(38 + pulse, 22, 72);
+
+    CRGB outerGlow, outerDisk, midDisk, coreDisk;
+    hsv2rgb_rainbow(CHSV(fb.hue, 105, vOuter), outerGlow);
+    hsv2rgb_rainbow(CHSV(fb.hue + 2, 120, vDisk), outerDisk);
+    hsv2rgb_rainbow(CHSV(fb.hue + 7, 94, vMid), midDisk);
+    hsv2rgb_rainbow(CHSV(fb.hue + 12, 82, vCore), coreDisk);
+
+    drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
+    drawGameCircleClipped(sx, sy, r, outerDisk);
+    int16_t offA = (r / 7 > 0) ? r / 7 : 1;
+    int16_t offB = (r / 9 > 0) ? r / 9 : 1;
+    int16_t offC = (r / 4 > 0) ? r / 4 : 1;
+    int16_t offD = (r / 5 > 0) ? r / 5 : 1;
+    drawGameCircleClipped(sx - offA, sy - offB, (int16_t)(r * 0.70f), midDisk);
+    drawGameCircleClipped(sx - offC, sy - offD, (int16_t)(r * 0.40f), coreDisk);
+
+    uint32_t rng = (uint32_t)fb.textureSeed + ((uint32_t)idx << 16);
+    uint8_t patchCount = (uint8_t)(2 + r / 12);
+    CRGB patch;
+    hsv2rgb_rainbow(CHSV(fb.hue + 16, 70, (uint8_t)constrain(vCore + 12, 0, 90)), patch);
+    for (uint8_t c = 0; c < patchCount; c++) {
+        rng = rng * 1664525u + 1013904223u;
+        float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f);
+        rng = rng * 1664525u + 1013904223u;
+        float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.55f);
+        int16_t tx = sx + (int16_t)(cosf(ang) * rr2);
+        int16_t ty = sy + (int16_t)(sinf(ang) * rr2);
+        int16_t tr = (r / 14 > 0) ? r / 14 : 1;
+        drawGameCircleClipped(tx, ty, tr, patch);
+    }
+}
+
+void SpaceDriftEffect::drawFarBodyGasGiant(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r,
+                                           int16_t pulse) {
+    uint8_t vOuter = (uint8_t)constrain(16 + pulse, 8, 34);
+    uint8_t vBase = (uint8_t)constrain(32 + pulse, 20, 62);
+
+    CRGB outerGlow, base;
+    hsv2rgb_rainbow(CHSV(fb.hue, 130, vOuter), outerGlow);
+    hsv2rgb_rainbow(CHSV(fb.hue, 200, vBase), base);
+    drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
+    drawGameCircleClipped(sx, sy, r, base);
+
+    // Banded row sweep: 5 alternating bands of slightly shifted hue + brightness.
+    // Band height scales with body size so small and large bodies both read as striped.
+    int16_t bandH = (int16_t)max<int>(1, r / 3);
+    int16_t yStart = (int16_t)max<int>(0, sy - r);
+    int16_t yEnd = (int16_t)min<int>((int)playHeight - 1, sy + r);
+    for (int16_t y = yStart; y <= yEnd; y++) {
+        int16_t bandIdx = (y - (sy - r)) / bandH;
+        // Skip even bands so the "base" body shows through and keeps warmth.
+        if ((bandIdx & 1) == 0) continue;
+        bool dark = (bandIdx & 2) != 0;
+        uint8_t bandHueShift = dark ? (uint8_t)(fb.hue - 10) : (uint8_t)(fb.hue + 12);
+        uint8_t bandSat = dark ? 220 : 170;
+        uint8_t bandVal = dark ? (uint8_t)constrain(18 + pulse, 10, 42)
+                                : (uint8_t)constrain(46 + pulse, 30, 82);
+        CRGB bandCol;
+        hsv2rgb_rainbow(CHSV(bandHueShift, bandSat, bandVal), bandCol);
+        drawCircleRow(sx, sy, r, y, bandCol);
+    }
+
+    // Bright "storm" highlight — a single small oval near center-offset to echo Jupiter's spot.
+    CRGB spot;
+    hsv2rgb_rainbow(CHSV(fb.hue + 18, 120, (uint8_t)constrain(64 + pulse, 40, 100)), spot);
+    int16_t offC = (r / 4 > 0) ? r / 4 : 1;
+    int16_t offD = (r / 5 > 0) ? r / 5 : 1;
+    drawGameCircleClipped(sx - offC, sy - offD, (int16_t)max<int>(1, r / 5), spot);
+}
+
+void SpaceDriftEffect::drawFarBodyOcean(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r,
+                                        int16_t pulse, uint8_t idx) {
+    uint8_t vOuter = (uint8_t)constrain(14 + pulse, 8, 32);
+    uint8_t vBase = (uint8_t)constrain(26 + pulse, 16, 50);
+    uint8_t vDeep = (uint8_t)constrain(34 + pulse, 20, 64);
+    uint8_t vHighlight = (uint8_t)constrain(50 + pulse, 30, 90);
+
+    CRGB outerGlow, base, deep, highlight;
+    hsv2rgb_rainbow(CHSV(fb.hue, 180, vOuter), outerGlow);
+    hsv2rgb_rainbow(CHSV(fb.hue, 230, vBase), base);
+    hsv2rgb_rainbow(CHSV(fb.hue + 6, 210, vDeep), deep);
+    hsv2rgb_rainbow(CHSV(fb.hue - 8, 140, vHighlight), highlight);
+
+    drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
+    drawGameCircleClipped(sx, sy, r, base);
+    // Slightly darker "deep" disk offset down-right for subtle sphere shading.
+    int16_t shadeOff = (r / 5 > 0) ? r / 5 : 1;
+    drawGameCircleClipped(sx + shadeOff, sy + shadeOff, (int16_t)(r * 0.82f), deep);
+    // Bright top-left highlight hints at a light source.
+    drawGameCircleClipped(sx - shadeOff, sy - shadeOff, (int16_t)max<int>(1, r / 4), highlight);
+
+    // Drifting white cloud speckles. Animate angle over time so clouds rotate slowly.
+    CRGB cloud;
+    hsv2rgb_rainbow(CHSV(0, 0, (uint8_t)constrain(90 + pulse, 60, 140)), cloud);
+    uint32_t rng = (uint32_t)fb.textureSeed + ((uint32_t)idx << 16) + 0x9e3779b9u;
+    uint8_t cloudCount = (uint8_t)(3 + r / 8);
+    float driftPhase = (float)(frameCount >> 2) * 0.0035f;
+    for (uint8_t c = 0; c < cloudCount; c++) {
+        rng = rng * 1664525u + 1013904223u;
+        float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f) + driftPhase;
+        rng = rng * 1664525u + 1013904223u;
+        float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.70f);
+        int16_t tx = sx + (int16_t)(cosf(ang) * rr2);
+        int16_t ty = sy + (int16_t)(sinf(ang) * rr2);
+        int16_t tr = (r / 12 > 0) ? r / 12 : 1;
+        drawGameCircleClipped(tx, ty, tr, cloud);
+    }
+}
+
+void SpaceDriftEffect::drawFarBodyIce(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r,
+                                      int16_t pulse) {
+    uint8_t vOuter = (uint8_t)constrain(16 + pulse, 10, 36);
+    uint8_t vBase = (uint8_t)constrain(56 + pulse, 40, 90);
+    uint8_t vShadow = (uint8_t)constrain(30 + pulse, 18, 58);
+    uint8_t vHighlight = (uint8_t)constrain(95 + pulse, 70, 130);
+
+    CRGB outerGlow, base, shadow, highlight;
+    hsv2rgb_rainbow(CHSV(fb.hue, 40, vOuter), outerGlow);
+    hsv2rgb_rainbow(CHSV(fb.hue, 20, vBase), base);
+    hsv2rgb_rainbow(CHSV(fb.hue, 110, vShadow), shadow);
+    hsv2rgb_rainbow(CHSV(0, 0, vHighlight), highlight);
+
+    drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
+    drawGameCircleClipped(sx, sy, r, base);
+    int16_t shadeOff = (r / 4 > 0) ? r / 4 : 1;
+    // Cool-blue shadow on the far side.
+    drawGameCircleClipped(sx + shadeOff, sy + shadeOff, (int16_t)(r * 0.78f), shadow);
+    // Crisp white rim-light cap on the near side.
+    drawGameCircleClipped(sx - shadeOff, sy - shadeOff, (int16_t)max<int>(1, r / 3), highlight);
+    // A couple of tiny sparkle pixels to sell the ice feel.
+    CRGB sparkle = CRGB::White;
+    drawGamePixel((int16_t)(sx - r / 2), (int16_t)(sy - r / 2), sparkle);
+    drawGamePixel((int16_t)(sx + r / 6), (int16_t)(sy - r / 3), sparkle);
+}
+
+void SpaceDriftEffect::drawFarBodyLava(const DriftFarBody& fb, int16_t sx, int16_t sy, int16_t r,
+                                       int16_t pulse, uint8_t idx) {
+    // Lava breathes on its own — independent pulse from the shared body pulse.
+    float breathe = sinf((frameCount + idx * 41u) * 0.06f);
+    uint8_t vOuter = (uint8_t)constrain(18 + pulse, 10, 38);
+    uint8_t vBase = (uint8_t)constrain(24 + pulse, 14, 44);
+    uint8_t vVein = (uint8_t)(140 + (int)(70.0f * breathe));
+    uint8_t vBright = (uint8_t)constrain((int)vVein + 40, 160, 255);
+
+    CRGB outerGlow, base, vein, veinHot;
+    hsv2rgb_rainbow(CHSV(fb.hue, 230, vOuter), outerGlow);
+    hsv2rgb_rainbow(CHSV(fb.hue, 255, vBase), base);
+    hsv2rgb_rainbow(CHSV(fb.hue + 20, 210, vVein), vein);
+    hsv2rgb_rainbow(CHSV(fb.hue + 32, 160, vBright), veinHot);
+
+    drawGameCircleClipped(sx, sy, (int16_t)(r + 1), outerGlow);
+    drawGameCircleClipped(sx, sy, r, base);
+
+    // Glowing vein patches scattered over the surface; one is always hot.
+    uint32_t rng = (uint32_t)fb.textureSeed + ((uint32_t)idx << 16) + 0x5f356495u;
+    uint8_t patchCount = (uint8_t)(3 + r / 8);
+    for (uint8_t c = 0; c < patchCount; c++) {
+        rng = rng * 1664525u + 1013904223u;
+        float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f);
+        rng = rng * 1664525u + 1013904223u;
+        float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.72f);
+        int16_t tx = sx + (int16_t)(cosf(ang) * rr2);
+        int16_t ty = sy + (int16_t)(sinf(ang) * rr2);
+        int16_t tr = (r / 10 > 0) ? r / 10 : 1;
+        drawGameCircleClipped(tx, ty, tr, (c == 0) ? veinHot : vein);
     }
 }
 
@@ -624,13 +801,13 @@ void SpaceDriftEffect::drawBodies() {
         int16_t sy = (int16_t)(centerY + (bodies[i].y - camY));
         int16_t r = (int16_t)bodies[i].radius;
 
-        CRGB glow, body, core;
-        hsv2rgb_rainbow(CHSV(bodies[i].hue, 90, 55), glow);
-        hsv2rgb_rainbow(CHSV(bodies[i].hue, 180, 150), body);
-        hsv2rgb_rainbow(CHSV(bodies[i].hue + 12, 120, 235), core);
-        drawGameCircle(sx, sy, r + 2, glow);
-        drawGameCircle(sx, sy, r, body);
-        drawGameCircle(sx - r / 3, sy - r / 3, max(1, r / 4), core);
+        switch ((DriftBodyKind)bodies[i].kind) {
+            case DriftBodyKind::GasGiant: drawBodyGasGiant(bodies[i], sx, sy, r); break;
+            case DriftBodyKind::Ocean:    drawBodyOcean(bodies[i], sx, sy, r, i); break;
+            case DriftBodyKind::Ice:      drawBodyIce(bodies[i], sx, sy, r); break;
+            case DriftBodyKind::Lava:     drawBodyLava(bodies[i], sx, sy, r, i); break;
+            default:                      drawBodyGeneric(bodies[i], sx, sy, r); break;
+        }
 
         if (bodies[i].ringed) {
             CRGB ring;
@@ -638,6 +815,111 @@ void SpaceDriftEffect::drawBodies() {
             drawGameRect(sx - r - 2, sy, (int16_t)(r * 2 + 4), 1, ring);
             drawGameRect(sx - r - 1, sy + 1, (int16_t)(r * 2 + 2), 1, ring);
         }
+    }
+}
+
+void SpaceDriftEffect::drawBodyGeneric(const DriftBody& b, int16_t sx, int16_t sy, int16_t r) {
+    CRGB glow, body, core;
+    hsv2rgb_rainbow(CHSV(b.hue, 90, 55), glow);
+    hsv2rgb_rainbow(CHSV(b.hue, 180, 150), body);
+    hsv2rgb_rainbow(CHSV(b.hue + 12, 120, 235), core);
+    drawGameCircle(sx, sy, r + 2, glow);
+    drawGameCircle(sx, sy, r, body);
+    drawGameCircle(sx - r / 3, sy - r / 3, max(1, r / 4), core);
+}
+
+void SpaceDriftEffect::drawBodyGasGiant(const DriftBody& b, int16_t sx, int16_t sy, int16_t r) {
+    CRGB glow, base;
+    hsv2rgb_rainbow(CHSV(b.hue, 130, 55), glow);
+    hsv2rgb_rainbow(CHSV(b.hue, 200, 170), base);
+    drawGameCircle(sx, sy, r + 2, glow);
+    drawGameCircle(sx, sy, r, base);
+
+    // Overlay 1-2 rows of darker/lighter band so even 3-4px bodies still read as striped.
+    int16_t bandH = (int16_t)max<int>(1, r / 3);
+    int16_t yStart = sy - r;
+    int16_t yEnd = sy + r;
+    for (int16_t y = yStart; y <= yEnd; y++) {
+        int16_t bandIdx = (y - yStart) / bandH;
+        if ((bandIdx & 1) == 0) continue;
+        bool dark = (bandIdx & 2) != 0;
+        CRGB bandCol;
+        hsv2rgb_rainbow(
+            CHSV(dark ? (uint8_t)(b.hue - 10) : (uint8_t)(b.hue + 12), dark ? 220 : 170,
+                 dark ? 100 : 225),
+            bandCol);
+        drawCircleRow(sx, sy, r, y, bandCol);
+    }
+}
+
+void SpaceDriftEffect::drawBodyOcean(const DriftBody& b, int16_t sx, int16_t sy, int16_t r, uint8_t idx) {
+    CRGB glow, base, deep, highlight, cloud;
+    hsv2rgb_rainbow(CHSV(b.hue, 180, 60), glow);
+    hsv2rgb_rainbow(CHSV(b.hue, 220, 155), base);
+    hsv2rgb_rainbow(CHSV(b.hue + 6, 200, 90), deep);
+    hsv2rgb_rainbow(CHSV(b.hue - 8, 150, 230), highlight);
+    hsv2rgb_rainbow(CHSV(0, 0, 220), cloud);
+
+    drawGameCircle(sx, sy, r + 2, glow);
+    drawGameCircle(sx, sy, r, base);
+    int16_t shadeOff = max<int16_t>(1, r / 4);
+    drawGameCircle(sx + shadeOff, sy + shadeOff, max<int16_t>(1, (int16_t)(r * 0.75f)), deep);
+    drawGameCircle(sx - shadeOff, sy - shadeOff, max<int16_t>(1, r / 4), highlight);
+
+    // 1-3 drifting cloud pixels per body; count scales with size.
+    uint8_t cloudCount = (uint8_t)(1 + r / 4);
+    uint32_t rng = 0x9e3779b9u + (uint32_t)idx * 2654435761u;
+    float driftPhase = (float)(frameCount >> 2) * 0.0055f;
+    for (uint8_t c = 0; c < cloudCount; c++) {
+        rng = rng * 1664525u + 1013904223u;
+        float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f) + driftPhase;
+        rng = rng * 1664525u + 1013904223u;
+        float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.6f);
+        int16_t cx = sx + (int16_t)(cosf(ang) * rr2);
+        int16_t cy = sy + (int16_t)(sinf(ang) * rr2);
+        drawGamePixel(cx, cy, cloud);
+    }
+}
+
+void SpaceDriftEffect::drawBodyIce(const DriftBody& b, int16_t sx, int16_t sy, int16_t r) {
+    CRGB glow, base, shadow, highlight;
+    hsv2rgb_rainbow(CHSV(b.hue, 40, 70), glow);
+    hsv2rgb_rainbow(CHSV(b.hue, 25, 215), base);
+    hsv2rgb_rainbow(CHSV(b.hue, 120, 100), shadow);
+    hsv2rgb_rainbow(CHSV(0, 0, 255), highlight);
+
+    drawGameCircle(sx, sy, r + 2, glow);
+    drawGameCircle(sx, sy, r, base);
+    int16_t shadeOff = max<int16_t>(1, r / 4);
+    drawGameCircle(sx + shadeOff, sy + shadeOff, max<int16_t>(1, (int16_t)(r * 0.7f)), shadow);
+    drawGamePixel((int16_t)(sx - r / 2), (int16_t)(sy - r / 2), highlight);
+}
+
+void SpaceDriftEffect::drawBodyLava(const DriftBody& b, int16_t sx, int16_t sy, int16_t r, uint8_t idx) {
+    // Pulse veins independently per body so they feel alive.
+    float breathe = sinf((frameCount + idx * 37u) * 0.10f);
+    uint8_t vVein = (uint8_t)constrain(170 + (int)(60.0f * breathe), 120, 235);
+    uint8_t vBright = (uint8_t)constrain((int)vVein + 40, 180, 255);
+
+    CRGB glow, base, vein, veinHot;
+    hsv2rgb_rainbow(CHSV(b.hue, 230, 60), glow);
+    hsv2rgb_rainbow(CHSV(b.hue, 255, 70), base);
+    hsv2rgb_rainbow(CHSV(b.hue + 20, 210, vVein), vein);
+    hsv2rgb_rainbow(CHSV(b.hue + 32, 160, vBright), veinHot);
+
+    drawGameCircle(sx, sy, r + 2, glow);
+    drawGameCircle(sx, sy, r, base);
+
+    uint8_t veinCount = (uint8_t)(2 + r / 4);
+    uint32_t rng = 0x4f1a9u + (uint32_t)idx * 2654435761u;
+    for (uint8_t v = 0; v < veinCount; v++) {
+        rng = rng * 1664525u + 1013904223u;
+        float ang = ((rng >> 8) & 1023u) * (6.2831853f / 1024.0f);
+        rng = rng * 1664525u + 1013904223u;
+        float rr2 = ((float)((rng >> 10) & 1023u) / 1023.0f) * (r * 0.75f);
+        int16_t vx = sx + (int16_t)(cosf(ang) * rr2);
+        int16_t vy = sy + (int16_t)(sinf(ang) * rr2);
+        drawGamePixel(vx, vy, (v == 0) ? veinHot : vein);
     }
 }
 
