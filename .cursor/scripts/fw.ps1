@@ -1,8 +1,8 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Agent automation for PlatformIO: clean, build, upload, timed serial monitor, free serial port.
-  Intended for Cursor/agent use (see AGENTS.md); not the project’s primary human-facing CLI.
+  Agent automation for PlatformIO: clean, build-only, upload (upload compiles—do not run build before upload),
+  timed serial monitor, free serial port. Intended for Cursor/agent use (see AGENTS.md); not the project’s primary human-facing CLI.
 
 .EXAMPLE
   pwsh -File .cursor/scripts/fw.ps1 build
