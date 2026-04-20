@@ -17,6 +17,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
   json["autobrightness"] = _state.autobrightness;
   json["brightness"] = _state.brightness;
   json["mode"] = _state.mode;
+  json["tofDebugView"] = _state.tofDebugView;
   json["firstBoot"] = _state.firstBoot;
   json["temperatureUnit"] = _state.temperatureUnit;
 
@@ -170,6 +171,7 @@ void StateManager::restore() {
   _state.autobrightness = json["autobrightness"] | DEFAULT_AUTOBRIGHTNESS;
   _state.brightness = json["brightness"] | DEFAULT_BRIGHTNESS;
   _state.mode = json["mode"] | DEFAULT_MODE;
+  _state.tofDebugView = json["tofDebugView"] | DEFAULT_TOF_DEBUG_VIEW;
   _state.firstBoot = json["firstBoot"] | DEFAULT_FIRST_BOOT;
   _state.temperatureUnit = json["temperatureUnit"] | DEFAULT_TEMPERATURE_UNIT;
 
@@ -259,6 +261,7 @@ void StateManager::setDefaultState() {
     _state.autobrightness = DEFAULT_AUTOBRIGHTNESS;
     _state.brightness = DEFAULT_BRIGHTNESS;
     _state.mode = DEFAULT_MODE;
+    _state.tofDebugView = DEFAULT_TOF_DEBUG_VIEW;
     _state.firstBoot = DEFAULT_FIRST_BOOT;
     _state.temperatureUnit = DEFAULT_TEMPERATURE_UNIT;
 

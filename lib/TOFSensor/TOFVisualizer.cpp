@@ -31,7 +31,7 @@ uint16_t TOFVisualizer::distanceToColor(int16_t distance) {
     float hue = mapFloat((float)d, (float)minDistance, (float)maxDistance, 0, 240);
     float h = hue / 60.0f;
     float s = 1.0f;
-    float v = 1.0f;
+    float v = 0.5f;
 
     int i = (int)h;
     float f = h - (float)i;
@@ -54,11 +54,11 @@ uint16_t TOFVisualizer::distanceToColor(int16_t distance) {
 }
 
 void TOFVisualizer::drawHeatmapAndOverlays(const InteractionData& interaction, uint16_t plotW, uint16_t plotH) {
-    uint16_t cDim = matrix->background->color565(6, 6, 8);
-    uint16_t cTopBand = matrix->background->color565(28, 14, 0);
-    uint16_t cPalmRing = matrix->background->color565(255, 40, 255);
-    uint16_t cPalmCross = matrix->background->color565(255, 255, 255);
-    uint16_t cCentroid = matrix->background->color565(200, 60, 255);
+    uint16_t cDim = matrix->background->color565(3, 3, 4);
+    uint16_t cTopBand = matrix->background->color565(14, 7, 0);
+    uint16_t cPalmRing = matrix->background->color565(127, 20, 127);
+    uint16_t cPalmCross = matrix->background->color565(127, 127, 127);
+    uint16_t cCentroid = matrix->background->color565(100, 30, 127);
 
     for (uint8_t y = 0; y < 8; y++) {
         uint16_t y0 = (uint16_t)((unsigned)y * plotH / 8u);

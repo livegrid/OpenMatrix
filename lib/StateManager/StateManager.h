@@ -77,6 +77,8 @@ struct State {
     bool autobrightness;
     uint8_t brightness;
     OpenMatrixMode mode;
+    /** When true (and TOF hardware enabled), display task shows TOF visualizer overlay. */
+    bool tofDebugView;
     bool firstBoot;
     TemperatureUnit temperatureUnit;
 

@@ -2,6 +2,7 @@
 #define DEFAULT_AUTOBRIGHTNESS true
 #define DEFAULT_BRIGHTNESS 100
 #define DEFAULT_MODE OpenMatrixMode::EFFECT
+#define DEFAULT_TOF_DEBUG_VIEW false
 #define DEFAULT_FIRST_BOOT true
 #define DEFAULT_TEMPERATURE_UNIT TemperatureUnit::CELSIUS
 

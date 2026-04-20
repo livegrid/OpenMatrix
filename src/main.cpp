@@ -16,6 +16,10 @@
 
 #include <DebugMonitor.h>
 
+#ifdef BLE_HID_REMOTE_ENABLED
+#include "BleHidRemote.h"
+#endif
+
 TaskManager& taskManager = TaskManager::getInstance();
 
 #ifdef PANEL_UPCYCLED
@@ -178,14 +182,14 @@ void displayTask(void* parameter) {
   aquarium.setTofSensor(&tofSensor);
 #endif
 
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   // Set mode to EFFECT with Constellation as default
-  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
   // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
   // stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
   // stateManager.getState()->effects.selected = Effects::ASTEROID_HOPPER;
-  // stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
+  stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0
@@ -214,8 +218,6 @@ void displayTask(void* parameter) {
         currentMode = stateManager.getState()->mode;
         switch (currentMode) {
           case OpenMatrixMode::EFFECT:
-            effectManager.setEffect(stateManager.getState()->effects.selected -
-                                    1);
             break;
           case OpenMatrixMode::IMAGE:
             imageDraw.openGIF(stateManager.getState()->image.selected.c_str());
@@ -224,6 +226,22 @@ void displayTask(void* parameter) {
             textDraw.setSize(stateManager.getState()->text.size);
             textDraw.drawText(stateManager.getState()->text.payload);
             break;
+          default:
+            break;
+        }
+      }
+
+      // Apply effect when selected changes (e.g. BLE remote) without a mode transition.
+      {
+        State* st = stateManager.getState();
+        static Effects lastEffectApplied = Effects::NONE;
+        if (st->mode == OpenMatrixMode::EFFECT) {
+          if (st->effects.selected != lastEffectApplied) {
+            effectManager.setEffect(st->effects.selected - 1);
+            lastEffectApplied = st->effects.selected;
+          }
+        } else {
+          lastEffectApplied = Effects::NONE;
         }
       }
       
@@ -242,39 +260,40 @@ void displayTask(void* parameter) {
       } else
 #endif
       {
-#ifdef TOF_DEBUG_ENABLED
-  if (tofSensor.isActive()) {
-    tofVisualizer->draw();
-    matrix.background->display();
-  }
-#else
-        switch (stateManager.getState()->mode) {
-          case OpenMatrixMode::EFFECT:
-            effectManager.updateCurrentEffect();
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::IMAGE:
-            imageDraw.showGIF();
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::TEXT:
-            textDraw.setSize(stateManager.getState()->text.size);
-            textDraw.drawText(stateManager.getState()->text.payload);
-            matrix.background->display();
-            break;
-          case OpenMatrixMode::AQUARIUM:
-            aquarium.update(touchShowSensorData());
-            aquarium.display();
-            break;
+#if defined(VL53L8CX_ENABLED)
+        if (stateManager.getState()->tofDebugView && tofSensor.isActive()) {
+          tofVisualizer->draw();
+          matrix.background->display();
+        } else
+#endif
+        {
+          switch (stateManager.getState()->mode) {
+            case OpenMatrixMode::EFFECT:
+              effectManager.updateCurrentEffect();
+              matrix.background->display();
+              break;
+            case OpenMatrixMode::IMAGE:
+              imageDraw.showGIF();
+              matrix.background->display();
+              break;
+            case OpenMatrixMode::TEXT:
+              textDraw.setSize(stateManager.getState()->text.size);
+              textDraw.drawText(stateManager.getState()->text.payload);
+              matrix.background->display();
+              break;
+            case OpenMatrixMode::AQUARIUM:
+              aquarium.update(touchShowSensorData());
+              aquarium.display();
+              break;
 #ifdef WIFI_ENABLED
-          case OpenMatrixMode::DMX:
-            dmx.update();
-            break;
+            case OpenMatrixMode::DMX:
+              dmx.update();
+              break;
 #endif
-          default:
-            break;
+            default:
+              break;
+          }
         }
-#endif
       }
 
 #ifdef PANEL_UPCYCLED
@@ -577,6 +596,13 @@ void setup(void) {
   // TOFTask: HWM 6488 B → 7168 words = 28KB [Core 0 - I2C hardware access]
   // Using PSRAM stack to save internal RAM (I2C operations don't need fast memory)
   TaskManager::getInstance().createTask("TOFTask", tofTask, 7168, 1, 0, true);
+#endif
+
+#ifdef BLE_HID_REMOTE_ENABLED
+  bleHidRemoteSetStateManager(&stateManager);
+  // Runs after WiFi phase; long connect/GATT work stays off the main setup path.
+  log_i("BLE HID remote: starting NimBLE task...");
+  TaskManager::getInstance().createTask("BleHidRemote", bleHidRemoteTask, 8192, 1, 0, false);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);

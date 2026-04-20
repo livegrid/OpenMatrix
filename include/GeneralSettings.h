@@ -15,9 +15,13 @@
 // #define TOUCH_ENABLED 1
 #define VL53L8CX_ENABLED 1  // Time-of-Flight sensor
 
+// MOCUTE (or similar) BLE HID gamepad: NimBLE client, Serial monitor output like ble-test.
+// Target MAC: lib/BleHidRemote/BleHidRemote.cpp (kTargetMac). Disable if tight on heap or WiFi issues.
+#define BLE_HID_REMOTE_ENABLED 1
+
 // #define WIFI_ENABLED 1  // Comment out to disable WiFi, web server, and ServerTask (saves RAM)
 
-// #define TOF_DEBUG_ENABLED 1
+// TOF visualizer overlay: use BLE remote OPT (State.tofDebugView), not this compile flag.
 
 // WiFi Buffer Configuration for ESP32-S3 RAM constraints
 // Reduces WiFi buffers to minimum viable for connection (saves ~10KB RAM during init)
