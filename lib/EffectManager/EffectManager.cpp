@@ -1,120 +1,101 @@
 #include "EffectManager.h"
+
 #include "../TOFSensor/TOFSensor.h"
 
+// Full effect headers are only needed in the .cpp so the manager's header
+// stays light.
+#include "AsteroidHopperEffect.h"
+#include "ConstellationEffect.h"
+#include "GravityFlapEffect.h"
+#include "MeteorShowerEffect.h"
+#include "NoiseEffect.h"
+#include "SpaceDriftEffect.h"
+#include "SpaceInvadersEffect.h"
+
+// Helper macros keep the registry table readable.
+#define EFFECT_FACTORY(Cls) \
+  [](Matrix* m) -> Effect* { return new Cls(m); }
+#define EFFECT_TOF(Cls)                                                   \
+  [](Effect* e, TOFSensor* s) { static_cast<Cls*>(e)->setTofSensor(s); }
+
 EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
-    // TOF-enabled interactive effects (Constellation is default/first)
-    m_constellation = new ConstellationEffect(matrix);
-    m_effects.push_back(m_constellation);
-    
-    m_meteorShower = new MeteorShowerEffect(matrix);
-    m_effects.push_back(m_meteorShower);
-    
-    m_spaceInvaders = new SpaceInvadersEffect(matrix);
-    m_effects.push_back(m_spaceInvaders);
-
-    m_gravityFlap = new GravityFlapEffect(matrix);
-    m_effects.push_back(m_gravityFlap);
-
-    m_asteroidHopper = new AsteroidHopperEffect(matrix);
-    m_effects.push_back(m_asteroidHopper);
-
-    m_spaceDrift = new SpaceDriftEffect(matrix);
-    m_effects.push_back(m_spaceDrift);
-    
-    // Other effects
-    // m_effects.push_back(new SimplexNoiseEffect(matrix));
-    // m_effects.push_back(new CellularNoiseEffect(matrix));
-    m_effects.push_back(new NoiseEffect(matrix));
-    // m_effects.push_back(new SnakeEffect(matrix));
-    // m_effects.push_back(new FlockEffect(matrix));
-    // m_effects.push_back(new GameofLifeEffect(matrix));
-    // m_effects.push_back(new LSystemEffect(matrix));
+  // Registry order == selectable order in UI. Keep index 0 = default
+  // (Constellation). Effects that don't accept a TOFSensor get a null
+  // applyTof entry.
+  m_slots = {
+      {"Constellation",   EFFECT_FACTORY(ConstellationEffect),   EFFECT_TOF(ConstellationEffect)},
+      {"Meteor Shower",   EFFECT_FACTORY(MeteorShowerEffect),    EFFECT_TOF(MeteorShowerEffect)},
+      {"Space Invaders",  EFFECT_FACTORY(SpaceInvadersEffect),   EFFECT_TOF(SpaceInvadersEffect)},
+      {"Gravity Flap",    EFFECT_FACTORY(GravityFlapEffect),     EFFECT_TOF(GravityFlapEffect)},
+      {"Asteroid Hopper", EFFECT_FACTORY(AsteroidHopperEffect),  EFFECT_TOF(AsteroidHopperEffect)},
+      {"Space Drift",     EFFECT_FACTORY(SpaceDriftEffect),      EFFECT_TOF(SpaceDriftEffect)},
+      {"Noise",           EFFECT_FACTORY(NoiseEffect),           nullptr},
+  };
+  // No effect is instantiated yet - activate() runs on the first setEffect() call.
 }
 
-EffectManager::~EffectManager() {
-    for (auto effect : m_effects) {
-        delete effect;
-    }
+EffectManager::~EffectManager() { destroyCurrent(); }
+
+void EffectManager::destroyCurrent() {
+  if (m_current) {
+    delete m_current;
+    m_current = nullptr;
+  }
+}
+
+void EffectManager::applyTofSensorToCurrent() {
+  if (m_current == nullptr || m_tofSensor == nullptr) return;
+  if (m_currentIndex >= m_slots.size()) return;
+  const auto& applier = m_slots[m_currentIndex].applyTof;
+  if (applier) applier(m_current, m_tofSensor);
+}
+
+void EffectManager::activate(size_t index) {
+  if (index >= m_slots.size()) return;
+  destroyCurrent();
+  m_currentIndex = index;
+  if (m_matrix && m_matrix->background) m_matrix->background->clear();
+  log_i("EffectManager: activating %s", m_slots[index].name);
+  m_current = m_slots[index].factory(m_matrix);
+  applyTofSensorToCurrent();
+  if (m_current) m_current->reset();
 }
 
 void EffectManager::updateCurrentEffect() {
-    if (m_currentEffect < m_effects.size()) {
-        m_effects[m_currentEffect]->update();
-    }
+  if (m_current) m_current->update();
 }
 
 void EffectManager::setEffect(size_t number) {
-  m_matrix->background->clear();
-  if (number < m_effects.size()) {
-    m_currentEffect = number;
-    m_effects[m_currentEffect]->reset();
+  activate(number);
+}
+
+void EffectManager::setEffect(const std::string& name) {
+  for (size_t i = 0; i < m_slots.size(); ++i) {
+    if (name == m_slots[i].name) {
+      activate(i);
+      return;
+    }
   }
 }
 
 void EffectManager::nextEffect() {
-    if (m_currentEffect == m_effects.size() - 1) {
-        m_currentEffect = 0;
-    } else {
-        m_currentEffect++;
-    }
-    m_effects[m_currentEffect]->reset();
+  size_t next = (m_currentIndex + 1) % m_slots.size();
+  activate(next);
 }
 
 void EffectManager::prevEffect() {
-    if (m_currentEffect == 0) {
-        m_currentEffect = m_effects.size() - 1;
-    } else {
-        m_currentEffect--;
-    }
-    m_effects[m_currentEffect]->reset();
-}
-
-void EffectManager::setEffect(const std::string& name) {
-  m_matrix->background->clear();
-  for (size_t i = 0; i < m_effects.size(); ++i) {
-    if (name == m_effects[i]->getName()) {
-        m_currentEffect = i;
-        m_effects[m_currentEffect]->reset();
-        return;
-    }
-  }
-}
-
-size_t EffectManager::getEffectCount() const {
-    return m_effects.size();
+  size_t prev = (m_currentIndex == 0) ? (m_slots.size() - 1) : (m_currentIndex - 1);
+  activate(prev);
 }
 
 const char* EffectManager::getCurrentEffectName() const {
-    if (m_currentEffect < m_effects.size()) {
-        return m_effects[m_currentEffect]->getName();
-    }
-    return "None";
-}
-
-uint8_t EffectManager::getCurrentEffect() const {
-    return m_currentEffect;
+  if (m_current && m_currentIndex < m_slots.size()) {
+    return m_slots[m_currentIndex].name;
+  }
+  return "None";
 }
 
 void EffectManager::setTofSensor(TOFSensor* sensor) {
-    m_tofSensor = sensor;
-    
-    // Pass sensor to TOF-enabled effects
-    if (m_constellation) {
-        m_constellation->setTofSensor(sensor);
-    }
-    if (m_meteorShower) {
-        m_meteorShower->setTofSensor(sensor);
-    }
-    if (m_spaceInvaders) {
-        m_spaceInvaders->setTofSensor(sensor);
-    }
-    if (m_gravityFlap) {
-        m_gravityFlap->setTofSensor(sensor);
-    }
-    if (m_asteroidHopper) {
-        m_asteroidHopper->setTofSensor(sensor);
-    }
-    if (m_spaceDrift) {
-        m_spaceDrift->setTofSensor(sensor);
-    }
+  m_tofSensor = sensor;
+  applyTofSensorToCurrent();
 }

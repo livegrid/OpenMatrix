@@ -563,60 +563,56 @@ class Aquarium {
     layer->setFont(f);
     layer->setTextColor(layer->color565(color.r, color.g, color.b));
 
-    // Split text into lines
-    std::vector<String> lines;
-    String currentLine;
-    for (const char* c = text; *c; ++c) {
-      if (*c == '\n') {
-        lines.push_back(currentLine);
-        currentLine = "";
-      } else {
-        currentLine += *c;
-      }
-    }
-    if (!currentLine.isEmpty()) {
-      lines.push_back(currentLine);
-    }
+    // Walk the string in place, using small stack buffers - no String /
+    // std::vector churn. Supports up to 8 lines of 63 chars each; ample
+    // for our messages ("Sensors\nWarming Up...", temperature notices, etc.)
+    constexpr size_t kMaxLines = 8;
+    constexpr size_t kLineBufSize = 64;
+    char lines[kMaxLines][kLineBufSize];
+    uint16_t lineWidths[kMaxLines] = {0};
+    size_t lineCount = 0;
 
-    // Calculate total height and maximum width
     int16_t x1, y1;
-    uint16_t w, h, maxWidth = 0, totalHeight = 0;
-    for (const String& line : lines) {
-      layer->getTextBounds(line.c_str(), 0, 0, &x1, &y1, &w, &h);
-      maxWidth = max(maxWidth, w);
+    uint16_t w = 0, h = 0;
+    uint16_t lineHeight = 0;
+    uint16_t totalHeight = 0;
+
+    const char* p = text;
+    while (*p && lineCount < kMaxLines) {
+      size_t len = 0;
+      while (p[len] && p[len] != '\n' && len + 1 < kLineBufSize) ++len;
+      memcpy(lines[lineCount], p, len);
+      lines[lineCount][len] = '\0';
+
+      layer->getTextBounds(lines[lineCount], 0, 0, &x1, &y1, &w, &h);
+      lineWidths[lineCount] = w;
+      if (h > lineHeight) lineHeight = h;
       totalHeight += h;
+
+      ++lineCount;
+      p += len;
+      if (*p == '\n') ++p;
     }
 
-    // Calculate starting Y position
     int16_t startY;
     if (textPos == TOP) {
-      startY = h;
+      startY = lineHeight;
     } else if (textPos == BOTTOM) {
-      startY = layer->getHeight() - totalHeight;
+      startY = layer->getHeight() - totalHeight + lineHeight;
     } else {  // MIDDLE
-      startY = (layer->getHeight() - totalHeight) / 2 + h;
+      startY = (layer->getHeight() - totalHeight) / 2 + lineHeight;
     }
 
-    // Draw each line
-    for (const String& line : lines) {
-      int16_t lineX;
-      layer->getTextBounds(line.c_str(), 0, 0, &x1, &y1, &w, &h);
-
+    for (size_t i = 0; i < lineCount; ++i) {
+      int16_t lineX = 0;
       switch (alignment) {
-        case TextAlignment::LEFT:
-          lineX = 0;
-          break;
-        case TextAlignment::CENTER:
-          lineX = (layer->getWidth() - w) / 2;
-          break;
-        case TextAlignment::RIGHT:
-          lineX = layer->getWidth() - w;
-          break;
+        case TextAlignment::LEFT:   lineX = 0; break;
+        case TextAlignment::CENTER: lineX = (layer->getWidth() - lineWidths[i]) / 2; break;
+        case TextAlignment::RIGHT:  lineX = layer->getWidth() - lineWidths[i]; break;
       }
-
       layer->setCursor(lineX, startY);
-      layer->print(line);
-      startY += h;
+      layer->print(lines[i]);
+      startY += lineHeight;
     }
   }
 };

@@ -12,7 +12,7 @@
 // #define SCD40_ENABLED 1  // Temperature/Humidity/CO2 sensor (disable to save ~2KB RAM + reduce I2C contention)
 // #define ADXL345_ENABLED 1   //AUTOROTATE
 // #define BH1750_ENABLED 1
-#define TOUCH_ENABLED 1
+// #define TOUCH_ENABLED 1
 #define VL53L8CX_ENABLED 1  // Time-of-Flight sensor
 
 // #define WIFI_ENABLED 1  // Comment out to disable WiFi, web server, and ServerTask (saves RAM)

@@ -456,7 +456,8 @@ void WebServerManager::setupInterface() {
     stateManager->getState()->settings.mqtt.matrix_text_topic = matrix_text_topic;
     stateManager->getState()->settings.mqtt.show_text = show_text;
     
-    MQTTManager::getInstance().checkSettingsAndReconnect();
+    // Settings changed: reset MQTT retry window and re-attempt with the new config.
+    MQTTManager::getInstance().onSettingsUpdated();
     stateManager->save();
 
     // TODO: Do something with these MQTT settings     

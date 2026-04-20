@@ -1,32 +1,75 @@
 #include "UI.h"
 #include "interface.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 UI::UI(WebServer* server, StateManager* stateManager) {
   _server = server;
   _state_manager = stateManager;
 }
 
+// WebServer::streamFile() and send_P(large) block core 0 in a tight read/write
+// loop. That can starve IDLE and trip the task watchdog (TG1WDT_SYS_RST).
+// Stream in chunks and call vTaskDelay(1) periodically so IDLE can run.
+
+static void streamLittleFSFileYielding(WebServer* server, File& file,
+                                       const char* contentType) {
+  if (!file) {
+    server->send(500, "text/plain", "File open failed");
+    return;
+  }
+  const size_t len = file.size();
+  server->setContentLength(len);
+  server->send(200, contentType, "");
+  constexpr size_t kChunk = 1024;
+  uint8_t buf[kChunk];
+  size_t sent = 0;
+  while (sent < len) {
+    const size_t toRead = min(kChunk, len - sent);
+    const int r = file.read(buf, toRead);
+    if (r <= 0) break;
+    server->sendContent(reinterpret_cast<const char*>(buf), (size_t)r);
+    sent += (size_t)r;
+    vTaskDelay(1);
+  }
+}
+
+// Gzipped UI from PROGMEM — same data as before, chunked for WDT safety.
+static void serveIndexHtml(WebServer* server, const char* logContext) {
+  constexpr size_t kChunkSize = 4096;
+  constexpr unsigned kYieldEveryChunks = 4;
+  const size_t totalSize = sizeof(OPEN_MATRIX_HTML);
+
+  server->sendHeader("Content-Encoding", "gzip");
+  server->setContentLength(totalSize);
+  server->send(200, "text/html", "");
+
+  uint8_t buf[kChunkSize];
+  size_t sent = 0;
+  unsigned chunksSinceYield = 0;
+  while (sent < totalSize) {
+    const size_t n = min(kChunkSize, totalSize - sent);
+    memcpy_P(buf, OPEN_MATRIX_HTML + sent, n);
+    server->sendContent(reinterpret_cast<const char*>(buf), n);
+    sent += n;
+    if (++chunksSinceYield >= kYieldEveryChunks) {
+      vTaskDelay(1);
+      chunksSinceYield = 0;
+    }
+  }
+  log_i("Sent Open Matrix HTML for %s clients (PROGMEM, %u bytes).", logContext,
+        (unsigned)sent);
+}
+
 void UI::begin() {
   // For STA clients
-  _server
-      ->on("/", HTTP_GET,
-           [&]() {
-             _server->sendHeader("Content-Encoding", "gzip");
-             _server->send_P(200, "text/html", (const char*)OPEN_MATRIX_HTML,
-                             sizeof(OPEN_MATRIX_HTML));
-             log_i("Sent Open Matrix HTML for STA clients.");
-           })
+  _server->on("/", HTTP_GET,
+              [&]() { serveIndexHtml(_server, "STA"); })
       .setFilter(_onSTAFilter);
 
   // For AP clients
-  _server
-      ->on("/openmatrix", HTTP_GET,
-           [&]() {
-             _server->sendHeader("Content-Encoding", "gzip");
-             _server->send_P(200, "text/html", (const char*)OPEN_MATRIX_HTML,
-                             sizeof(OPEN_MATRIX_HTML));
-             log_i("Sent Open Matrix HTML for AP clients.");
-           })
+  _server->on("/openmatrix", HTTP_GET,
+              [&]() { serveIndexHtml(_server, "AP"); })
       .setFilter(_onAPFilter);
 
   // OpenMatrix State
@@ -40,7 +83,7 @@ void UI::begin() {
   _server->on("/public/manifest.json", HTTP_GET, [this]() {
     if (LittleFS.exists("/public/manifest.json")) {
       File file = LittleFS.open("/public/manifest.json", "r");
-      _server->streamFile(file, "application/json");
+      streamLittleFSFileYielding(_server, file, "application/json");
       file.close();
     } else {
       _server->send(404, "text/plain", "Manifest not found");
@@ -52,7 +95,7 @@ void UI::begin() {
   _server->on("/public/logo_32.png", HTTP_GET, [this]() {
     if (LittleFS.exists("/public/logo_32.png")) {
       File file = LittleFS.open("/public/logo_32.png", "r");
-      _server->streamFile(file, "image/png");
+      streamLittleFSFileYielding(_server, file, "image/png");
       file.close();
     } else {
       _server->send(404, "text/plain", "Logo 32 not found");
@@ -63,7 +106,7 @@ void UI::begin() {
   _server->on("/public/logo_192.png", HTTP_GET, [this]() {
     if (LittleFS.exists("/public/logo_192.png")) {
       File file = LittleFS.open("/public/logo_192.png", "r");
-      _server->streamFile(file, "image/png");
+      streamLittleFSFileYielding(_server, file, "image/png");
       file.close();
     } else {
       _server->send(404, "text/plain", "Logo 192 not found");
@@ -74,7 +117,7 @@ void UI::begin() {
   _server->on("/public/logo_512.png", HTTP_GET, [this]() {
     if (LittleFS.exists("/public/logo_512.png")) {
       File file = LittleFS.open("/public/logo_512.png", "r");
-      _server->streamFile(file, "image/png");
+      streamLittleFSFileYielding(_server, file, "image/png");
       file.close();
     } else {
       _server->send(404, "text/plain", "Logo 512 not found");
@@ -85,7 +128,7 @@ void UI::begin() {
   _server->on("/public/service-worker.js", HTTP_GET, [this]() {
     if (LittleFS.exists("/public/service-worker.js")) {
       File file = LittleFS.open("/public/service-worker.js", "r");
-      _server->streamFile(file, "application/javascript");
+      streamLittleFSFileYielding(_server, file, "application/javascript");
       file.close();
     } else {
       _server->send(404, "text/plain", "Service worker not found");

@@ -9,7 +9,7 @@
 // #include <NetWizard.h>
 #include <WebServer.h>
 
-// #include "MQTTManager.h"
+#include "MQTTManager.h"
 #include "UI.h"
 #include "WebServerManager.h"
 #endif
@@ -75,12 +75,10 @@ TextDraw textDraw(&matrix);
 #ifdef WIFI_ENABLED
 WebServerManager webServerManager(&matrix, &effectManager, &imageDraw,
                                   &stateManager, &taskManager);
-#endif
 
-#include "Edmx.h"
+// Edmx and MQTT only exist when WiFi is enabled - they're both networked services.
 Edmx& dmx = Edmx::getInstance();
-
-#include "MQTTManager.h"
+#endif
 
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
@@ -90,6 +88,29 @@ TouchMenu touchMenu(&matrix, &stateManager, &webServerManager);
 TouchMenu touchMenu(&matrix, &stateManager, nullptr);
 #endif
 #endif
+
+// Small helpers so the display loop stays clean when TOUCH_ENABLED is off.
+static inline bool touchShouldStartDemo() {
+#ifdef TOUCH_ENABLED
+  return touchMenu.shouldStartDemo();
+#else
+  return false;
+#endif
+}
+static inline bool touchIsMenuOpen() {
+#ifdef TOUCH_ENABLED
+  return touchMenu.isMenuOpen();
+#else
+  return false;
+#endif
+}
+static inline bool touchShowSensorData() {
+#ifdef TOUCH_ENABLED
+  return touchMenu.showSensorData();
+#else
+  return false;
+#endif
+}
 
 #ifndef SCD40_ENABLED
 void demoTask(void* parameter) {
@@ -157,14 +178,14 @@ void displayTask(void* parameter) {
   aquarium.setTofSensor(&tofSensor);
 #endif
 
-  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
+  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   // Set mode to EFFECT with Constellation as default
-  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  // stateManager.getState()->mode = OpenMatrixMode::EFFECT;
   // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
   // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
   // stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
   // stateManager.getState()->effects.selected = Effects::ASTEROID_HOPPER;
-  stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
+  // stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
   // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
   // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
   // effectManager.setEffect(0);  // Constellation is index 0
@@ -211,13 +232,22 @@ void displayTask(void* parameter) {
         stateManager.save();
       }
 
-      if (touchMenu.shouldStartDemo()) {
+      if (touchShouldStartDemo()) {
         aquarium.startDemo();
       }
 
-      if (touchMenu.isMenuOpen()) {
+#ifdef TOUCH_ENABLED
+      if (touchIsMenuOpen()) {
         touchMenu.displayMenu();
-      } else {
+      } else
+#endif
+      {
+#ifdef TOF_DEBUG_ENABLED
+  if (tofSensor.isActive()) {
+    tofVisualizer->draw();
+    matrix.background->display();
+  }
+#else
         switch (stateManager.getState()->mode) {
           case OpenMatrixMode::EFFECT:
             effectManager.updateCurrentEffect();
@@ -233,25 +263,18 @@ void displayTask(void* parameter) {
             matrix.background->display();
             break;
           case OpenMatrixMode::AQUARIUM:
-#ifdef VL53L8CX_ENABLED
-            if (tofVisualizer && tofSensor.isActive()) {
-              tofVisualizer->draw();
-              matrix.background->display();
-            } else {
-              aquarium.update(touchMenu.showSensorData());
-              aquarium.display();
-            }
-#else
-            aquarium.update(touchMenu.showSensorData());
+            aquarium.update(touchShowSensorData());
             aquarium.display();
-#endif
             break;
+#ifdef WIFI_ENABLED
           case OpenMatrixMode::DMX:
             dmx.update();
             break;
+#endif
           default:
             break;
         }
+#endif
       }
 
 #ifdef PANEL_UPCYCLED
@@ -341,11 +364,12 @@ void serverTask(void* parameter) {
 }
 #endif
 
+#ifdef WIFI_ENABLED
+// Drives publishing cadence + reconnect decisions; MQTT connect/publish handled in MQTTManager.
 void mqttTask(void* parameter) {
   MQTTManager& mqttManager = MQTTManager::getInstance();
-  mqttManager.begin("192.168.1.102", 1883, &stateManager);
+  mqttManager.begin(&stateManager);
 
-  // Set up a callback for incoming messages
   mqttManager.setCallback(
       [&mqttManager](char* topic, char* payload,
                      AsyncMqttClientMessageProperties properties, size_t len,
@@ -354,36 +378,18 @@ void mqttTask(void* parameter) {
                                           index, total);
       });
 
-  const TickType_t xFrequency = pdMS_TO_TICKS(5000);  // 5 seconds
+  const TickType_t xFrequency = pdMS_TO_TICKS(5000);
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
-  bool configPublished = false;
-
   for (;;) {
-    if (mqttManager.isConnected()) {
-      if (!configPublished) {
-        // Publish Home Assistant discovery messages
-        mqttManager.publishHomeAssistantConfig();
-        configPublished = true;
-        log_i("MQTT: Published Home Assistant discovery config");
-      }
-      float temperature =
-          stateManager.getState()->environment.temperature.value;
-      float humidity = stateManager.getState()->environment.humidity.value;
-      int co2 = stateManager.getState()->environment.co2.value;
-
-      mqttManager.publishSensorData(temperature, humidity, co2);
-      mqttManager.publishSensorData(
-          temperature, humidity, co2,
-          stateManager.getState()->settings.mqtt.co2_topic.c_str());
-      log_v("MQTT: Sent sensor data to Home Assistant");
-    } else {
-      log_v("MQTT: Not connected, skipping message");
-    }
-
+    mqttManager.loop(
+        stateManager.getState()->environment.temperature.value,
+        stateManager.getState()->environment.humidity.value,
+        stateManager.getState()->environment.co2.value);
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
+#endif
 
 #ifdef VL53L8CX_ENABLED
 void tofTask(void* parameter) {
@@ -537,11 +543,20 @@ void setup(void) {
   // === PHASE 1: Core tasks ===
   log_i("Phase 1: Creating Display and Server tasks...");
 
+  // DisplayTask:
+  //   Steady-state HWM observed ~4.4 KB (includes the ~4 KB Water batch buffer).
+  //   However aquarium.begin() on first boot has a deeper call tree (fish/boid
+  //   construction, state serialization, etc.) and overflowed a 12 KB stack.
+  //   5120 words = 20 KB gives plenty of headroom for that path while still
+  //   saving 12 KB vs the original 32 KB.
   TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1, false);
 
 #ifdef WIFI_ENABLED
   // ServerTask in PSRAM: frees ~30KB internal heap for AsyncUDP.listen() (needs xTaskCreate from internal)
   TaskManager::getInstance().createTask("ServerTask", serverTask, 7528, 1, 0, true);
+
+  // MQTT task - only runs when WiFi is enabled. Stays dormant until valid settings exist.
+  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0, true);
 #endif
 
   // === PHASE 2: Additional tasks ===
