@@ -119,6 +119,14 @@ void SpaceInvadersEffect::setTofSensor(TOFSensor* sensor) {
     }
 }
 
+void SpaceInvadersEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
+    minDetectionDistance = minDist;
+    maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
+}
+
 // Portrait game coordinate (gx, gy) → landscape matrix coordinate.
 // Vertically flipped to match the working orientation on hardware.
 void SpaceInvadersEffect::drawGamePixel(int16_t gx, int16_t gy, const CRGB& color) {

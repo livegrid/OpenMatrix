@@ -122,4 +122,5 @@ public:
     const char* getName() const override;
 
     void setTofSensor(TOFSensor* sensor);
+    void setDetectionRange(int16_t minDist, int16_t maxDist);
 };

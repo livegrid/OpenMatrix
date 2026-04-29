@@ -38,9 +38,9 @@ typedef enum {
     METEOR_SHOWER,
     SPACE_INVADERS,
     GRAVITY_FLAP,
+    SIMPLEX_NOISE,
     ASTEROID_HOPPER,
     SPACE_DRIFT,
-    SIMPLEX_NOISE,
     SNAKE,
     FLOCKING,
     GAMEOFLIFE,
@@ -125,6 +125,8 @@ struct State {
     // Effects
     struct {
         Effects selected = CONSTELLATION;
+        /** Increment when persisted effect numeric IDs change (slot reorder). Used in restore(). */
+        uint8_t slotOrderRevision = 1;
     } effects;
 
     // Image

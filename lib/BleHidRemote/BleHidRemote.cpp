@@ -22,14 +22,15 @@ static constexpr uint32_t kBetweenConnectMs       = 2500;
 static constexpr uint32_t kBetweenStagesMs        = 3000;
 static constexpr unsigned kReadHexMax             = 96;
 
-/** EffectManager slot indices: Constellation, Meteor, Gravity Flap, Asteroid Hopper, Space Invaders, Space Drift. */
-static const uint8_t kRemoteEffectSlots[] = {0, 1, 3, 4, 2, 5};
+/** EffectManager slot indices: Constellation, Meteor, Gravity Flap, Space Invaders, Asteroid Hopper, Space Drift (Noise excluded). */
+static const uint8_t kRemoteEffectSlots[] = {0, 1, 3, 2, 5, 6};
 static constexpr size_t kRemoteEffectCount = sizeof(kRemoteEffectSlots) / sizeof(kRemoteEffectSlots[0]);
 
 static NimBLEClient* g_client         = nullptr;
 static volatile bool g_connected      = false;
 static StateManager*   g_stateManager = nullptr;
 static size_t          g_remoteRingIdx = 0;
+static BleHidRemoteTofRangeAdjustCallback g_tofRangeAdjustCallback = nullptr;
 
 static void syncRemoteRingFromState() {
   if (!g_stateManager) {
@@ -51,6 +52,10 @@ static void syncRemoteRingFromState() {
 void bleHidRemoteSetStateManager(StateManager* stateManager) {
   g_stateManager = stateManager;
   syncRemoteRingFromState();
+}
+
+void bleHidRemoteSetTofRangeAdjustCallback(BleHidRemoteTofRangeAdjustCallback callback) {
+  g_tofRangeAdjustCallback = callback;
 }
 
 struct HidReportSample {
@@ -138,6 +143,20 @@ static void onRemoteTofDebugToggle() {
   st->tofDebugView = !st->tofDebugView;
   g_stateManager->save();
   ESP_LOGI(kTag, "TOF debug overlay %s", st->tofDebugView ? "on" : "off");
+}
+
+static void onRemoteIncreaseTofRange() {
+  if (!g_tofRangeAdjustCallback) {
+    return;
+  }
+  g_tofRangeAdjustCallback(+250);
+}
+
+static void onRemoteDecreaseTofRange() {
+  if (!g_tofRangeAdjustCallback) {
+    return;
+  }
+  g_tofRangeAdjustCallback(-250);
 }
 
 class ClientCallbacks : public NimBLEClientCallbacks {
@@ -244,7 +263,7 @@ static void dumpGattAndSubscribe(NimBLEClient* client) {
     }
   }
   Serial.println(
-      "Ready — A: next effect, Y: prev, OPT: TOF debug toggle, TOP: Aquarium; [RAW] on change.\n");
+      "Ready — A: next effect, Y: prev, X/B: TOF range +/-, OPT: TOF debug toggle, TOP: Aquarium; [RAW] on change.\n");
 }
 
 static void processHidReports() {
@@ -272,14 +291,17 @@ static void processHidReports() {
     const bool opt = (d[8] & kMaskOpt_b8) != 0;
     const bool top = (d[5] == 0xFF);
 
-    (void)x;
-    (void)b;
-
     if (a && !g_prevA) {
       onRemoteNextEffect();
     }
+    if (x && !g_prevX) {
+      onRemoteIncreaseTofRange();
+    }
     if (y && !g_prevYBtn) {
       onRemotePrevEffect();
+    }
+    if (b && !g_prevB) {
+      onRemoteDecreaseTofRange();
     }
     if (opt && !g_prevOpt) {
       onRemoteTofDebugToggle();

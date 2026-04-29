@@ -74,6 +74,14 @@ void AsteroidHopperEffect::setTofSensor(TOFSensor* sensor) {
     }
 }
 
+void AsteroidHopperEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
+    minDetectionDistance = minDist;
+    maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
+}
+
 void AsteroidHopperEffect::reset() {
     frameCount = 0;
     m_matrix->background->fillScreen(0);

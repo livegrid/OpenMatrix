@@ -17,19 +17,21 @@
   [](Matrix* m) -> Effect* { return new Cls(m); }
 #define EFFECT_TOF(Cls)                                                   \
   [](Effect* e, TOFSensor* s) { static_cast<Cls*>(e)->setTofSensor(s); }
+#define EFFECT_TOF_RANGE(Cls)                                                             \
+  [](Effect* e, int16_t minDist, int16_t maxDist) { static_cast<Cls*>(e)->setDetectionRange(minDist, maxDist); }
 
 EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
-  // Registry order == selectable order in UI. Keep index 0 = default
-  // (Constellation). Effects that don't accept a TOFSensor get a null
-  // applyTof entry.
+  // Registry order == selectable order in UI. Index 0 = default (Constellation).
+  // Asteroid Hopper and Space Drift are the last selectable slots after Noise.
+  // Effects that don't accept a TOFSensor get null applyTof entries.
   m_slots = {
-      {"Constellation",   EFFECT_FACTORY(ConstellationEffect),   EFFECT_TOF(ConstellationEffect)},
-      {"Meteor Shower",   EFFECT_FACTORY(MeteorShowerEffect),    EFFECT_TOF(MeteorShowerEffect)},
-      {"Space Invaders",  EFFECT_FACTORY(SpaceInvadersEffect),   EFFECT_TOF(SpaceInvadersEffect)},
-      {"Gravity Flap",    EFFECT_FACTORY(GravityFlapEffect),     EFFECT_TOF(GravityFlapEffect)},
-      {"Asteroid Hopper", EFFECT_FACTORY(AsteroidHopperEffect),  EFFECT_TOF(AsteroidHopperEffect)},
-      {"Space Drift",     EFFECT_FACTORY(SpaceDriftEffect),      EFFECT_TOF(SpaceDriftEffect)},
-      {"Noise",           EFFECT_FACTORY(NoiseEffect),           nullptr},
+      {"Constellation",   EFFECT_FACTORY(ConstellationEffect),   EFFECT_TOF(ConstellationEffect), EFFECT_TOF_RANGE(ConstellationEffect)},
+      {"Meteor Shower",   EFFECT_FACTORY(MeteorShowerEffect),    EFFECT_TOF(MeteorShowerEffect), EFFECT_TOF_RANGE(MeteorShowerEffect)},
+      {"Space Invaders",  EFFECT_FACTORY(SpaceInvadersEffect),   EFFECT_TOF(SpaceInvadersEffect), EFFECT_TOF_RANGE(SpaceInvadersEffect)},
+      {"Gravity Flap",    EFFECT_FACTORY(GravityFlapEffect),     EFFECT_TOF(GravityFlapEffect), EFFECT_TOF_RANGE(GravityFlapEffect)},
+      {"Noise",           EFFECT_FACTORY(NoiseEffect),           nullptr, nullptr},
+      {"Asteroid Hopper", EFFECT_FACTORY(AsteroidHopperEffect),  EFFECT_TOF(AsteroidHopperEffect), EFFECT_TOF_RANGE(AsteroidHopperEffect)},
+      {"Space Drift",     EFFECT_FACTORY(SpaceDriftEffect),      EFFECT_TOF(SpaceDriftEffect), EFFECT_TOF_RANGE(SpaceDriftEffect)},
   };
   // No effect is instantiated yet - activate() runs on the first setEffect() call.
 }
@@ -50,6 +52,13 @@ void EffectManager::applyTofSensorToCurrent() {
   if (applier) applier(m_current, m_tofSensor);
 }
 
+void EffectManager::applyTofDetectionRangeToCurrent() {
+  if (m_current == nullptr || !m_hasTofDetectionRange) return;
+  if (m_currentIndex >= m_slots.size()) return;
+  const auto& applier = m_slots[m_currentIndex].applyTofRange;
+  if (applier) applier(m_current, m_tofMinDistance, m_tofMaxDistance);
+}
+
 void EffectManager::activate(size_t index) {
   if (index >= m_slots.size()) return;
   destroyCurrent();
@@ -58,6 +67,7 @@ void EffectManager::activate(size_t index) {
   log_i("EffectManager: activating %s", m_slots[index].name);
   m_current = m_slots[index].factory(m_matrix);
   applyTofSensorToCurrent();
+  applyTofDetectionRangeToCurrent();
   if (m_current) m_current->reset();
 }
 
@@ -98,4 +108,11 @@ const char* EffectManager::getCurrentEffectName() const {
 void EffectManager::setTofSensor(TOFSensor* sensor) {
   m_tofSensor = sensor;
   applyTofSensorToCurrent();
+}
+
+void EffectManager::setTofDetectionRange(int16_t minDist, int16_t maxDist) {
+  m_tofMinDistance = minDist;
+  m_tofMaxDistance = maxDist;
+  m_hasTofDetectionRange = true;
+  applyTofDetectionRangeToCurrent();
 }

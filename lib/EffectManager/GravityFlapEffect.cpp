@@ -77,6 +77,14 @@ void GravityFlapEffect::setTofSensor(TOFSensor* sensor) {
     }
 }
 
+void GravityFlapEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
+    minDetectionDistance = minDist;
+    maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
+}
+
 void GravityFlapEffect::reset() {
     frameCount = 0;
     m_matrix->background->fillScreen(0);

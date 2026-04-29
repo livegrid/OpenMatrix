@@ -58,6 +58,14 @@ void SpaceDriftEffect::setTofSensor(TOFSensor* sensor) {
     }
 }
 
+void SpaceDriftEffect::setDetectionRange(int16_t minDist, int16_t maxDist) {
+    minDetectionDistance = minDist;
+    maxDetectionDistance = maxDist;
+    if (tofInteraction) {
+        tofInteraction->setDistanceRange(minDist, maxDist);
+    }
+}
+
 void SpaceDriftEffect::reset() {
     frameCount = 0;
     camX = 0;

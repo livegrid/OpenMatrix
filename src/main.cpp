@@ -70,6 +70,37 @@ AutoRotate autoRotate(&matrix);
 #include "EffectManager.h"
 EffectManager effectManager(&matrix);
 
+#ifdef VL53L8CX_ENABLED
+static constexpr int16_t kRemoteTofMaxMinMm = 1000;
+static constexpr int16_t kRemoteTofMaxMaxMm = 4000;
+static int16_t g_tofRuntimeMaxDetectionDistance = TOF_MAX_DETECTION_DIST;
+
+static void applyRuntimeTofRange() {
+  tofVisualizer->setDistanceRange(TOF_MIN_DETECTION_DIST, g_tofRuntimeMaxDetectionDistance);
+  effectManager.setTofDetectionRange(TOF_MIN_DETECTION_DIST, g_tofRuntimeMaxDetectionDistance);
+  log_i("TOF range updated: min=%d max=%d", TOF_MIN_DETECTION_DIST,
+        g_tofRuntimeMaxDetectionDistance);
+}
+#endif
+
+#if defined(VL53L8CX_ENABLED) && defined(BLE_HID_REMOTE_ENABLED)
+static void onBleRemoteTofRangeAdjust(int deltaMm) {
+  int32_t next = (int32_t)g_tofRuntimeMaxDetectionDistance + (int32_t)deltaMm;
+  if (next < kRemoteTofMaxMinMm) {
+    next = kRemoteTofMaxMinMm;
+  }
+  if (next > kRemoteTofMaxMaxMm) {
+    next = kRemoteTofMaxMaxMm;
+  }
+  int16_t clamped = (int16_t)next;
+  if (clamped == g_tofRuntimeMaxDetectionDistance) {
+    return;
+  }
+  g_tofRuntimeMaxDetectionDistance = clamped;
+  applyRuntimeTofRange();
+}
+#endif
+
 #include "ImageDraw.h"
 ImageDraw imageDraw(&matrix);
 
@@ -171,8 +202,7 @@ void displayTask(void* parameter) {
 #ifdef VL53L8CX_ENABLED
   // Initialize TOF visualizer after matrix is initialized (static allocation)
   tofVisualizer->setMatrix(&matrix);
-  tofVisualizer->setDistanceRange(TOF_MIN_DETECTION_DIST,
-                                  TOF_MAX_DETECTION_DIST);
+  applyRuntimeTofRange();
   tofSensor.setRotation(TOF_DEFAULT_ROTATION);
   
   // Connect TOF sensor to interactive effects (MeteorShower, SpaceInvaders, GravityFlap)
@@ -182,19 +212,6 @@ void displayTask(void* parameter) {
   aquarium.setTofSensor(&tofSensor);
 #endif
 
-  // stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
-  // Set mode to EFFECT with Constellation as default
-  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  // stateManager.getState()->effects.selected = Effects::CONSTELLATION;
-  // stateManager.getState()->effects.selected = Effects::METEOR_SHOWER;
-  // stateManager.getState()->effects.selected = Effects::GRAVITY_FLAP;
-  // stateManager.getState()->effects.selected = Effects::ASTEROID_HOPPER;
-  stateManager.getState()->effects.selected = Effects::SPACE_DRIFT;
-  // stateManager.getState()->effects.selected = Effects::SPACE_INVADERS;
-  // stateManager.getState()->effects.selected = Effects::SIMPLEX_NOISE;
-  // effectManager.setEffect(0);  // Constellation is index 0
-
-
   // Route large allocations (Fish, Plants, Boids) to PSRAM so internal heap
   // stays free for WiFi, E1.31/AsyncUDP, and mDNS.
   log_i("Aquarium begin: routing heap allocs >= 64 B to PSRAM (internal free=%u)",
@@ -202,8 +219,6 @@ void displayTask(void* parameter) {
   heap_caps_malloc_extmem_enable(64);
   aquarium.begin();
   log_i("Aquarium begin done (internal free=%u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-
-  stateManager.save();
 
   for (;;) {
     unsigned long currentTime = millis();
@@ -539,6 +554,10 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
+  // Every boot starts on Constellation (ignore persisted effect until user changes).
+  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
+  stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  stateManager.save();
   // stateManager.startPeriodicSave();
 
   
@@ -600,6 +619,9 @@ void setup(void) {
 
 #ifdef BLE_HID_REMOTE_ENABLED
   bleHidRemoteSetStateManager(&stateManager);
+#if defined(VL53L8CX_ENABLED)
+  bleHidRemoteSetTofRangeAdjustCallback(onBleRemoteTofRangeAdjust);
+#endif
   // Runs after WiFi phase; long connect/GATT work stays off the main setup path.
   log_i("BLE HID remote: starting NimBLE task...");
   TaskManager::getInstance().createTask("BleHidRemote", bleHidRemoteTask, 8192, 1, 0, false);

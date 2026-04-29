@@ -29,6 +29,7 @@ class EffectManager {
     const char* name;
     std::function<Effect*(Matrix*)> factory;
     std::function<void(Effect*, TOFSensor*)> applyTof;  // may be null
+    std::function<void(Effect*, int16_t, int16_t)> applyTofRange;  // may be null
   };
 
   EffectManager(Matrix* matrix);
@@ -46,14 +47,19 @@ class EffectManager {
 
   // Stores the sensor; re-applied whenever a new effect is instantiated.
   void setTofSensor(TOFSensor* sensor);
+  void setTofDetectionRange(int16_t minDist, int16_t maxDist);
 
  private:
   void activate(size_t index);
   void destroyCurrent();
   void applyTofSensorToCurrent();
+  void applyTofDetectionRangeToCurrent();
 
   Matrix* m_matrix;
   TOFSensor* m_tofSensor = nullptr;
+  int16_t m_tofMinDistance = 0;
+  int16_t m_tofMaxDistance = 0;
+  bool m_hasTofDetectionRange = false;
 
   std::vector<Slot> m_slots;
   size_t m_currentIndex = 0;

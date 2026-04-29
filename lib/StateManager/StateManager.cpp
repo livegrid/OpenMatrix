@@ -71,6 +71,7 @@ void StateManager::serialize(String& buffer, bool settings_only) {
 
   // Effects
   json["effects"]["selected"] = _state.effects.selected;
+  json["effects"]["slotOrderRevision"] = _state.effects.slotOrderRevision;
 
   // Image
   json["image"]["selected"] = _state.image.selected;
@@ -208,7 +209,26 @@ void StateManager::restore() {
 
   // Effects
   _state.effects.selected = json["effects"]["selected"] | DEFAULT_EFFECTS_SELECTED;
-  log_i("Restored selected effect: %d", static_cast<int>(_state.effects.selected));
+  _state.effects.slotOrderRevision = json["effects"]["slotOrderRevision"] | 0;
+  if (_state.effects.slotOrderRevision < 1) {
+    // Legacy numbering (Hopper=5, Drift=6, Noise=7); slots now Noise=5 then Hopper/Drift.
+    switch (static_cast<int>(_state.effects.selected)) {
+      case 5:
+        _state.effects.selected = Effects::ASTEROID_HOPPER;
+        break;
+      case 6:
+        _state.effects.selected = Effects::SPACE_DRIFT;
+        break;
+      case 7:
+        _state.effects.selected = Effects::SIMPLEX_NOISE;
+        break;
+      default:
+        break;
+    }
+    _state.effects.slotOrderRevision = 1;
+  }
+  log_i("Restored selected effect: %d (slotOrderRevision=%u)", static_cast<int>(_state.effects.selected),
+        (unsigned)_state.effects.slotOrderRevision);
 
   // Image
   _state.image.selected = json["image"]["selected"] | DEFAULT_IMAGE_SELECTED;
@@ -285,6 +305,7 @@ void StateManager::setDefaultState() {
 
     // Effects
     _state.effects.selected = DEFAULT_EFFECTS_SELECTED;
+    _state.effects.slotOrderRevision = 1;
     _state.image.selected = DEFAULT_IMAGE_SELECTED;
     #ifdef PANEL_UPCYCLED
     _state.image.width = 78;
