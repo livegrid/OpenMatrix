@@ -39,7 +39,14 @@ public:
 
         for (uint16_t i = 0; i < planktonCount; i++) {
             float depthBoost = getDepthBoostAt((float)px[i], (float)py[i]);
-            uint8_t target = (uint8_t)(depthBoost * 255);
+            uint8_t target = 0;
+            if (depthBoost > PLANKTON_ACTIVATION_FLOOR) {
+                float activated = (depthBoost - PLANKTON_ACTIVATION_FLOOR) /
+                                  (1.0f - PLANKTON_ACTIVATION_FLOOR);
+                activated = constrain(activated, 0.0f, 1.0f);
+                target = (uint8_t)(PLANKTON_PUNCH_MIN_BRIGHTNESS +
+                                   activated * (255 - PLANKTON_PUNCH_MIN_BRIGHTNESS));
+            }
 
             int16_t diff = (int16_t)target - (int16_t)brightness[i];
             if (diff > 0) {
@@ -64,9 +71,20 @@ public:
 
             uint8_t hue = PLANKTON_HUE_BASE + (uint8_t)((i * 2654435761u) >> 24) % PLANKTON_HUE_RANGE;
             uint8_t sat = PLANKTON_SAT_BASE + (uint8_t)((i * 2654435761u) >> 20) % PLANKTON_SAT_RANGE;
+            if (brightness[i] > 170) {
+                uint8_t desaturate = (uint8_t)((brightness[i] - 170) / 2);
+                sat = sat > desaturate ? sat - desaturate : 80;
+            }
             CRGB color;
             hsv2rgb_rainbow(CHSV(hue, sat, brightness[i]), color);
             matrix->foreground->drawPixel(x, y, color);
+
+            if (brightness[i] > 190 && (((millis() >> 4) + i * 17u) & 0x1F) < 3) {
+                uint16_t sx = x + 1 < screenWidth ? x + 1 : x;
+                CRGB sparkle = color;
+                sparkle.nscale8_video(120);
+                matrix->foreground->drawPixel(sx, y, sparkle);
+            }
         }
     }
 

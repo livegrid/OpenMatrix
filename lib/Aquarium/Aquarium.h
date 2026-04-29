@@ -39,6 +39,13 @@ class Aquarium {
   // TOF sensor interaction
   TOFInteractionManager* interactionManager = nullptr;
   TOFSensor* tofSensor = nullptr;  // Store sensor pointer for lazy init
+  bool aquariumPalmValid = false;
+  float aquariumPalmX = 0.5f;
+  float aquariumPalmY = 0.5f;
+  float aquariumPalmVelocityX = 0;
+  float aquariumPalmVelocityY = 0;
+  unsigned long aquariumPalmLastSeenMs = 0;
+  unsigned long aquariumPalmLastUpdateMs = 0;
 
   // Demo settings
   bool demoMode;
@@ -285,6 +292,76 @@ class Aquarium {
     
     water.update(temperature);
   }
+
+  void augmentAquariumInteraction(InteractionData& interaction) {
+    unsigned long now = millis();
+    float dt = aquariumPalmLastUpdateMs == 0 ? 0.033f : (now - aquariumPalmLastUpdateMs) / 1000.0f;
+    if (dt <= 0.0f || dt > 1.0f) dt = 0.033f;
+    aquariumPalmLastUpdateMs = now;
+
+    if (interaction.hasPalm) {
+      float rawX = ((float)interaction.palmX + 0.5f) / 8.0f;
+      float rawY = ((float)interaction.palmY + 0.5f) / 8.0f;
+      rawX = constrain(rawX, 0.0f, 1.0f);
+      rawY = constrain(rawY, 0.0f, 1.0f);
+
+      if (!aquariumPalmValid) {
+        aquariumPalmX = rawX;
+        aquariumPalmY = rawY;
+        aquariumPalmVelocityX = 0;
+        aquariumPalmVelocityY = 0;
+        aquariumPalmValid = true;
+      } else {
+        float prevX = aquariumPalmX;
+        float prevY = aquariumPalmY;
+        aquariumPalmX += (rawX - aquariumPalmX) * PALM_POSITION_SMOOTH;
+        aquariumPalmY += (rawY - aquariumPalmY) * PALM_POSITION_SMOOTH;
+
+        float instVx = (aquariumPalmX - prevX) / dt;
+        float instVy = (aquariumPalmY - prevY) / dt;
+        aquariumPalmVelocityX += (instVx - aquariumPalmVelocityX) * PALM_VELOCITY_SMOOTH;
+        aquariumPalmVelocityY += (instVy - aquariumPalmVelocityY) * PALM_VELOCITY_SMOOTH;
+      }
+
+      aquariumPalmLastSeenMs = now;
+    } else if (aquariumPalmValid) {
+      unsigned long missingMs = now - aquariumPalmLastSeenMs;
+      if (missingMs <= PALM_HOLD_MS) {
+        aquariumPalmVelocityX *= PALM_VELOCITY_DECAY;
+        aquariumPalmVelocityY *= PALM_VELOCITY_DECAY;
+      } else {
+        aquariumPalmValid = false;
+        aquariumPalmVelocityX = 0;
+        aquariumPalmVelocityY = 0;
+      }
+    }
+
+    if (aquariumPalmValid) {
+      unsigned long missingMs = interaction.hasPalm ? 0 : now - aquariumPalmLastSeenMs;
+      float holdStrength = 1.0f;
+      if (missingMs > 0) {
+        holdStrength = 1.0f - ((float)missingMs / (float)PALM_HOLD_MS);
+        holdStrength = constrain(holdStrength, 0.0f, 1.0f);
+      }
+
+      interaction.hasPalmHold = holdStrength > 0.0f;
+      interaction.palmNormX = aquariumPalmX;
+      interaction.palmNormY = aquariumPalmY;
+      interaction.palmVelocityX = aquariumPalmVelocityX;
+      interaction.palmVelocityY = aquariumPalmVelocityY;
+      interaction.palmVelocityMag = sqrtf(aquariumPalmVelocityX * aquariumPalmVelocityX +
+                                          aquariumPalmVelocityY * aquariumPalmVelocityY);
+      interaction.palmStrength = holdStrength;
+    } else {
+      interaction.hasPalmHold = false;
+      interaction.palmNormX = 0.5f;
+      interaction.palmNormY = 0.5f;
+      interaction.palmVelocityX = 0;
+      interaction.palmVelocityY = 0;
+      interaction.palmVelocityMag = 0;
+      interaction.palmStrength = 0;
+    }
+  }
   
   // Helper: Bilinear interpolation to get smooth depth value at any position
   float interpolateDepth(const InteractionData& interaction, float normX, float normY) {
@@ -389,7 +466,7 @@ class Aquarium {
   }
 
   // Update all fish in the aquarium
-  void updateFish() {
+  void updateFish(InteractionData* interactionOverride = nullptr) {
     float co2;
     
     if (demoMode) {
@@ -398,11 +475,13 @@ class Aquarium {
       co2 = (scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400;
     }
     
-    // Get interaction data if available
     InteractionData* interaction = nullptr;
     InteractionData interactionData;
-    if (interactionManager) {
+    if (interactionOverride) {
+      interaction = interactionOverride;
+    } else if (interactionManager) {
       interactionData = interactionManager->getInteractionData();
+      augmentAquariumInteraction(interactionData);
       interaction = &interactionData;
     }
 
@@ -510,6 +589,7 @@ class Aquarium {
         memset(&interactionData, 0, sizeof(interactionData));
         interactionData.hasBlob = false;
       }
+      augmentAquariumInteraction(interactionData);
       planktonField.update(interactionData);
       planktonField.draw();
 
@@ -517,7 +597,7 @@ class Aquarium {
                               &interactionData);
       boidManager.renderBoids();
 
-      updateFish();
+      updateFish(&interactionData);
       // updateFood();
 
       updatePlants();

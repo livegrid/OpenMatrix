@@ -23,6 +23,16 @@ struct InteractionData {
     int16_t palmDeltaMm = 0;
     int16_t palmRefMm = 0;
 
+    // Effect-local consumers may smooth/hold palm data here without changing the
+    // raw hasPalm event semantics from TOFInteractionManager.
+    bool hasPalmHold = false;
+    float palmNormX = 0.5f;
+    float palmNormY = 0.5f;
+    float palmVelocityX = 0;
+    float palmVelocityY = 0;
+    float palmVelocityMag = 0;
+    float palmStrength = 0;
+
     bool handsRaised = false;
     int handRaiseTopMass = 0;
     float handRaiseMassExcess = 0;

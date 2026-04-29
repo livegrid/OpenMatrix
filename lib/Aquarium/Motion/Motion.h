@@ -46,6 +46,13 @@ class Motion {
   unsigned long curiousPauseUntil = 0;  // Pause timer for CURIOUS pauses
   unsigned long curiousLastPauseCheck = 0;
   PVector lastBlobPos;                  // Cached blob position for SCARED flee direction
+  PVector interactionCenter;
+  PVector interactionTarget;
+  PVector interactionFlow;
+  float interactionRadius = 0;
+  float interactionStrength = 0;
+  bool interactionPalmMode = false;
+  int interactionSlotIndex = 0;
 
  public:
   Motion(PVector pos, uint16_t xResolution, uint16_t yResolution)
@@ -66,30 +73,84 @@ class Motion {
 
   // Called from Fish::update() with the full interaction data
   void updateInteractionState(const InteractionData& interaction,
-                              uint16_t physicsWidth, uint16_t physicsHeight) {
+                              uint16_t physicsWidth, uint16_t physicsHeight,
+                              int selfIndex = -1, int schoolCount = 1) {
     unsigned long now = millis();
-    float maxDist = (float)min(xResolution, yResolution) * INTERACTION_RADIUS_FRACTION;
+    (void)schoolCount;
 
-    if (interaction.hasBlob) {
-      PVector blobPos(interaction.blobX * physicsWidth,
-                      interaction.blobY * physicsHeight);
-      float distToBlob = (blobPos - pos).mag();
-      blobLostTime = 0;  // Blob is present
+    bool hasInteraction = false;
+    interactionPalmMode = interaction.hasPalmHold && interaction.palmStrength > 0.01f;
+    interactionStrength = interactionPalmMode ? interaction.palmStrength : 1.0f;
+    interactionSlotIndex = selfIndex >= 0 ? selfIndex : 0;
 
-      // Skip if out of interaction range
-      if (distToBlob > maxDist || distToBlob < INTERACTION_DISTANCE_EPSILON) {
-        return;
+    if (interactionPalmMode) {
+      interactionCenter = PVector(constrain(interaction.palmNormX, 0.0f, 1.0f) * physicsWidth,
+                                  constrain(interaction.palmNormY, 0.0f, 1.0f) * physicsHeight);
+      interactionRadius = max((float)min(physicsWidth, physicsHeight) * PALM_ZONE_RADIUS_FRACTION,
+                              (float)(12 * PHYSICS_SCALE));
+      interactionFlow = PVector(interaction.palmVelocityX, interaction.palmVelocityY);
+      hasInteraction = true;
+    } else if (interaction.hasBlob) {
+      int minX = 8, minY = 8, maxX = -1, maxY = -1;
+      int activeCount = 0;
+      for (uint8_t y = 0; y < 8; y++) {
+        for (uint8_t x = 0; x < 8; x++) {
+          int16_t depth = interaction.depthMap[y][x];
+          if (depth > TOF_MIN_DETECTION_DIST && depth < TOF_MAX_DETECTION_DIST) {
+            if ((int)x < minX) minX = x;
+            if ((int)y < minY) minY = y;
+            if ((int)x > maxX) maxX = x;
+            if ((int)y > maxY) maxY = y;
+            activeCount++;
+          }
+        }
       }
 
-      lastBlobPos = blobPos;
+      if (activeCount > 0) {
+        float centerNormX = ((float)minX + (float)maxX + 1.0f) * 0.5f / 8.0f;
+        float centerNormY = ((float)minY + (float)maxY + 1.0f) * 0.5f / 8.0f;
+        interactionCenter = PVector(centerNormX * physicsWidth, centerNormY * physicsHeight);
 
-      // For low-resolution TOF input, direct-follow interaction is more readable
-      // than freeze/fear transitions that get retriggered by velocity noise.
+        float halfW = ((float)(maxX - minX + 1) / 8.0f) * physicsWidth * 0.5f;
+        float halfH = ((float)(maxY - minY + 1) / 8.0f) * physicsHeight * 0.5f;
+        interactionRadius = max(halfW, halfH) * (1.0f + BODY_ZONE_PADDING_FRACTION);
+        interactionRadius = max(interactionRadius, (float)min(physicsWidth, physicsHeight) * 0.18f);
+      } else {
+        interactionCenter = PVector(interaction.blobX * physicsWidth,
+                                    interaction.blobY * physicsHeight);
+        interactionRadius = max((float)min(physicsWidth, physicsHeight) * 0.25f,
+                                (float)(12 * PHYSICS_SCALE));
+      }
+      interactionFlow = PVector(0, 0);
+      hasInteraction = true;
+    }
+
+    if (hasInteraction) {
+      blobLostTime = 0;  // A body or held palm is present
+
+      // Give every fish a deterministic personal slot in the interaction zone.
+      // That keeps the school near the person/palm without collapsing to one point.
+      uint32_t slotHash = (uint32_t)(interactionSlotIndex + 1) * 2654435761u;
+      float angle = (float)(slotHash % 6283u) * 0.001f;
+      float radiusJitter = 0.35f + (float)((slotHash >> 16) % 66u) * (0.65f / 65.0f);
+      float slotRadius = interactionRadius *
+                         (interactionPalmMode ? 0.55f : BODY_ZONE_SLOT_RADIUS_FRACTION) *
+                         radiusJitter;
+      interactionTarget = interactionCenter +
+                          PVector(cosf(angle) * slotRadius, sinf(angle) * slotRadius);
+      interactionTarget.x = constrain(interactionTarget.x, 0.0f, (float)physicsWidth);
+      interactionTarget.y = constrain(interactionTarget.y, 0.0f, (float)physicsHeight);
+
+      // Low-resolution TOF works best as a soft zone/flow cue, not as fear/freeze states.
       if (interactionState != InteractionState::CURIOUS) {
         interactionState = InteractionState::CURIOUS;
         stateStartTime = now;
       }
     } else {
+      interactionPalmMode = false;
+      interactionStrength = 0;
+      interactionFlow = PVector(0, 0);
+
       // No blob -- start recovery timer
       if (blobLostTime == 0) {
         blobLostTime = now;
@@ -145,17 +206,34 @@ class Motion {
         }
 
         case InteractionState::CURIOUS: {
-          // Deterministic follow (no random pause) keeps hand-tracking readable.
-          PVector toBlob = lastBlobPos - pos;
-          float distToBlob = toBlob.mag();
-          if (distToBlob > INTERACTION_DISTANCE_EPSILON &&
-              distToBlob > CURIOUS_ATTRACTION_STOP_DISTANCE) {
-            toBlob.setMag(FOOD_FORCE * STATE_CURIOUS_FOLLOW_FORCE_FRAC);
-            applyForce(toBlob);
+          if (interactionPalmMode) {
+            float flowMag = interactionFlow.mag();
+            if (flowMag > FOLLOW_DIRECTION_MIN_VELOCITY) {
+              PVector flowForce = interactionFlow / flowMag;
+              float flowScale = constrain(flowMag, 0.25f, 1.0f);
+              flowForce *= FOLLOW_DIRECTION_FORCE * flowScale * interactionStrength;
+              applyForce(flowForce);
+            }
           }
 
-          // Keep tiny organic motion so fish still feel alive without overpowering follow.
-          doMotionScaled(0.2f, 0.15f);
+          PVector toTarget = interactionTarget - pos;
+          float distToTarget = toTarget.mag();
+          float distToCenter = (interactionCenter - pos).mag();
+          bool outsideZone = distToCenter > interactionRadius;
+
+          if (distToTarget > INTERACTION_DISTANCE_EPSILON) {
+            float pullForce = interactionPalmMode
+                                  ? FOLLOW_POSITION_BIAS
+                                  : (outsideZone ? BODY_ZONE_EDGE_PULL_FORCE : BODY_ZONE_PULL_FORCE);
+            bool shouldPull = outsideZone || distToTarget > interactionRadius * 0.55f;
+            if (shouldPull) {
+              toTarget.setMag(pullForce * interactionStrength);
+              applyForce(toTarget);
+            }
+          }
+
+          // Keep organic motion visible while leaving room for palm/body guidance.
+          doMotionScaled(FOLLOW_IDLE_WOBBLE_SIN, FOLLOW_IDLE_WOBBLE_NOISE);
           break;
         }
       }

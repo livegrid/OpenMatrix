@@ -154,7 +154,9 @@ class Fish {
     if (interaction) {
       motion->updateInteractionState(*interaction,
           matrix->getXResolution() * PHYSICS_SCALE,
-          matrix->getYResolution() * PHYSICS_SCALE);
+          matrix->getYResolution() * PHYSICS_SCALE,
+          selfIndex,
+          schoolPositions ? (int)schoolPositions->size() : 1);
     }
 
     // Keep fish from collapsing into a single point while following TOF.

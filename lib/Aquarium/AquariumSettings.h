@@ -166,6 +166,10 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // Fish Interaction State Machine
 #define INTERACTION_RADIUS_FRACTION 1.0f   // Fraction of min(screenW,screenH) that counts as interaction range
 #define INTERACTION_DISTANCE_EPSILON 0.1f  // Min distance to avoid div-by-zero
+#define BODY_ZONE_PADDING_FRACTION 0.35f   // Extra room around the detected body bbox for fish to occupy
+#define BODY_ZONE_SLOT_RADIUS_FRACTION 0.65f  // How broadly fish distribute around body center
+#define BODY_ZONE_PULL_FORCE 1.1f          // Gentle pull toward each fish's assigned body-zone slot
+#define BODY_ZONE_EDGE_PULL_FORCE 2.2f     // Stronger pull when fish are outside the person-shaped zone
 
 // ALERT state
 #define STATE_ALERT_DURATION_MS 500        // Legacy: ALERT is currently bypassed
@@ -183,6 +187,11 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define FOLLOW_DIRECTION_MIN_VELOCITY 0.15f    // Blob velocity below this = "stationary" (use position bias only)
 #define FOLLOW_IDLE_WOBBLE_SIN 0.3f            // Organic sine wobble during follow
 #define FOLLOW_IDLE_WOBBLE_NOISE 0.2f          // Organic noise wobble during follow
+#define PALM_HOLD_MS 450                       // Keep last palm alive through brief low-res dropouts
+#define PALM_POSITION_SMOOTH 0.55f             // Smooth raw 8x8 palm cell jumps
+#define PALM_VELOCITY_SMOOTH 0.35f             // Smooth derived palm movement vector
+#define PALM_VELOCITY_DECAY 0.82f              // Fade movement vector while palm is temporarily missing
+#define PALM_ZONE_RADIUS_FRACTION 0.30f         // Palm guides a region, not a single clumping point
 #define CURIOUS_ATTRACTION_STOP_DISTANCE (10 * PHYSICS_SCALE)  // Stop direct attraction when close to hand blob
 #define STATE_CURIOUS_FOLLOW_FORCE_FRAC 0.6f                  // Follow force = FOOD_FORCE * this in CURIOUS state
 #define CURIOUS_SEPARATION_DISTANCE (20 * PHYSICS_SCALE)  // Fish-to-fish personal space (~20 px)
@@ -201,6 +210,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define PLANKTON_BRIGHTNESS_RISE_SHIFT 2   // diff >> 2 = fast rise ~25%/frame
 #define PLANKTON_BRIGHTNESS_FADE_SHIFT 4   // diff >> 4 = slow fade ~6%/frame
 #define PLANKTON_MIN_DRAW_BRIGHTNESS 30    // Skip drawing below this — avoids dark edge bleed onto water
+#define PLANKTON_ACTIVATION_FLOOR 0.04f    // Ignore faint depth noise before boosting visibility
+#define PLANKTON_PUNCH_MIN_BRIGHTNESS 70   // Activated plankton should pop over the water layer
 
 // Food
 #define FOOD_FALL_SPEED 0.3f
