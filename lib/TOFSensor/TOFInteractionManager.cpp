@@ -415,24 +415,37 @@ void TOFInteractionManager::detectPalmOutlier(const int16_t grid[8][8]) {
     }
 
     if (bestDelta >= kPalmDeltaMm) {
-        int nCount = 0;
-        int nSum = 0;
-        const int dx[4] = {1, -1, 0, 0};
-        const int dy[4] = {0, 0, 1, -1};
-        for (int i = 0; i < 4; i++) {
-            int nx = bestX + dx[i];
-            int ny = bestY + dy[i];
-            if (nx < 0 || nx >= 8 || ny < 0 || ny >= 8) continue;
-            int16_t nd = grid[ny][nx];
-            if (nd > kValidDepthMinMm && nd < kValidDepthMaxMm) {
-                nSum += nd;
-                nCount++;
+        int clusterCells = 0;
+        int bgCount = 0;
+        int bgSum = 0;
+        for (int oy = -1; oy <= 1; oy++) {
+            int ny = bestY + oy;
+            if (ny < 0 || ny >= 8) continue;
+            for (int ox = -1; ox <= 1; ox++) {
+                int nx = bestX + ox;
+                if (nx < 0 || nx >= 8) continue;
+                int16_t nd = grid[ny][nx];
+                if (nd <= kValidDepthMinMm || nd >= kValidDepthMaxMm) continue;
+
+                int foregroundDelta = (int)ref - (int)nd;
+                bool samePalmSurface = foregroundDelta >= kPalmDeltaMm &&
+                                       abs((int)nd - (int)bestD) <= kPalmClusterDepthWindowMm;
+                if (samePalmSurface) {
+                    clusterCells++;
+                } else {
+                    bgSum += nd;
+                    bgCount++;
+                }
             }
         }
-        if (nCount > 0) {
-            int nAvg = nSum / nCount;
-            if ((nAvg - bestD) < kPalmLocalContrastMm) bestDelta = -1;
+
+        bool clusterSupported = clusterCells >= kPalmMinClusterCells;
+        bool contrastSupported = false;
+        if (bgCount > 0) {
+            int bgAvg = bgSum / bgCount;
+            contrastSupported = (bgAvg - bestD) >= kPalmLocalContrastMm;
         }
+        if (!clusterSupported && !contrastSupported) bestDelta = -1;
     }
 
     if (bestDelta >= kPalmDeltaMm) {

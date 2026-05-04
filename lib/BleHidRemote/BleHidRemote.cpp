@@ -20,6 +20,8 @@ static constexpr int      kConnectAttemptsPerAddr = 3;
 static constexpr uint32_t kPostInitDelayMs        = 1500;
 static constexpr uint32_t kBetweenConnectMs       = 2500;
 static constexpr uint32_t kBetweenStagesMs        = 3000;
+/** When not connected (initial fail or disconnect), wait this long before another connect attempt. */
+static constexpr uint32_t kReconnectIntervalMs      = 10000;
 static constexpr unsigned kReadHexMax             = 96;
 
 /** EffectManager slot indices: Constellation, Meteor, Gravity Flap, Space Invaders, Asteroid Hopper, Space Drift (Noise excluded). */
@@ -28,6 +30,8 @@ static constexpr size_t kRemoteEffectCount = sizeof(kRemoteEffectSlots) / sizeof
 
 static NimBLEClient* g_client         = nullptr;
 static volatile bool g_connected      = false;
+/** millis() timestamp: earliest time we may call connectDirect again (first boot = ASAP). */
+static volatile uint32_t g_nextBleReconnectAtMs = 0;
 static StateManager*   g_stateManager = nullptr;
 static size_t          g_remoteRingIdx = 0;
 static BleHidRemoteTofRangeAdjustCallback g_tofRangeAdjustCallback = nullptr;
@@ -120,6 +124,10 @@ static void onRemotePrevEffect() {
   applyRemoteEffectSlot(static_cast<uint8_t>(g_remoteRingIdx));
 }
 
+void bleHidRemotePrevEffect(void) {
+  onRemotePrevEffect();
+}
+
 static void onRemoteAquarium() {
   if (!g_stateManager) {
     return;
@@ -175,11 +183,14 @@ class ClientCallbacks : public NimBLEClientCallbacks {
   void onDisconnect(NimBLEClient* pClient, int reason) override {
     (void)pClient;
     g_connected = false;
+    g_nextBleReconnectAtMs = millis() + kReconnectIntervalMs;
     g_prevX = g_prevYBtn = g_prevA = g_prevB = g_prevOpt = g_prevTop = false;
     g_havePrevSuffix = false;
     memset(g_prevSuffix, 0xFF, sizeof(g_prevSuffix));
     Serial.printf("[CB] disconnected reason=%d (%s)\n", reason,
                   NimBLEUtils::returnCodeToString(reason));
+    Serial.printf("BLE remote: will retry connect in %lu ms\n",
+                  (unsigned long)kReconnectIntervalMs);
   }
 
   void onAuthenticationComplete(NimBLEConnInfo& connInfo) override {
@@ -367,6 +378,22 @@ static bool connectDirect() {
   return connectWithRetries(publicAddr, "PUBLIC");
 }
 
+static void finishSessionAfterConnect() {
+  Serial.printf("Peer: %s  RSSI=%d  MTU=%u\n", g_client->getPeerAddress().toString().c_str(),
+                g_client->getRssi(), (unsigned)g_client->getMTU());
+
+  Serial.println("Starting encryption/pairing (secureConnection)...");
+  if (g_client->secureConnection(false)) {
+    Serial.println("secureConnection finished OK (or not required).");
+  } else {
+    Serial.println("secureConnection failed — continuing; some reads may fail until paired.");
+  }
+  delay(200);
+
+  dumpGattAndSubscribe(g_client);
+  syncRemoteRingFromState();
+}
+
 void bleHidRemoteTask(void* parameter) {
   (void)parameter;
 
@@ -391,36 +418,29 @@ void bleHidRemoteTask(void* parameter) {
                 (unsigned long)kPostInitDelayMs);
   delay(kPostInitDelayMs);
 
-  if (!connectDirect()) {
-    Serial.println(
-        "Connection failed — giving up (enable pad / check MAC / try other address type).");
-    for (;;) {
-      processHidReports();
-      delay(500);
-    }
-  }
-
-  Serial.printf("Peer: %s  RSSI=%d  MTU=%u\n", g_client->getPeerAddress().toString().c_str(),
-                g_client->getRssi(), (unsigned)g_client->getMTU());
-
-  Serial.println("Starting encryption/pairing (secureConnection)...");
-  if (g_client->secureConnection(false)) {
-    Serial.println("secureConnection finished OK (or not required).");
-  } else {
-    Serial.println("secureConnection failed — continuing; some reads may fail until paired.");
-  }
-  delay(200);
-
-  dumpGattAndSubscribe(g_client);
-  syncRemoteRingFromState();
+  g_nextBleReconnectAtMs = millis();
 
   for (;;) {
     processHidReports();
 
-    if (g_client && g_connected && g_client->isConnected()) {
-      static uint32_t last = 0;
-      if (millis() - last > 60000) {
-        last = millis();
+    if (!g_client->isConnected()) {
+      const int32_t waitLeft = static_cast<int32_t>(millis() - g_nextBleReconnectAtMs);
+      if (waitLeft >= 0) {
+        Serial.println("BLE remote: attempting connect...");
+        if (!connectDirect()) {
+          Serial.println(
+              "Connection failed — check remote power / MAC. Retrying on schedule.");
+          g_nextBleReconnectAtMs = millis() + kReconnectIntervalMs;
+          Serial.printf("BLE remote: next attempt in %lu ms\n",
+                        (unsigned long)kReconnectIntervalMs);
+        } else {
+          finishSessionAfterConnect();
+        }
+      }
+    } else {
+      static uint32_t lastAlive = 0;
+      if (millis() - lastAlive > 60000) {
+        lastAlive = millis();
         Serial.printf("[alive] RSSI=%d\n", g_client->getRssi());
       }
     }

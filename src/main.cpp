@@ -16,6 +16,9 @@
 
 #include <DebugMonitor.h>
 
+#include <esp_err.h>
+#include <esp_task_wdt.h>
+
 #ifdef BLE_HID_REMOTE_ENABLED
 #include "BleHidRemote.h"
 #endif
@@ -220,10 +223,33 @@ void displayTask(void* parameter) {
   aquarium.begin();
   log_i("Aquarium begin done (internal free=%u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
+#ifdef BLE_HID_REMOTE_ENABLED
+  pinMode(0, INPUT_PULLUP);
+#endif
+
+  esp_task_wdt_add(NULL);
+
   for (;;) {
+    esp_task_wdt_reset();
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
+#ifdef BLE_HID_REMOTE_ENABLED
+      {
+        static constexpr unsigned long kIo0BootDebounceMs = 240;
+        static bool io0_was_high                       = true;
+        static unsigned long io0_prevTriggerMs           = 0;
+
+        const bool io0_high   = digitalRead(0);
+        unsigned long io0_now = millis();
+        if (io0_was_high && !io0_high &&
+            io0_now - io0_prevTriggerMs >= kIo0BootDebounceMs) {
+          io0_prevTriggerMs = io0_now;
+          bleHidRemotePrevEffect();
+        }
+        io0_was_high = io0_high;
+      }
+#endif
       // Pin 2 disabled - now used by TOF sensor power enable
       // digitalWrite(2, LOW);
       if (currentMode != stateManager.getState()->mode) {
@@ -554,9 +580,8 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
-  // Every boot starts on Constellation (ignore persisted effect until user changes).
-  stateManager.getState()->mode = OpenMatrixMode::EFFECT;
-  stateManager.getState()->effects.selected = Effects::CONSTELLATION;
+  // Aquarium TOF iteration: boot straight into Aquarium for faster test cycles.
+  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
   stateManager.save();
   // stateManager.startPeriodicSave();
 
@@ -577,6 +602,16 @@ void setup(void) {
   webServerManager.connectToWiFi();
   log_i("WiFi phase complete. Free heap: %u bytes", ESP.getFreeHeap());
 #endif
+
+  esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = 5000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  esp_err_t wdt_err = esp_task_wdt_init(&wdt_config);
+  if (wdt_err != ESP_OK) {
+    log_e("Failed to initialize task watchdog timer: %s", esp_err_to_name(wdt_err));
+  }
 
   // === PHASE 1: Core tasks ===
   log_i("Phase 1: Creating Display and Server tasks...");
