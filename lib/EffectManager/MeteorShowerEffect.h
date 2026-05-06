@@ -27,10 +27,14 @@ public:
     void resetForces();
     void applyBaseFlow(float targetSpeed, float flowCorrectionStrength, float forwardAcceleration);
     void applyWobble(uint32_t time, float wobbleStrength, float wobbleSpeed);
-    void applySeparation(Meteor* meteors, uint8_t count, uint8_t selfIndex, float separationDistance, float separationStrength);
-    void applyAttractor(PVector& attractorPos, float strength, float radius);
-    void applyAttractorY(PVector& attractorPos, float strength, float radius);
-    void update(float targetSpeed, float maxVerticalSpeed);
+    void applySeparation(Meteor* meteors, uint8_t count, uint8_t selfIndex, float separationDistance,
+                         float separationStrength, uint8_t maxNeighbors, uint8_t maxChecks);
+    void applyFlocking(Meteor* meteors, uint8_t count, uint8_t selfIndex, float neighborDistance,
+                       float alignmentStrength, float cohesionStrength, uint8_t maxNeighbors,
+                       uint8_t maxChecks);
+    void applyAttractor(const PVector& attractorPos, float strength, float radius);
+    void applyAttractorY(const PVector& attractorPos, float strength, float radius);
+    void update(float targetSpeed, float maxVerticalSpeed, float velocityDrag);
     bool isOffScreen();
     
     static float randomFloat();
@@ -62,9 +66,11 @@ public:
 class MeteorShowerEffect : public Effect {
 private:
     // Constants
-    static constexpr uint8_t MAX_METEORS = 60;
+    static constexpr uint8_t MAX_METEORS = 96;
     static constexpr uint8_t MAX_PLANETS = 3;
     static constexpr uint8_t TOF_GRID_SIZE = 8;
+    static constexpr uint8_t MAX_BG_STARS = 56;
+    static constexpr uint8_t MAX_NEBULA_CLOUDS = 4;
     
     // Meteor system
     Meteor meteors[MAX_METEORS];
@@ -91,7 +97,11 @@ private:
     float wobbleSpeed;
     float separationDistance;
     float separationStrength;
+    float flockNeighborDistance;
+    float alignmentStrength;
+    float cohesionStrength;
     float maxVerticalSpeed;
+    float velocityDrag;
     uint8_t trailFadeAmount;
     float attractorStrength;
     float attractorRadius;
@@ -122,20 +132,46 @@ private:
     uint8_t spawnHistoryIndex;
     uint8_t maxActiveAttractors;
     uint8_t maxSeparationNeighbors;
+    uint8_t maxFlockNeighbors;
+    uint8_t maxNeighborChecks;
     uint8_t trailPersistence;
     uint8_t meteorCompositeThreshold;
+
+    struct BgStar {
+        float x;
+        float y;
+        float speed;
+        float twinklePhase;
+        uint8_t hue;
+        uint8_t baseBrightness;
+        uint8_t layer;
+    };
+    struct NebulaCloud {
+        float x;
+        float y;
+        float radius;
+        float driftX;
+        float driftY;
+        float pulsePhase;
+        uint8_t hue;
+    };
+    BgStar stars[MAX_BG_STARS];
+    NebulaCloud clouds[MAX_NEBULA_CLOUDS];
     
     // Helper methods
     void initMeteors();
     void initTofAttractors();
     void initPlanets();
+    void initBackgroundElements();
     void updateTofData();
     void updateTofAttractors();
     void updateMeteors();
     void updatePlanets();
+    void updateBackgroundElements();
     void spawnMeteor();
     void spawnPlanet();
     void drawGradientBackground();
+    void drawBackgroundElements();
     void drawPlanets();
     void drawMeteors();
     void fadeTrails();
@@ -147,6 +183,7 @@ private:
 
 public:
     MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor = nullptr);
+    ~MeteorShowerEffect() override;
     
     void reset() override;
     void update() override;
