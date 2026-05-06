@@ -30,8 +30,8 @@ EffectManager::EffectManager(Matrix* matrix) : m_matrix(matrix) {
       {"Space Invaders",  EFFECT_FACTORY(SpaceInvadersEffect),   EFFECT_TOF(SpaceInvadersEffect), EFFECT_TOF_RANGE(SpaceInvadersEffect)},
       {"Gravity Flap",    EFFECT_FACTORY(GravityFlapEffect),     EFFECT_TOF(GravityFlapEffect), EFFECT_TOF_RANGE(GravityFlapEffect)},
       {"Noise",           EFFECT_FACTORY(NoiseEffect),           nullptr, nullptr},
-      {"Asteroid Hopper", EFFECT_FACTORY(AsteroidHopperEffect),  EFFECT_TOF(AsteroidHopperEffect), EFFECT_TOF_RANGE(AsteroidHopperEffect)},
-      {"Space Drift",     EFFECT_FACTORY(SpaceDriftEffect),      EFFECT_TOF(SpaceDriftEffect), EFFECT_TOF_RANGE(SpaceDriftEffect)},
+      // {"Asteroid Hopper", EFFECT_FACTORY(AsteroidHopperEffect),  EFFECT_TOF(AsteroidHopperEffect), EFFECT_TOF_RANGE(AsteroidHopperEffect)},
+      // {"Space Drift",     EFFECT_FACTORY(SpaceDriftEffect),      EFFECT_TOF(SpaceDriftEffect), EFFECT_TOF_RANGE(SpaceDriftEffect)},
   };
   // No effect is instantiated yet - activate() runs on the first setEffect() call.
 }

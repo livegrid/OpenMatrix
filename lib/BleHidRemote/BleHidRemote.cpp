@@ -24,8 +24,8 @@ static constexpr uint32_t kBetweenStagesMs        = 3000;
 static constexpr uint32_t kReconnectIntervalMs      = 10000;
 static constexpr unsigned kReadHexMax             = 96;
 
-/** EffectManager slot indices: Constellation, Meteor, Gravity Flap, Space Invaders, Asteroid Hopper, Space Drift (Noise excluded). */
-static const uint8_t kRemoteEffectSlots[] = {0, 1, 3, 2, 5, 6};
+/** EffectManager slot indices: Constellation, Meteor, Gravity Flap, Space Invaders (Noise intentionally excluded). */
+static const uint8_t kRemoteEffectSlots[] = {0, 1, 3, 2};
 static constexpr size_t kRemoteEffectCount = sizeof(kRemoteEffectSlots) / sizeof(kRemoteEffectSlots[0]);
 
 static NimBLEClient* g_client         = nullptr;

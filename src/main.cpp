@@ -278,7 +278,19 @@ void displayTask(void* parameter) {
         static Effects lastEffectApplied = Effects::NONE;
         if (st->mode == OpenMatrixMode::EFFECT) {
           if (st->effects.selected != lastEffectApplied) {
-            effectManager.setEffect(st->effects.selected - 1);
+            size_t selectedIndex =
+                (static_cast<int>(st->effects.selected) > 0)
+                    ? static_cast<size_t>(st->effects.selected - 1)
+                    : 0;
+            if (selectedIndex >= effectManager.getEffectCount()) {
+              log_w("Requested effect enum %d maps to invalid slot %u (count=%u); falling back to Constellation",
+                    static_cast<int>(st->effects.selected), (unsigned)selectedIndex,
+                    (unsigned)effectManager.getEffectCount());
+              st->effects.selected = Effects::CONSTELLATION;
+              selectedIndex = 0;
+              stateManager.save();
+            }
+            effectManager.setEffect(selectedIndex);
             lastEffectApplied = st->effects.selected;
           }
         } else {
