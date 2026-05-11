@@ -183,7 +183,7 @@ void displayTask(void* parameter) {
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setRotation(2);
-  matrix.setBrightness(200);
+  matrix.setBrightness(250);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
@@ -271,6 +271,56 @@ void displayTask(void* parameter) {
             break;
         }
       }
+
+#if defined(VL53L8CX_ENABLED)
+      // After ~1 minute with nobody in the TOF interaction band while in EFFECT mode,
+      // return to Constellation (screensaver). Uses raw ranging so we don't add a second
+      // InteractionManager competing for the same frame id as the active effect.
+      {
+        State* st = stateManager.getState();
+        static OpenMatrixMode tofScreensaverPrevMode = OpenMatrixMode::STARTUP;
+        static constexpr unsigned long kTofScreensaverIdleMs = 60UL * 1000UL;
+        static unsigned long tofScreensaverPresenceLastMs = 0;
+        static bool tofScreensaverPresenceInited = false;
+
+        if (st->mode != tofScreensaverPrevMode) {
+          if (st->mode == OpenMatrixMode::EFFECT) {
+            tofScreensaverPresenceInited = false;
+          }
+          tofScreensaverPrevMode = st->mode;
+        }
+
+        if (st->mode == OpenMatrixMode::EFFECT && tofSensor.isActive()) {
+          unsigned long now = millis();
+          if (!tofScreensaverPresenceInited) {
+            tofScreensaverPresenceLastMs = now;
+            tofScreensaverPresenceInited = true;
+          }
+
+          bool presentInBand = false;
+          for (uint8_t y = 0; y < 8 && !presentInBand; y++) {
+            for (uint8_t x = 0; x < 8; x++) {
+              int16_t d = tofSensor.getDistance(x, y);
+              if (d > TOF_MIN_DETECTION_DIST && d < g_tofRuntimeMaxDetectionDistance) {
+                presentInBand = true;
+                break;
+              }
+            }
+          }
+
+          if (presentInBand) {
+            tofScreensaverPresenceLastMs = now;
+          } else if (st->effects.selected != Effects::CONSTELLATION &&
+                     (now - tofScreensaverPresenceLastMs >= kTofScreensaverIdleMs)) {
+            st->effects.selected = Effects::CONSTELLATION;
+            stateManager.save();
+            tofScreensaverPresenceLastMs = now;
+          }
+        } else if (st->mode == OpenMatrixMode::EFFECT && !tofSensor.isActive()) {
+          tofScreensaverPresenceInited = false;
+        }
+      }
+#endif
 
       // Apply effect when selected changes (e.g. BLE remote) without a mode transition.
       {
@@ -592,9 +642,13 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
-  // Aquarium TOF iteration: boot straight into Aquarium for faster test cycles.
-  stateManager.getState()->mode = OpenMatrixMode::AQUARIUM;
-  stateManager.save();
+  // Boot into Constellation effect (default); TOF idle timeout also returns here.
+  {
+    State* st = stateManager.getState();
+    st->mode = OpenMatrixMode::EFFECT;
+    st->effects.selected = Effects::CONSTELLATION;
+    stateManager.save();
+  }
   // stateManager.startPeriodicSave();
 
   
