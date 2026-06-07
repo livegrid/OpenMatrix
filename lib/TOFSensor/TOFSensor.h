@@ -17,10 +17,10 @@
 
 // Shared detection range configuration (mm)
 #define TOF_MIN_DETECTION_DIST 500
-#define TOF_MAX_DETECTION_DIST 1600
+#define TOF_MAX_DETECTION_DIST 1850
 
 // Shared TOF coordinate rotation (degrees)
-#define TOF_DEFAULT_ROTATION 270
+#define TOF_DEFAULT_ROTATION 90
 
 class TOFSensor {
 private:
@@ -41,6 +41,7 @@ public:
     ~TOFSensor();
     
     bool begin();
+    bool restart() { return begin(); }
     bool update();
     bool isActive() { return is_active; }
 

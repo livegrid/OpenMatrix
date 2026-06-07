@@ -5,7 +5,7 @@
 
 namespace {
 /** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
-constexpr int16_t kTofEffectRotationDeg = 180;  // 0 / 90 / 180 / 270
+constexpr int16_t kTofEffectRotationDeg = 0;  // 0 / 90 / 180 / 270
 }  // namespace
 
 // Static random seed

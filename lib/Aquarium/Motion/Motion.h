@@ -79,7 +79,11 @@ class Motion {
     (void)schoolCount;
 
     bool hasInteraction = false;
+#if AQUARIUM_TOF_PALM_INTERACTION_ENABLED
     interactionPalmMode = interaction.hasPalmHold && interaction.palmStrength > 0.01f;
+#else
+    interactionPalmMode = false;
+#endif
     interactionStrength = interactionPalmMode ? interaction.palmStrength : 1.0f;
     interactionSlotIndex = selfIndex >= 0 ? selfIndex : 0;
 

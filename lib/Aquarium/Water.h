@@ -48,6 +48,7 @@ class Water {
 
     float timeZ = (float)(millis() * simplexSpeed);
 
+#if AQUARIUM_WATER_GOD_RAYS_ENABLED
     // God ray positions — computed once per batch, very slow drift
     float rayTime = (float)millis() * 0.000030f;
     float W = (float)totalCols;
@@ -57,6 +58,7 @@ class Water {
       W * 0.80f + sinf(rayTime * 0.89f + 4.27f) * W * 0.09f,
     };
     float rayHalfW = W * 0.05f; // soft, wide beams
+#endif
 
     // Small stack buffer for the current row batch only (rowsPerUpdate * totalCols floats)
     // For 192 cols × 4 rows = 768 floats = 3 KB — well within the display task stack
@@ -80,9 +82,11 @@ class Water {
       // Light attenuation with depth (bright at surface, dark at floor)
       uint8_t depthScale = (uint8_t)(255.0f * (1.0f - depthT * 0.55f));
 
+#if AQUARIUM_WATER_GOD_RAYS_ENABLED
       // God rays fade out toward the bottom (gone past ~70% depth)
       float rayDepthFade = 1.0f - depthT * 1.45f;
       if (rayDepthFade < 0.0f) rayDepthFade = 0.0f;
+#endif
 
       for (size_t col = 0; col < totalCols; ++col) {
         float n = batchNoise[col + batchRow * batchCols];
@@ -93,6 +97,7 @@ class Water {
         // Depth attenuation
         color.nscale8(depthScale);
 
+#if AQUARIUM_WATER_GOD_RAYS_ENABLED
         // God ray contribution — quadratic falloff per ray, additive cyan-white light
         if (rayDepthFade > 0.0f) {
           float rayIntensity = 0.0f;
@@ -109,6 +114,7 @@ class Water {
           color.g = qadd8(color.g, (uint8_t)(boost * 8 / 10));
           color.b = qadd8(color.b, boost);
         }
+#endif
 
         matrix->background->drawPixel((uint16_t)col, (uint16_t)row, color);
       }

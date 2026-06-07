@@ -3,7 +3,7 @@
 
 namespace {
 /** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
-constexpr int16_t kTofEffectRotationDeg = 270;  // 0 / 90 / 180 / 270
+constexpr int16_t kTofEffectRotationDeg = 90;  // 0 / 90 / 180 / 270
 
 static int16_t depthAtEffectCell(const InteractionData& d, TOFSensor& sensor, uint8_t effectX, uint8_t effectY) {
     uint8_t rx, ry;
@@ -328,12 +328,12 @@ MeteorShowerEffect::MeteorShowerEffect(Matrix* matrix, TOFSensor* sensor)
     maxVerticalSpeed = 2.0f;
     velocityDrag = 0.986f;
     trailFadeAmount = 12;
-    attractorStrength = 0.12f;
-    attractorRadius = 22.0f;
+    attractorStrength = 0.18f;
+    attractorRadius = 30.0f;
     centerAttractorStrength = 0.02f;
     centerAttractorRadius = 48.0f;
     forwardAcceleration = 0.03f;
-    maxActiveAttractors = 10;
+    maxActiveAttractors = 16;
     maxSeparationNeighbors = 6;
     maxFlockNeighbors = 5;
     maxNeighborChecks = 20;
@@ -434,6 +434,7 @@ void MeteorShowerEffect::initTofAttractors() {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
             tofAttractors[y][x].position.set(x * cellW + cellW / 2, y * cellH + cellH / 2);
             tofAttractors[y][x].active = false;
+            tofAttractors[y][x].strength = 0.0f;
         }
     }
 }
@@ -490,6 +491,7 @@ void MeteorShowerEffect::updateTofAttractors() {
         for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
             for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
                 tofAttractors[y][x].active = false;
+                tofAttractors[y][x].strength = 0.0f;
             }
         }
         return;
@@ -497,6 +499,8 @@ void MeteorShowerEffect::updateTofAttractors() {
 
     topRowActive = false;
     uint8_t topRowHitCount = 0;
+    int16_t detectRange = maxDetectionDistance - minDetectionDistance;
+    if (detectRange <= 0) detectRange = 1;
     
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
@@ -504,6 +508,14 @@ void MeteorShowerEffect::updateTofAttractors() {
                 tofSensor ? depthAtEffectCell(tofInteractionData, *tofSensor, x, y) : 0;
             bool isActive = depth > minDetectionDistance && depth < maxDetectionDistance;
             tofAttractors[y][x].active = isActive;
+            tofAttractors[y][x].strength = 0.0f;
+            if (isActive) {
+                float depthNorm =
+                    1.0f - (float)(depth - minDetectionDistance) / (float)detectRange;
+                depthNorm = constrain(depthNorm, 0.0f, 1.0f);
+                // Keep a minimum pull when active so sparse detections still steer.
+                tofAttractors[y][x].strength = 0.35f + (depthNorm * 0.65f);
+            }
             
             // Boost when the high-x edge of the effect 8x8 grid is active (p5.js port convention).
             if (isActive && x == 7) {
@@ -584,6 +596,7 @@ void MeteorShowerEffect::updateMeteors() {
     
     // Collect active ToF attractor positions
     PVector activeAttractors[64];
+    float activeAttractorStrengths[64];
     uint8_t activeCount = 0;
     
     if (tofGridReady) {
@@ -591,6 +604,7 @@ void MeteorShowerEffect::updateMeteors() {
             for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
                 if (tofAttractors[y][x].active && activeCount < maxActiveAttractors) {
                     activeAttractors[activeCount] = tofAttractors[y][x].position;
+                    activeAttractorStrengths[activeCount] = tofAttractors[y][x].strength;
                     activeCount++;
                 }
             }
@@ -601,6 +615,22 @@ void MeteorShowerEffect::updateMeteors() {
     uint8_t height = m_matrix->getYResolution();
     PVector centerAttractor;
     centerAttractor.set(width * 2.0f / 3.0f, height / 2.0f);
+    PVector blobAttractor;
+    bool hasBlobAttractor = false;
+    if (tofGridReady && tofInteractionData.hasBlob && tofSensor) {
+        float xNorm = constrain(tofInteractionData.blobX, 0.0f, 1.0f);
+        float yNorm = constrain(tofInteractionData.blobY, 0.0f, 1.0f);
+        uint8_t gx = (uint8_t)constrain((int)(xNorm * 7.999f), 0, 7);
+        uint8_t gy = (uint8_t)constrain((int)(yNorm * 7.999f), 0, 7);
+        uint8_t nx, ny;
+        tofSensor->fromDisplayAligned(gx, gy, nx, ny);
+        uint8_t ex, ey;
+        TOFSensor::inverseRotateGrid8x8(nx, ny, kTofEffectRotationDeg, ex, ey);
+        float fx = ((float)ex + 0.5f) / 8.0f;
+        float fy = ((float)ey + 0.5f) / 8.0f;
+        blobAttractor.set(fx * (float)width, fy * (float)height);
+        hasBlobAttractor = true;
+    }
     
     // Update each meteor
     for (int i = meteorCount - 1; i >= 0; i--) {
@@ -622,7 +652,16 @@ void MeteorShowerEffect::updateMeteors() {
         
         // Apply ToF attractors
         for (uint8_t j = 0; j < activeCount; j++) {
-            m->applyAttractor(activeAttractors[j], attractorStrength, attractorRadius);
+            m->applyAttractor(
+                activeAttractors[j],
+                attractorStrength * activeAttractorStrengths[j],
+                attractorRadius
+            );
+        }
+
+        // Mirror Space Invaders: use the stable blob centroid as an additional steering source.
+        if (hasBlobAttractor) {
+            m->applyAttractor(blobAttractor, attractorStrength * 1.35f, attractorRadius * 1.4f);
         }
         
         // If no ToF attractors active, use center attractor for Y-axis

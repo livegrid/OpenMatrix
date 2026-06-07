@@ -3,7 +3,7 @@
 
 namespace {
 /** Digital orientation tweak for this effect vs global TOF frame (after physical rotation in TOFSensor). */
-constexpr int16_t kTofEffectRotationDeg = 90;  // 0 / 90 / 180 / 270
+constexpr int16_t kTofEffectRotationDeg = 270;  // 0 / 90 / 180 / 270
 
 static int16_t depthAtEffectCell(const InteractionData& d, TOFSensor& sensor, uint8_t effectX, uint8_t effectY) {
     uint8_t rx, ry;
@@ -175,17 +175,27 @@ void ConstellationEffect::buildDepthField() {
 
     int16_t range = maxDetectionDistance - minDetectionDistance;
     if (range <= 0) range = 1;
+    int16_t farSoftDistance = DEPTH_FAR_SOFT_MM;
+    if (farSoftDistance < 1) farSoftDistance = 1;
+    int16_t farSoftMax = maxDetectionDistance + farSoftDistance;
 
     for (uint8_t y = 0; y < TOF_GRID_SIZE; y++) {
         for (uint8_t x = 0; x < TOF_GRID_SIZE; x++) {
             int16_t depth =
                 tofSensor ? depthAtEffectCell(tofInteractionData, *tofSensor, x, y) : 0;
             float value = 0;
-            if (depth > minDetectionDistance && depth < maxDetectionDistance) {
-                // Gradient: closer = stronger (1.0 at min, 0.0 at max)
-                value = 1.0f - (float)(depth - minDetectionDistance) / (float)range;
-                if (value < 0) value = 0;
-                if (value > 1.0f) value = 1.0f;
+            if (depth >= minDetectionDistance && depth <= maxDetectionDistance) {
+                // Closer = stronger, but preserve a minimum activation floor near max distance.
+                float depthNorm =
+                    1.0f - (float)(depth - minDetectionDistance) / (float)range;
+                depthNorm = constrain(depthNorm, 0.0f, 1.0f);
+                value = DEPTH_ACTIVE_FLOOR + depthNorm * (1.0f - DEPTH_ACTIVE_FLOOR);
+            } else if (depth > maxDetectionDistance && depth <= farSoftMax) {
+                // Soft tail after max distance to avoid abrupt cutoff at the edge.
+                float tail =
+                    1.0f - (float)(depth - maxDetectionDistance) / (float)farSoftDistance;
+                tail = constrain(tail, 0.0f, 1.0f);
+                value = DEPTH_ACTIVE_FLOOR * tail;
             }
             depthField[y][x] = value;
         }

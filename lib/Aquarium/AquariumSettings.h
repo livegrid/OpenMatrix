@@ -154,6 +154,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define BOID_TOF_ATTRACTION_RADIUS_FRACTION 1.0f  // Attraction active within this fraction of min(width,height)
 
 //TOF Interaction Settings
+#define AQUARIUM_TOF_PALM_INTERACTION_ENABLED 0  // 0 = body blob/centroid only; 1 = palm hold + flow
 #define AQUARIUM_TOF_ROTATION_OFFSET 90  // Extra Aquarium-only rotation in degrees (0/90/180/270)
 #define TOF_BASELINE_ADAPT_RATE 0.01f  // How fast baseline adapts (0-1)
 #define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
@@ -201,7 +202,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define STATE_IDLE_RECOVERY_MS 2000        // After blob disappears, return to IDLE after this delay
 
 // Plankton Visual Feedback
-#define PLANKTON_MAX_COUNT 500
+#define PLANKTON_MAX_COUNT 1000
 #define PLANKTON_TOF_GRID_SIZE 8
 #define PLANKTON_HUE_BASE 135           // Cyan-aqua (bioluminescent, FastLED hue)
 #define PLANKTON_HUE_RANGE 20           // Tight range: 125-155 (cyan to teal)
@@ -212,6 +213,9 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define PLANKTON_MIN_DRAW_BRIGHTNESS 30    // Skip drawing below this — avoids dark edge bleed onto water
 #define PLANKTON_ACTIVATION_FLOOR 0.04f    // Ignore faint depth noise before boosting visibility
 #define PLANKTON_PUNCH_MIN_BRIGHTNESS 70   // Activated plankton should pop over the water layer
+
+// Water layer
+#define AQUARIUM_WATER_GOD_RAYS_ENABLED 1  // 1 = volumetric light shafts; 0 = simplex water only
 
 // Food
 #define FOOD_FALL_SPEED 0.3f

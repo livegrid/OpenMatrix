@@ -22,7 +22,7 @@ struct FlapBlob {
 class GravityFlapEffect : public Effect {
 private:
     static constexpr uint8_t MAX_PLATFORMS = 9;
-    static constexpr int16_t kTofEffectRotationDeg = 180;
+    static constexpr int16_t kTofEffectRotationDeg = 0;
 
     TOFSensor* tofSensor;
     TOFInteractionManager* tofInteraction;

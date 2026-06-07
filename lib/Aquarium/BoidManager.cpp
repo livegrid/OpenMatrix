@@ -18,6 +18,7 @@ BoidInteractionZone buildInteractionZone(const InteractionData* interaction, con
   BoidInteractionZone zone;
   if (!interaction) return zone;
 
+#if AQUARIUM_TOF_PALM_INTERACTION_ENABLED
   if (interaction->hasPalmHold && interaction->palmStrength > 0.01f) {
     zone.valid = true;
     zone.palmMode = true;
@@ -28,6 +29,7 @@ BoidInteractionZone buildInteractionZone(const InteractionData* interaction, con
     zone.strength = interaction->palmStrength;
     return zone;
   }
+#endif  // AQUARIUM_TOF_PALM_INTERACTION_ENABLED
 
   if (!interaction->hasBlob) return zone;
 

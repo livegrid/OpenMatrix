@@ -17,6 +17,7 @@
 #include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
+#include "PlanktonField.h"
 #include "../TOFSensor/TOFSensor.h"
 #include "../TOFSensor/TOFInteractionManager.h"
 
@@ -33,7 +34,7 @@ class Aquarium {
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
-
+  PlanktonField planktonField;
   // TOF sensor interaction
   TOFInteractionManager* interactionManager = nullptr;
   TOFSensor* tofSensor = nullptr;  // Store sensor pointer for lazy init
@@ -66,11 +67,13 @@ class Aquarium {
         seaFloor(m),
         demoMode(false),
         demoStep(0),
-        demoFinished(false) {}
+        demoFinished(false),
+        planktonField(m) {}
 
   void begin() {
     loadState();
     seaFloor.generate();
+    planktonField.init();
     boidManager.initializeBoids();
   }
 
@@ -290,6 +293,19 @@ class Aquarium {
   }
 
   void augmentAquariumInteraction(InteractionData& interaction) {
+#if !AQUARIUM_TOF_PALM_INTERACTION_ENABLED
+    aquariumPalmValid = false;
+    aquariumPalmVelocityX = 0;
+    aquariumPalmVelocityY = 0;
+    interaction.hasPalmHold = false;
+    interaction.palmNormX = 0.5f;
+    interaction.palmNormY = 0.5f;
+    interaction.palmVelocityX = 0;
+    interaction.palmVelocityY = 0;
+    interaction.palmVelocityMag = 0;
+    interaction.palmStrength = 0;
+    return;
+#else
     unsigned long now = millis();
     float dt = aquariumPalmLastUpdateMs == 0 ? 0.033f : (now - aquariumPalmLastUpdateMs) / 1000.0f;
     if (dt <= 0.0f || dt > 1.0f) dt = 0.033f;
@@ -357,6 +373,7 @@ class Aquarium {
       interaction.palmVelocityMag = 0;
       interaction.palmStrength = 0;
     }
+#endif  // AQUARIUM_TOF_PALM_INTERACTION_ENABLED
   }
   
   // Draw a live TOF shadow on the foreground before fish/plants, while water
@@ -521,10 +538,10 @@ class Aquarium {
         interactionData.hasBlob = false;
       }
       augmentAquariumInteraction(interactionData);
-      // planktonField.update(interactionData);
-      // planktonField.draw();
+      planktonField.update(interactionData);
 
       updateWater();
+      planktonField.draw();
 
       boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400,
                               &interactionData);

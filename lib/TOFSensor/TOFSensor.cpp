@@ -134,6 +134,13 @@ bool TOFSensor::initSensorWithRetry() {
 }
 
 bool TOFSensor::begin() {
+    if (sensor && is_active) {
+        sensor->stop_ranging();
+        is_active = false;
+    }
+    ranging_frame_id = 0;
+    memset(&results, 0, sizeof(VL53L8CX_ResultsData));
+
     pinMode(TOF_PWREN_PIN_2, OUTPUT);
     digitalWrite(TOF_PWREN_PIN_2, LOW);
     pinMode(TOF_PWREN_PIN_3, OUTPUT);

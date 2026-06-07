@@ -63,6 +63,8 @@ private:
     bool tofGridReady;
     int16_t minDetectionDistance;
     int16_t maxDetectionDistance;
+    static constexpr float DEPTH_ACTIVE_FLOOR = 0.10f;      // Keep gentle activation at far edge.
+    static constexpr int16_t DEPTH_FAR_SOFT_MM = 250;       // Extra tail past max distance.
 
     // Depth field (8x8 normalized 0.0-1.0)
     float depthField[TOF_GRID_SIZE][TOF_GRID_SIZE];

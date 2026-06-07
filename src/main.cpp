@@ -77,6 +77,12 @@ EffectManager effectManager(&matrix);
 static constexpr int16_t kRemoteTofMaxMinMm = 1000;
 static constexpr int16_t kRemoteTofMaxMaxMm = 4000;
 static int16_t g_tofRuntimeMaxDetectionDistance = TOF_MAX_DETECTION_DIST;
+static volatile uint32_t g_tofTaskHeartbeatMs = 0;
+static volatile uint32_t g_tofLastFrameMs = 0;
+
+static constexpr uint32_t kTofNoFrameRecoverMs = 8000;
+static constexpr uint32_t kTofRecoverRetryBackoffMs = 15000;
+static constexpr uint32_t kTofTaskHeartbeatTimeoutMs = 20000;
 
 static void applyRuntimeTofRange() {
   tofVisualizer->setDistanceRange(TOF_MIN_DETECTION_DIST, g_tofRuntimeMaxDetectionDistance);
@@ -150,6 +156,14 @@ static inline bool touchShowSensorData() {
 #endif
 }
 
+static void restartDeviceForTofStall(const char* reason) {
+  log_e("TOF watchdog: restarting device (%s)", reason ? reason : "unknown");
+  stateManager.save();
+  aquarium.saveState();
+  delay(100);
+  ESP.restart();
+}
+
 #ifndef SCD40_ENABLED
 void demoTask(void* parameter) {
   for (;;) {
@@ -182,8 +196,8 @@ void displayTask(void* parameter) {
   // Initialize matrix
   log_i("Initializing matrix display...");
   matrix.init();
-  matrix.setRotation(2);
-  matrix.setBrightness(250);
+  matrix.setRotation(0);
+  matrix.setBrightness(200);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
@@ -318,6 +332,20 @@ void displayTask(void* parameter) {
           }
         } else if (st->mode == OpenMatrixMode::EFFECT && !tofSensor.isActive()) {
           tofScreensaverPresenceInited = false;
+        }
+      }
+
+      // TOF task watchdog from outside the task itself: if heartbeat stops updating,
+      // the TOF task is likely wedged. Hard restart restores all task wiring cleanly.
+      {
+        static unsigned long tofWatchdogLastCheckMs = 0;
+        unsigned long now = millis();
+        if (now - tofWatchdogLastCheckMs >= 1000) {
+          tofWatchdogLastCheckMs = now;
+          uint32_t heartbeatMs = g_tofTaskHeartbeatMs;
+          if (heartbeatMs != 0 && (uint32_t)(now - heartbeatMs) > kTofTaskHeartbeatTimeoutMs) {
+            restartDeviceForTofStall("task heartbeat timeout");
+          }
         }
       }
 #endif
@@ -538,17 +566,38 @@ void tofTask(void* parameter) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   
   static int updateCount = 0;
+  unsigned long lastRecoveryAttemptMs = millis();
+  g_tofTaskHeartbeatMs = lastRecoveryAttemptMs;
+  g_tofLastFrameMs = lastRecoveryAttemptMs;
+
+  esp_task_wdt_add(NULL);
   
   for (;;) {
+    unsigned long now = millis();
+    g_tofTaskHeartbeatMs = now;
+
     // Update sensor and get new data
     if (tofSensor.update()) {
       // New data available, visualization will be updated in display task
       updateCount++;
+      g_tofLastFrameMs = now;
       if (updateCount % 50 == 0) {  // Log every 5 seconds (50 * 100ms)
         log_i("TOF: Active, received %d updates", updateCount);
       }
+    } else if ((uint32_t)(now - g_tofLastFrameMs) > kTofNoFrameRecoverMs &&
+               (uint32_t)(now - lastRecoveryAttemptMs) > kTofRecoverRetryBackoffMs) {
+      lastRecoveryAttemptMs = now;
+      log_w("TOF watchdog: no frames for %lu ms, attempting sensor restart",
+            (unsigned long)(now - g_tofLastFrameMs));
+      if (tofSensor.restart()) {
+        g_tofLastFrameMs = millis();
+        log_i("TOF watchdog: sensor restart succeeded");
+      } else {
+        log_e("TOF watchdog: sensor restart failed");
+      }
     }
-    
+
+    esp_task_wdt_reset();
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -642,11 +691,10 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
-  // Boot into Constellation effect (default); TOF idle timeout also returns here.
+  // Boot into Aquarium mode (default).
   {
     State* st = stateManager.getState();
-    st->mode = OpenMatrixMode::EFFECT;
-    st->effects.selected = Effects::CONSTELLATION;
+    st->mode = OpenMatrixMode::AQUARIUM;
     stateManager.save();
   }
   // stateManager.startPeriodicSave();

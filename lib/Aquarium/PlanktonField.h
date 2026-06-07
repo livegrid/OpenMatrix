@@ -7,7 +7,8 @@
 #include "../TOFSensor/TOFInteractionManager.h"
 
 // Plankton particles: invisible until presence detected, then glow. Static positions.
-// Drawn on foreground to avoid water's chunked background updates overwriting them.
+// Drawn on foreground (after water update) so each pixel can blend glow over the
+// background water color instead of fading to opaque black.
 class PlanktonField {
 public:
     static constexpr uint16_t MAX_PLANKTON = PLANKTON_MAX_COUNT;
@@ -60,7 +61,8 @@ public:
     }
 
     void draw() {
-        if (!matrix || planktonCount == 0) return;
+        if (!matrix || !matrix->background || !matrix->foreground || planktonCount == 0)
+            return;
 
         for (uint16_t i = 0; i < planktonCount; i++) {
             if (brightness[i] < PLANKTON_MIN_DRAW_BRIGHTNESS) continue;
@@ -69,20 +71,23 @@ public:
             uint16_t y = py[i];
             if (x >= screenWidth || y >= screenHeight) continue;
 
+            CRGB water = matrix->background->pixels->data[y][x];
+
             uint8_t hue = PLANKTON_HUE_BASE + (uint8_t)((i * 2654435761u) >> 24) % PLANKTON_HUE_RANGE;
             uint8_t sat = PLANKTON_SAT_BASE + (uint8_t)((i * 2654435761u) >> 20) % PLANKTON_SAT_RANGE;
             if (brightness[i] > 170) {
                 uint8_t desaturate = (uint8_t)((brightness[i] - 170) / 2);
                 sat = sat > desaturate ? sat - desaturate : 80;
             }
-            CRGB color;
-            hsv2rgb_rainbow(CHSV(hue, sat, brightness[i]), color);
+            CRGB glow;
+            hsv2rgb_rainbow(CHSV(hue, sat, 255), glow);
+            CRGB color = blend(water, glow, brightness[i]);
             matrix->foreground->drawPixel(x, y, color);
 
             if (brightness[i] > 190 && (((millis() >> 4) + i * 17u) & 0x1F) < 3) {
                 uint16_t sx = x + 1 < screenWidth ? x + 1 : x;
-                CRGB sparkle = color;
-                sparkle.nscale8_video(120);
+                CRGB waterSparkle = matrix->background->pixels->data[y][sx];
+                CRGB sparkle = blend(waterSparkle, glow, (uint8_t)((uint16_t)brightness[i] * 120 / 255));
                 matrix->foreground->drawPixel(sx, y, sparkle);
             }
         }

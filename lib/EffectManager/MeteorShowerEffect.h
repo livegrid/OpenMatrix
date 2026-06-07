@@ -45,6 +45,7 @@ public:
 struct TOFAttractor {
     PVector position;
     bool active;
+    float strength;
 };
 
 // Background planet decoration
