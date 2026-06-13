@@ -90,7 +90,10 @@ class Water {
 
       for (size_t col = 0; col < totalCols; ++col) {
         float n = batchNoise[col + batchRow * batchCols];
-        uint8_t noiseFactor = (uint8_t)((n + 1.0f) * 127.5f);
+        // Map noise [-1,1] -> [floor,255] so troughs keep a base tint instead of clipping to black
+        float nNorm = (n + 1.0f) * 0.5f;  // 0..1
+        uint8_t noiseFactor = (uint8_t)(AQUARIUM_WATER_AMBIENT_FLOOR
+                                        + nNorm * (255.0f - AQUARIUM_WATER_AMBIENT_FLOOR));
         CRGB color = simplexColor;
         color.nscale8(noiseFactor);
 

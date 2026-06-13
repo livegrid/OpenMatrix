@@ -14,6 +14,7 @@
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
 #include "Motion/MotionFactory.h"
+#include "Motion/MotionProfile.h"
 #include "../TOFSensor/TOFInteractionManager.h"
 
 class Fish {
@@ -158,11 +159,16 @@ class Fish {
           selfIndex,
           schoolPositions ? (int)schoolPositions->size() : 1);
     }
+    motion->refreshActiveProfile();
 
-    // Keep fish from collapsing into a single point while following TOF.
-    if (interaction && schoolPositions && selfIndex >= 0 &&
-        motion->getInteractionState() == Motion::InteractionState::CURIOUS &&
-        selfIndex < (int)schoolPositions->size()) {
+    // Keep fish from collapsing into a single point while grouped on a stimulus.
+    {
+      MotionProfile profile = motion->getMotionProfile();
+      bool groupedProfile = profile == MotionProfile::Approach ||
+                            profile == MotionProfile::Hold ||
+                            profile == MotionProfile::Chase;
+      if (interaction && schoolPositions && selfIndex >= 0 && groupedProfile &&
+          selfIndex < (int)schoolPositions->size()) {
       PVector selfPosPhysics = (*schoolPositions)[selfIndex] * PHYSICS_SCALE;
       PVector separation(0, 0);
       int neighborCount = 0;
@@ -187,6 +193,7 @@ class Fish {
         separation /= (float)neighborCount;
         separation.setMag(CURIOUS_SEPARATION_FORCE);
         motion->applyExternalForce(separation);
+      }
       }
     }
     

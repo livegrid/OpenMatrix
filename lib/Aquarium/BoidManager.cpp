@@ -1,17 +1,19 @@
 #include "BoidManager.h"
 #include "../TOFSensor/TOFInteractionManager.h"
+#include "Motion/MotionProfile.h"
 
 #include <random>
 
 namespace {
 
 struct BoidInteractionZone {
-  bool valid = false;
-  bool palmMode = false;
-  PVector center;
+  bool hasBody = false;
+  bool palmActive = false;
+  PVector bodyCenter;
+  PVector palmCenter;
   PVector flow;
   float radius = 0;
-  float strength = 0;
+  float palmStrength = 0;
 };
 
 BoidInteractionZone buildInteractionZone(const InteractionData* interaction, const PVector& limits) {
@@ -20,16 +22,13 @@ BoidInteractionZone buildInteractionZone(const InteractionData* interaction, con
 
 #if AQUARIUM_TOF_PALM_INTERACTION_ENABLED
   if (interaction->hasPalmHold && interaction->palmStrength > 0.01f) {
-    zone.valid = true;
-    zone.palmMode = true;
-    zone.center = PVector(constrain(interaction->palmNormX, 0.0f, 1.0f) * (limits.x - 1.0f),
-                          constrain(interaction->palmNormY, 0.0f, 1.0f) * (limits.y - 1.0f));
+    zone.palmActive = true;
+    zone.palmCenter = PVector(constrain(interaction->palmNormX, 0.0f, 1.0f) * (limits.x - 1.0f),
+                              constrain(interaction->palmNormY, 0.0f, 1.0f) * (limits.y - 1.0f));
     zone.flow = PVector(interaction->palmVelocityX, interaction->palmVelocityY);
-    zone.radius = max(min(limits.x, limits.y) * PALM_ZONE_RADIUS_FRACTION, 12.0f);
-    zone.strength = interaction->palmStrength;
-    return zone;
+    zone.palmStrength = interaction->palmStrength;
   }
-#endif  // AQUARIUM_TOF_PALM_INTERACTION_ENABLED
+#endif
 
   if (!interaction->hasBlob) return zone;
 
@@ -48,23 +47,236 @@ BoidInteractionZone buildInteractionZone(const InteractionData* interaction, con
     }
   }
 
-  zone.valid = true;
-  zone.strength = 1.0f;
+  zone.hasBody = true;
   if (activeCount > 0) {
     float centerNormX = ((float)minX + (float)maxX + 1.0f) * 0.5f / 8.0f;
     float centerNormY = ((float)minY + (float)maxY + 1.0f) * 0.5f / 8.0f;
-    zone.center = PVector(centerNormX * (limits.x - 1.0f), centerNormY * (limits.y - 1.0f));
+    zone.bodyCenter = PVector(centerNormX * (limits.x - 1.0f), centerNormY * (limits.y - 1.0f));
 
     float halfW = ((float)(maxX - minX + 1) / 8.0f) * limits.x * 0.5f;
     float halfH = ((float)(maxY - minY + 1) / 8.0f) * limits.y * 0.5f;
     zone.radius = max(halfW, halfH) * (1.0f + BODY_ZONE_PADDING_FRACTION);
     zone.radius = max(zone.radius, min(limits.x, limits.y) * 0.18f);
   } else {
-    zone.center = PVector(constrain(interaction->blobX, 0.0f, 1.0f) * (limits.x - 1.0f),
-                          constrain(interaction->blobY, 0.0f, 1.0f) * (limits.y - 1.0f));
+    zone.bodyCenter = PVector(constrain(interaction->blobX, 0.0f, 1.0f) * (limits.x - 1.0f),
+                              constrain(interaction->blobY, 0.0f, 1.0f) * (limits.y - 1.0f));
     zone.radius = max(min(limits.x, limits.y) * 0.25f, 12.0f);
   }
   return zone;
+}
+
+PVector getScreenSteerCenter(const PVector& limits) {
+#if MOTION_PROFILE_DEBUG_ENABLED
+  return PVector(MotionProfileDebug::getTargetScreenX((uint16_t)limits.x),
+                 MotionProfileDebug::getTargetScreenY((uint16_t)limits.y));
+#else
+  return PVector(limits.x * 0.5f, limits.y * 0.5f);
+#endif
+}
+
+PVector getBoidChaseTarget(const PVector& center, int slotIndex) {
+  uint32_t slotHash = (uint32_t)(slotIndex + 1) * 2654435761u;
+  float slotAngle = (float)(slotHash % 6283u) * 0.001f;
+  return center + PVector(cosf(slotAngle) * BOID_CHASE_SLOT_SPREAD,
+                          sinf(slotAngle) * BOID_CHASE_SLOT_SPREAD);
+}
+
+MotionProfile resolveBoidBaseProfile(const InteractionData* interaction) {
+#if MOTION_PROFILE_DEBUG_ENABLED
+  return MotionProfileDebug::getForcedProfile();
+#else
+  static bool hadBodyBlob = false;
+  static unsigned long alertUntilMs = 0;
+
+  if (!interaction) return MotionProfile::Wander;
+
+  bool hasBody = interaction->hasBlob;
+  if (!hadBodyBlob && hasBody) {
+    alertUntilMs = millis() + STATE_ALERT_DURATION_MS;
+  }
+  hadBodyBlob = hasBody;
+
+  static bool fleeLatched = false;
+  static unsigned long fleeClearAfterMs = 0;
+  unsigned long now = millis();
+
+  if (!hasBody && interaction->distanceHint == TofDistanceHint::NoPerson) {
+    fleeLatched = false;
+    fleeClearAfterMs = 0;
+    return MotionProfile::Wander;
+  }
+
+  if (hasBody && interaction->distanceHint == TofDistanceHint::TooClose) {
+    fleeLatched = true;
+    fleeClearAfterMs = 0;
+    return MotionProfile::Flee;
+  }
+  if (fleeLatched) {
+    if (hasBody && interaction->distanceHint == TofDistanceHint::Ok) {
+      if (fleeClearAfterMs == 0) fleeClearAfterMs = now + TOF_FLEE_CLEAR_MS;
+      if (now < fleeClearAfterMs) return MotionProfile::Flee;
+      fleeLatched = false;
+      fleeClearAfterMs = 0;
+    } else {
+      fleeClearAfterMs = 0;
+      return MotionProfile::Flee;
+    }
+  }
+#if AQUARIUM_TOF_PALM_INTERACTION_ENABLED
+  if (interaction->hasPalmHold && interaction->palmStrength > 0.01f) {
+    return MotionProfile::Chase;
+  }
+#endif
+  if (millis() < alertUntilMs) {
+    return MotionProfile::Alert;
+  }
+  if (hasBody) {
+    return MotionProfile::Approach;
+  }
+  return MotionProfile::Wander;
+#endif
+}
+
+float boidHoldEagerness(int slotIndex) {
+  uint32_t h = (uint32_t)(slotIndex + 1) * 2654435761u;
+  return 0.35f + (float)((h >> 8) % 65u) * (0.65f / 65.0f);
+}
+
+bool shouldBoidHold(int slotIndex, const Boid& boid, const BoidInteractionZone& zone,
+                    unsigned long& holdUntil) {
+  if (!zone.hasBody) return false;
+
+  PVector slotTarget = getBoidChaseTarget(zone.bodyCenter, slotIndex);
+  float holdRadius = zone.radius * PROFILE_HOLD_SLOT_RADIUS_FRAC * boidHoldEagerness(slotIndex);
+  float distToSlot = boid.location.dist(slotTarget);
+  float distToCenter = boid.location.dist(zone.bodyCenter);
+  unsigned long now = millis();
+
+  if (distToCenter > zone.radius || distToSlot >= holdRadius) {
+    holdUntil = 0;
+    return false;
+  }
+
+  if (holdUntil == 0 && distToSlot < holdRadius * 0.85f) {
+    uint32_t h = (uint32_t)(slotIndex + 1) * 1597334677u;
+    unsigned long dwell = PROFILE_HOLD_MIN_MS +
+                        (unsigned long)((h >> 12) % (PROFILE_HOLD_MAX_MS - PROFILE_HOLD_MIN_MS + 1));
+    holdUntil = now + dwell;
+  }
+
+  return holdUntil > 0 && now < holdUntil;
+}
+
+bool isBoidOffCanvas(const Boid& boid) {
+  return boid.location.x < 0.0f || boid.location.y < 0.0f ||
+         boid.location.x >= boid.limits.x || boid.location.y >= boid.limits.y;
+}
+
+void flockWeighted(Boid& boid, Boid* group, uint8_t count, float sepW, float aliW, float cohW) {
+  PVector sep = boid.separate(group, count) * sepW;
+  PVector ali = boid.align(group, count) * aliW;
+  PVector coh = boid.cohesion(group, count) * cohW;
+  boid.applyForce(sep);
+  boid.applyForce(ali);
+  boid.applyForce(coh);
+}
+
+void applyBoidProfile(Boid& boid, MotionProfile profile, const PVector& steerCenter,
+                      const BoidInteractionZone& zone, int slotIndex, float co2SpeedMult,
+                      Boid* group, uint8_t groupCount) {
+  MotionProfileSpec spec = getMotionProfileSpec(profile);
+  float speedMult = co2SpeedMult * spec.maxSpeedFrac;
+  float sepW = 1.5f;
+  float aliW = 1.0f;
+  float cohW = 1.0f;
+
+  if (spec.damping < 0.999f) {
+    boid.velocity *= spec.damping;
+  }
+
+  PVector chaseTarget = getBoidChaseTarget(steerCenter, slotIndex);
+  if (zone.palmActive && profile == MotionProfile::Chase) {
+    chaseTarget = zone.palmCenter;
+  } else if (zone.hasBody && profile != MotionProfile::Flee) {
+    chaseTarget = getBoidChaseTarget(zone.bodyCenter, slotIndex);
+  }
+
+  switch (profile) {
+    case MotionProfile::Hold:
+      sepW = 1.2f;
+      aliW = 0.35f;
+      cohW = 0.15f;
+      boid.arrive(chaseTarget);
+      break;
+
+    case MotionProfile::Alert:
+      sepW = 0.6f;
+      aliW = 0.25f;
+      cohW = 0.15f;
+      break;
+
+    case MotionProfile::Approach:
+      sepW = 1.4f;
+      aliW = 0.8f;
+      cohW = 0.4f;
+      if (boid.location.dist(chaseTarget) > BOID_CHASE_ARRIVE_DIST) {
+        boid.applyForce(boid.seek(chaseTarget) * BOID_CHASE_SEEK_WEIGHT * 0.55f);
+      } else {
+        boid.arrive(chaseTarget);
+      }
+      break;
+
+    case MotionProfile::Chase:
+      sepW = 2.2f;
+      aliW = 0.5f;
+      cohW = 0.1f;
+      if (boid.location.dist(chaseTarget) > BOID_CHASE_ARRIVE_DIST) {
+        boid.applyForce(boid.seek(chaseTarget) * BOID_CHASE_SEEK_WEIGHT);
+      } else if (!zone.palmActive) {
+        profile = MotionProfile::Hold;
+        spec = getMotionProfileSpec(profile);
+        speedMult = co2SpeedMult * spec.maxSpeedFrac;
+        boid.arrive(chaseTarget);
+      }
+      break;
+
+    case MotionProfile::Flee: {
+      sepW = 0.2f;
+      aliW = 0.0f;
+      cohW = 0.0f;
+      PVector threat = zone.hasBody ? zone.bodyCenter : steerCenter;
+      PVector away = boid.location - threat;
+      if (away.magSq() < 1.0f) {
+        away = PVector(Boid::randomf(), Boid::randomf());
+      }
+      away.normalize();
+      away *= BOID_FLEE_FORCE;
+      boid.applyForce(away);
+      boid.velocity += away * 0.15f;
+      speedMult = co2SpeedMult * BOID_FLEE_SPEED_MULT;
+      break;
+    }
+
+    case MotionProfile::Wander:
+    default:
+      break;
+  }
+
+  if (profile != MotionProfile::Flee) {
+    flockWeighted(boid, group, groupCount, sepW, aliW, cohW);
+  }
+
+  float effMin = boid.maxspeed * spec.minSpeedFrac * co2SpeedMult;
+  boid.velocity += boid.acceleration;
+  if (effMin > 0.0f && boid.velocity.magSq() < effMin * effMin) {
+    boid.velocity.setMag(effMin);
+  }
+  boid.velocity.limit(boid.maxspeed * speedMult);
+  boid.location += boid.velocity;
+  if (profile == MotionProfile::Flee && isBoidOffCanvas(boid)) {
+    boid.velocity = PVector(0, 0);
+  }
+  boid.acceleration *= 0;
 }
 
 }  // namespace
@@ -93,36 +305,34 @@ void BoidManager::updateBoids(long co2, const InteractionData* interaction) {
   speedMultiplier /= 100.0f;
 
   BoidInteractionZone zone = buildInteractionZone(interaction, limits);
+  MotionProfile baseProfile = resolveBoidBaseProfile(interaction);
+  PVector steerCenter = getScreenSteerCenter(limits);
+  int globalSlot = 0;
+
+  static unsigned long boidHoldUntil[96] = {};
 
   for (auto& group : boidGroups) {
+    uint8_t groupCount = (uint8_t)group.size();
     for (auto& boid : group) {
-      if (zone.valid) {
-        if (zone.palmMode) {
-          float flowMag = zone.flow.mag();
-          if (flowMag > FOLLOW_DIRECTION_MIN_VELOCITY) {
-            PVector flowForce = zone.flow / flowMag;
-            float flowScale = constrain(flowMag, 0.25f, 1.0f);
-            boid.applyForce(flowForce * BOID_TOF_ATTRACTION_FORCE * flowScale * zone.strength);
-          }
-        }
+      int holdIdx = globalSlot % 96;
+      MotionProfile profile = baseProfile;
 
-        float distanceToZone = boid.location.dist(zone.center);
-        bool outsideZone = distanceToZone > zone.radius;
-        bool palmNeedsBias = zone.palmMode && distanceToZone > zone.radius * 0.65f;
-        if (distanceToZone > INTERACTION_DISTANCE_EPSILON &&
-            (outsideZone || palmNeedsBias)) {
-          float attractionWeight = BOID_TOF_ATTRACTION_FORCE * zone.strength;
-          if (outsideZone) {
-            float outside = min((distanceToZone - zone.radius) / max(zone.radius, 1.0f), 1.0f);
-            attractionWeight *= 0.4f + 0.6f * outside;
-          } else {
-            attractionWeight *= FOLLOW_POSITION_BIAS;
-          }
-          boid.applyForce(boid.seek(zone.center) * attractionWeight);
-        }
+      if (profile == MotionProfile::Approach &&
+          shouldBoidHold(globalSlot, boid, zone, boidHoldUntil[holdIdx])) {
+        profile = MotionProfile::Hold;
       }
-      boid.run(group.data(), group.size(),speedMultiplier);
-      boid.avoidBorders();
+
+      if (profile == MotionProfile::Flee && isBoidOffCanvas(boid)) {
+        profile = MotionProfile::Wander;
+      }
+
+      applyBoidProfile(boid, profile, steerCenter, zone, globalSlot, speedMultiplier,
+                       group.data(), groupCount);
+
+      if (profile != MotionProfile::Flee) {
+        boid.avoidBorders();
+      }
+      globalSlot++;
     }
   }
 }
@@ -130,15 +340,13 @@ void BoidManager::updateBoids(long co2, const InteractionData* interaction) {
 void BoidManager::renderBoids() {
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
-      // Use normalized velocity directly instead of expensive atan2/cos/sin
       float velMagSq = boid.velocity.x * boid.velocity.x + boid.velocity.y * boid.velocity.y;
-      if (velMagSq > 0.0001f) {  // Avoid division by zero
+      if (velMagSq > 0.0001f) {
         float invMag = 1.0f / sqrt(velMagSq);
         int x2 = boid.location.x + boid.velocity.x * invMag;
         int y2 = boid.location.y + boid.velocity.y * invMag;
         matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2, CRGB(50, 200, 100));
       } else {
-        // Stationary boid - just draw a pixel
         matrix->foreground->drawPixel(boid.location.x, boid.location.y, CRGB(50, 200, 100));
       }
     }

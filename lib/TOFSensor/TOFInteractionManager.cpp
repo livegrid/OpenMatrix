@@ -342,10 +342,6 @@ bool TOFInteractionManager::interactionBandOk() const {
 void TOFInteractionManager::detectPalmOutlier(const int16_t grid[8][8]) {
     PalmInfo candidate{};
     candidate.valid = false;
-    int16_t valid[64];
-    int nv = 0;
-    int16_t lo = kValidDepthMaxMm;
-    int16_t hi = 0;
 
     auto clearPalmDebounced = [&]() {
         palm_on_streak = 0;
@@ -355,105 +351,53 @@ void TOFInteractionManager::detectPalmOutlier(const int16_t grid[8][8]) {
         }
     };
 
-    for (int y = 0; y < 8; y++) {
-        for (int x = 0; x < 8; x++) {
-            int16_t d = grid[y][x];
-            if (d > kValidDepthMinMm && d < kValidDepthMaxMm) {
-                valid[nv++] = d;
-                if (d < lo) lo = d;
-                if (d > hi) hi = d;
-            }
-        }
-    }
-
-    if (nv < kPalmMinValidCells || (hi - lo) < kPalmMinDepthSpreadMm) {
-        clearPalmDebounced();
-        return;
-    }
-
     if (data.distanceHint == TofDistanceHint::NoPerson || data.stanceDepthMm <= 0) {
         clearPalmDebounced();
         return;
     }
 
-    int16_t ref = data.stanceDepthMm;
-    if (ref < kPalmRefMinMm || ref > kPalmRefMaxMm) {
-        clearPalmDebounced();
-        return;
-    }
-
-    int anchors = 0;
+    int16_t inBand[64];
+    int nib = 0;
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             int16_t d = grid[y][x];
-            if (d > kValidDepthMinMm && d < kValidDepthMaxMm && abs(d - ref) <= kPalmBodyAnchorWindowMm) {
-                anchors++;
+            if (d > minDistance && d < maxDistance) {
+                inBand[nib++] = d;
             }
         }
     }
-    if (anchors < kPalmMinBodyAnchorCells) {
+
+    if (nib < kPalmMinInBandCells) {
         clearPalmDebounced();
         return;
     }
 
-    int bestDelta = -1;
+    int16_t inBandWork[64];
+    memcpy(inBandWork, inBand, (size_t)nib * sizeof(inBandWork[0]));
+    insertionSortInt16(inBandWork, nib);
+    int16_t ref = medianSorted(inBandWork, nib);
+
+    int16_t closestD = kValidDepthMaxMm;
     int bestX = 0, bestY = 0;
-    int16_t bestD = 0;
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             int16_t d = grid[y][x];
-            if (!d || d >= ref) continue;
-            int delta = (int)ref - (int)d;
-            if (delta < kPalmDeltaMm) continue;
-            if (delta > bestDelta) {
-                bestDelta = delta;
+            if (d <= minDistance || d >= maxDistance) continue;
+            if (d < closestD) {
+                closestD = d;
                 bestX = x;
                 bestY = y;
-                bestD = d;
             }
         }
     }
 
-    if (bestDelta >= kPalmDeltaMm) {
-        int clusterCells = 0;
-        int bgCount = 0;
-        int bgSum = 0;
-        for (int oy = -1; oy <= 1; oy++) {
-            int ny = bestY + oy;
-            if (ny < 0 || ny >= 8) continue;
-            for (int ox = -1; ox <= 1; ox++) {
-                int nx = bestX + ox;
-                if (nx < 0 || nx >= 8) continue;
-                int16_t nd = grid[ny][nx];
-                if (nd <= kValidDepthMinMm || nd >= kValidDepthMaxMm) continue;
-
-                int foregroundDelta = (int)ref - (int)nd;
-                bool samePalmSurface = foregroundDelta >= kPalmDeltaMm &&
-                                       abs((int)nd - (int)bestD) <= kPalmClusterDepthWindowMm;
-                if (samePalmSurface) {
-                    clusterCells++;
-                } else {
-                    bgSum += nd;
-                    bgCount++;
-                }
-            }
-        }
-
-        bool clusterSupported = clusterCells >= kPalmMinClusterCells;
-        bool contrastSupported = false;
-        if (bgCount > 0) {
-            int bgAvg = bgSum / bgCount;
-            contrastSupported = (bgAvg - bestD) >= kPalmLocalContrastMm;
-        }
-        if (!clusterSupported && !contrastSupported) bestDelta = -1;
-    }
-
-    if (bestDelta >= kPalmDeltaMm) {
+    int delta = (int)ref - (int)closestD;
+    if (delta >= kPalmDeltaMm) {
         candidate.valid = true;
         candidate.x = (uint8_t)bestX;
         candidate.y = (uint8_t)bestY;
-        candidate.depth = bestD;
-        candidate.delta_mm = (int16_t)bestDelta;
+        candidate.depth = closestD;
+        candidate.delta_mm = (int16_t)delta;
         candidate.ref_mm = ref;
     }
 

@@ -2,17 +2,40 @@
 name: post-change-upload-monitor
 description: >-
   After agent-made firmware or embedded changes, decides whether to upload to the
-  device and whether to run a short serial monitor pass. Skips redundant
-  build-before-upload (upload compiles). Handles PlatformIO upload failures when
-  the serial port is busy (Windows), ensures monitors are stopped cleanly, and
-  caps retries after crashes. Use when finishing edits to OpenMatrix firmware
-  (src/, include/, platformio.ini), memory or stack tuning, BLE, boot-critical
-  paths, or any change where a flash-and-watch verification is expected.
+  device and whether to run a short serial monitor pass. CRITICAL: if uploading,
+  run upload directly—never build then upload (upload already compiles; build first
+  doubles compile time). Use build only for compile-only checks with no flash.
+  Handles PlatformIO upload failures when the serial port is busy (Windows),
+  ensures monitors are stopped cleanly, and caps retries after crashes. Use when
+  finishing edits to OpenMatrix firmware (src/, include/, platformio.ini), memory
+  or stack tuning, BLE, boot-critical paths, or any change where a flash-and-watch
+  verification is expected.
 ---
 
 # Post-change upload and monitor
 
 Apply at the **end of a batch of agent changes** to this repo (ESP32-S3, PlatformIO). Do not upload after documentation-only edits unless the user asked to verify a build.
+
+## Golden rule — pick one path
+
+**Never run `build` and then `upload` in the same verification flow.** Upload already compiles; doing both doubles compile time for no benefit.
+
+```
+Firmware changed — how do you verify?
+│
+├─ Will flash the device (default for real firmware edits)
+│     → upload only          (fw.ps1 upload)
+│     → monitor if warranted (fw.ps1 monitor)
+│     ✗ do NOT run build first
+│
+├─ Compile check only — no flash (no hardware, or user asked build-only)
+│     → build only           (fw.ps1 build)
+│
+└─ Trivial / docs / comments — flash not needed
+      → do nothing           (no build, no upload, no monitor)
+```
+
+If you are about to run **`build` then `upload`**, stop: run **`upload`** directly instead.
 
 ## 1. Should you upload?
 
@@ -24,9 +47,9 @@ Apply at the **end of a batch of agent changes** to this repo (ESP32-S3, Platfor
 
 **Default for real firmware edits:** assume **upload is usually required** after changes that affect the binary.
 
-**Do not** run a **separate build before upload.** `pio run -t upload` (and `fw.ps1 upload`) already compile; an extra `build` first is wasted time.
+**If upload is going to happen, go straight to upload.** Do not “check compile first” with a separate `build`—that is the same compile twice.
 
-Use **`build` / `pio run` alone** only when you need a compile check **without** flashing (e.g. the user asked for a build-only sanity check, or no hardware is available).
+Use **`build` / `pio run` alone** only when you will **not** upload in this step (e.g. the user asked for a build-only check, or no hardware is available and you only need to confirm it compiles).
 
 ## 2. Should you monitor serial for a few seconds?
 
@@ -43,10 +66,20 @@ While monitoring: watch for **panic, Guru Meditation, boot loop, repeated crash*
 
 ## 3. Execution order
 
-Prefer the repo **`.cursor/scripts/fw.ps1`** helpers from the project root—these are **for agent automation** (see `AGENTS.md`), not end-user documentation. They keep timed monitors bounded and let `free-serial` target monitor processes only:
+Prefer the repo **`.cursor/scripts/fw.ps1`** helpers from the project root—these are **for agent automation** (see `AGENTS.md`), not end-user documentation. They keep timed monitors bounded and let `free-serial` target monitor processes only.
 
-- **Upload** (includes compile): `pwsh -File .cursor/scripts/fw.ps1 upload` (or `pio run -t upload`; use project default env unless the user specified another). Do **not** run **`build` immediately before** this.
-- **Build only** (no flash): `pwsh -File .cursor/scripts/fw.ps1 build` when a compile check without uploading is explicitly appropriate—**not** as a routine step before upload.
+**Canonical verify flow (when flashing):** `upload` → `monitor` (if warranted). **One compile**—inside upload. No `build` beforehand.
+
+| Goal | Command | Notes |
+|------|---------|-------|
+| Flash + verify compile | `fw.ps1 upload` | **Start here** when the device should be updated. Compiles as part of upload. |
+| Serial check after flash | `fw.ps1 monitor` | After upload, when the skill says to watch boot logs. |
+| Compile only, no flash | `fw.ps1 build` | **Only** when you are **not** uploading in this step. |
+
+Commands (from project root):
+
+- **Upload** (includes compile): `pwsh -File .cursor/scripts/fw.ps1 upload` (or `pio run -t upload`; use project default env unless the user specified another). **Never** precede this with `build`.
+- **Build only** (no flash): `pwsh -File .cursor/scripts/fw.ps1 build` — mutually exclusive with upload in the same verification pass; if you will upload, skip this entirely.
 - **If upload fails — port busy / access denied**:
    - Note the COM port from the error or `pio device list`.
    - Run `pwsh -File .cursor/scripts/fw.ps1 free-serial`, then retry **`upload` once**. Also close any other serial monitor (IDE serial tab, PuTTY, etc.) if still blocked. Do not kill unrelated system processes.
@@ -65,7 +98,8 @@ Prefer the repo **`.cursor/scripts/fw.ps1`** helpers from the project root—the
 
 ## 5. Anti-patterns
 
-- Running **`build` then `upload`** in one flow (upload already builds)
+- **`build` then `upload`** — the most common waste of time; upload already builds. If upload is planned, delete the build step from your plan.
+- **“Compile check” before upload** — upload *is* the compile check when you are flashing
 - Leaving `pio device monitor` running in the background after the task is done
 - Uploading after every tiny comment-only change without user preference
 - More than **~3** upload-and-verify attempts for the same issue without new information

@@ -1,5 +1,6 @@
 #include "SpaceInvadersEffect.h"
 #include "SpacemanSprites.h"
+#include "StepBackSprite.h"
 #include "../TOFSensor/TOFSensor.h"
 #include <math.h>
 
@@ -740,6 +741,12 @@ void SpaceInvadersEffect::update() {
             nextLevel();
             gameWon = false;
         }
+    }
+
+    if (tofGridReady && tofInteractionData.hasBlob &&
+        tofInteractionData.distanceHint == TofDistanceHint::TooClose) {
+        drawStepBackProximityWarning(playWidth, playHeight, m_matrix,
+                                     [this](int16_t gx, int16_t gy, const CRGB& c) { drawGamePixel(gx, gy, c); });
     }
     
     if (blob.valid) {

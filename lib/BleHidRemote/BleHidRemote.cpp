@@ -128,6 +128,14 @@ void bleHidRemotePrevEffect(void) {
   onRemotePrevEffect();
 }
 
+void bleHidRemoteNextEffect(void) {
+  onRemoteNextEffect();
+}
+
+void bleHidRemoteSyncEffectRingFromState(void) {
+  syncRemoteRingFromState();
+}
+
 static void onRemoteAquarium() {
   if (!g_stateManager) {
     return;

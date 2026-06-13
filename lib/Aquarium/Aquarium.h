@@ -17,7 +17,8 @@
 #include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
-#include "PlanktonField.h"
+// #include "PlanktonField.h"  // TEST: plankton disabled
+#include "Motion/MotionProfile.h"
 #include "../TOFSensor/TOFSensor.h"
 #include "../TOFSensor/TOFInteractionManager.h"
 
@@ -34,7 +35,7 @@ class Aquarium {
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
-  PlanktonField planktonField;
+  // PlanktonField planktonField;  // TEST: plankton disabled
   // TOF sensor interaction
   TOFInteractionManager* interactionManager = nullptr;
   TOFSensor* tofSensor = nullptr;  // Store sensor pointer for lazy init
@@ -67,13 +68,13 @@ class Aquarium {
         seaFloor(m),
         demoMode(false),
         demoStep(0),
-        demoFinished(false),
-        planktonField(m) {}
+        demoFinished(false) {}
+        // planktonField(m) — TEST: plankton disabled
 
   void begin() {
     loadState();
     seaFloor.generate();
-    planktonField.init();
+    // planktonField.init();  // TEST: plankton disabled
     boidManager.initializeBoids();
   }
 
@@ -417,6 +418,10 @@ class Aquarium {
 
   // Update all fish in the aquarium
   void updateFish(InteractionData* interactionOverride = nullptr) {
+#if MOTION_PROFILE_DEBUG_ENABLED
+    MotionProfileDebug::tick(matrix->getXResolution() * PHYSICS_SCALE,
+                             matrix->getYResolution() * PHYSICS_SCALE);
+#endif
     float co2;
     
     if (demoMode) {
@@ -538,10 +543,10 @@ class Aquarium {
         interactionData.hasBlob = false;
       }
       augmentAquariumInteraction(interactionData);
-      planktonField.update(interactionData);
+      // planktonField.update(interactionData);  // TEST: plankton disabled
 
       updateWater();
-      planktonField.draw();
+      // planktonField.draw();  // TEST: plankton disabled
 
       boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400,
                               &interactionData);

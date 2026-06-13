@@ -74,6 +74,47 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define FISH_MAX_SPEED 30
 #define FISH_MIN_SPEED 10
 #define FISH_MAX_FORCE 0.3
+
+// Motion profiles (high-level locomotion presets; see MotionProfile.h)
+#define PROFILE_HOLD_SIN_SCALE 0.12f
+#define PROFILE_HOLD_NOISE_SCALE 0.08f
+#define PROFILE_HOLD_MIN_SPEED_FRAC 0.10f
+#define PROFILE_HOLD_MAX_SPEED_FRAC 0.28f
+#define PROFILE_HOLD_DAMPING 0.98f
+#define PROFILE_ALERT_MAX_SPEED_FRAC 0.20f
+#define PROFILE_ALERT_DAMPING 0.85f
+#define PROFILE_APPROACH_SIN_SCALE 0.15f
+#define PROFILE_APPROACH_NOISE_SCALE 0.10f
+#define PROFILE_APPROACH_MIN_SPEED_FRAC 0.20f
+#define PROFILE_APPROACH_MAX_SPEED_FRAC 0.55f
+#define PROFILE_CHASE_MIN_SPEED_FRAC 0.35f
+#define PROFILE_CHASE_MAX_SPEED_FRAC 1.0f
+#define PROFILE_CHASE_ARRIVE_DISTANCE (14 * PHYSICS_SCALE)  // switch Chase -> Hold when this close
+#define PROFILE_CHASE_SLOT_SPREAD (10 * PHYSICS_SCALE)    // per-fish spread around chase target
+#define PROFILE_FLEE_MIN_SPEED_FRAC 0.7f
+#define PROFILE_FLEE_MAX_SPEED_FRAC 2.5f
+#define PROFILE_FLEE_DAMPING 1.0f
+#define PROFILE_FLEE_REPEL_FORCE 3.5f
+#define PROFILE_FLEE_VEL_BOOST 1.4f
+#define TOF_FLEE_CLEAR_MS 400              // stay fleeing briefly after distance returns to Ok
+#define PROFILE_FRIEND_SIN_SCALE 0.20f
+#define PROFILE_FRIEND_NOISE_SCALE 0.12f
+#define PROFILE_FRIEND_MIN_SPEED_FRAC 0.15f
+#define PROFILE_FRIEND_MAX_SPEED_FRAC 0.45f
+#define PROFILE_HOLD_SLOT_RADIUS_FRAC 0.45f  // distToTarget / interactionRadius to enter Hold
+#define PROFILE_HOLD_MIN_MS 1200             // per-fish min dwell in Hold
+#define PROFILE_HOLD_MAX_MS 3500             // per-fish max dwell in Hold
+
+// Boid profile tuning (screen pixels unless noted)
+#define BOID_CHASE_ARRIVE_DIST 10.0f
+#define BOID_CHASE_SLOT_SPREAD 14.0f
+#define BOID_CHASE_SEEK_WEIGHT 1.4f
+#define BOID_FLEE_FORCE 1.6f
+#define BOID_FLEE_SPEED_MULT 2.5f
+
+// Set 0 to use interaction-driven profiles; 1 cycles all fish through profiles on serial timer.
+#define MOTION_PROFILE_DEBUG_ENABLED 0
+#define MOTION_PROFILE_DEBUG_CYCLE_MS 6000
 #define FISH_SIN_AMPLITUDE 2
 #define FISH_SIN_FREQUENCY 0.002
 #define FISH_NOISE_AMPLITUDE 6
@@ -154,7 +195,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define BOID_TOF_ATTRACTION_RADIUS_FRACTION 1.0f  // Attraction active within this fraction of min(width,height)
 
 //TOF Interaction Settings
-#define AQUARIUM_TOF_PALM_INTERACTION_ENABLED 0  // 0 = body blob/centroid only; 1 = palm hold + flow
+#define AQUARIUM_TOF_PALM_INTERACTION_ENABLED 1  // 0 = body blob/centroid only; 1 = palm hold + chase
 #define AQUARIUM_TOF_ROTATION_OFFSET 90  // Extra Aquarium-only rotation in degrees (0/90/180/270)
 #define TOF_BASELINE_ADAPT_RATE 0.01f  // How fast baseline adapts (0-1)
 #define TOF_ACTIVE_THRESHOLD 200      // mm difference from baseline to be "active"
@@ -216,6 +257,7 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 
 // Water layer
 #define AQUARIUM_WATER_GOD_RAYS_ENABLED 1  // 1 = volumetric light shafts; 0 = simplex water only
+#define AQUARIUM_WATER_AMBIENT_FLOOR 60    // Min brightness (0-255) of the noise modulation so dark troughs keep a base water tint instead of clipping to black
 
 // Food
 #define FOOD_FALL_SPEED 0.3f

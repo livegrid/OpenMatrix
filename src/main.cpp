@@ -189,6 +189,19 @@ void demoTask(void* parameter) {
 }
 #endif
 
+/** IO0 cycles the same effect ring as BLE remote A (Space Invaders -> Gravity Flap -> Asteroid -> Constellation). */
+static void cycleIo0PrimaryView() {
+#if defined(BLE_HID_REMOTE_ENABLED)
+  bleHidRemoteNextEffect();
+#else
+  State* st = stateManager.getState();
+  st->tofDebugView = false;
+  st->mode         = OpenMatrixMode::EFFECT;
+  stateManager.save();
+  log_i("IO0: BLE remote disabled, mode -> EFFECT");
+#endif
+}
+
 void displayTask(void* parameter) {
   // Give some time for system to stabilize after boot
   vTaskDelay(pdMS_TO_TICKS(1000));
@@ -237,9 +250,7 @@ void displayTask(void* parameter) {
   aquarium.begin();
   log_i("Aquarium begin done (internal free=%u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
-#ifdef BLE_HID_REMOTE_ENABLED
   pinMode(0, INPUT_PULLUP);
-#endif
 
   esp_task_wdt_add(NULL);
 
@@ -248,7 +259,6 @@ void displayTask(void* parameter) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
-#ifdef BLE_HID_REMOTE_ENABLED
       {
         static constexpr unsigned long kIo0BootDebounceMs = 240;
         static bool io0_was_high                       = true;
@@ -259,11 +269,10 @@ void displayTask(void* parameter) {
         if (io0_was_high && !io0_high &&
             io0_now - io0_prevTriggerMs >= kIo0BootDebounceMs) {
           io0_prevTriggerMs = io0_now;
-          bleHidRemotePrevEffect();
+          cycleIo0PrimaryView();
         }
         io0_was_high = io0_high;
       }
-#endif
       // Pin 2 disabled - now used by TOF sensor power enable
       // digitalWrite(2, LOW);
       if (currentMode != stateManager.getState()->mode) {
@@ -326,8 +335,13 @@ void displayTask(void* parameter) {
             tofScreensaverPresenceLastMs = now;
           } else if (st->effects.selected != Effects::CONSTELLATION &&
                      (now - tofScreensaverPresenceLastMs >= kTofScreensaverIdleMs)) {
+            st->tofDebugView = false;
+            st->mode         = OpenMatrixMode::EFFECT;
             st->effects.selected = Effects::CONSTELLATION;
             stateManager.save();
+#if defined(BLE_HID_REMOTE_ENABLED)
+            bleHidRemoteSyncEffectRingFromState();
+#endif
             tofScreensaverPresenceLastMs = now;
           }
         } else if (st->mode == OpenMatrixMode::EFFECT && !tofSensor.isActive()) {
@@ -691,12 +705,6 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
-  // Boot into Aquarium mode (default).
-  {
-    State* st = stateManager.getState();
-    st->mode = OpenMatrixMode::AQUARIUM;
-    stateManager.save();
-  }
   // stateManager.startPeriodicSave();
 
   

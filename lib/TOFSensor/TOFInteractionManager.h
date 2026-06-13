@@ -56,14 +56,8 @@ private:
     static constexpr bool kUseStableCentroidGate = true;
     static constexpr uint8_t kStableFramesRequired = 3;
     static constexpr int16_t kPalmDeltaMm = 300;
-    static constexpr int16_t kPalmLocalContrastMm = 120;
-    static constexpr int16_t kPalmClusterDepthWindowMm = 180;
-    static constexpr int kPalmMinClusterCells = 2;
     static constexpr int16_t kDistanceCenterSlopMm = 300;
-    static constexpr int kPalmMinValidCells = 8;
-    static constexpr int kPalmMinDepthSpreadMm = 80;
-    static constexpr int kPalmMinBodyAnchorCells = 3;
-    static constexpr int16_t kPalmBodyAnchorWindowMm = 260;
+    static constexpr int kPalmMinInBandCells = 4;
     static constexpr uint8_t kPalmOnFrames = 2;
     static constexpr uint8_t kPalmOffFrames = 2;
     static constexpr int kBlobMinCells = 3;
@@ -80,8 +74,6 @@ private:
     static constexpr int kStanceMinInBandCells = 4;
     static constexpr int16_t kValidDepthMinMm = 1;
     static constexpr int16_t kValidDepthMaxMm = 4000;
-    static constexpr int16_t kPalmRefMinMm = 120;
-    static constexpr int16_t kPalmRefMaxMm = 3800;
     static constexpr uint8_t kInBandStreakCap = 120;
 
     int16_t analysis_grid[8][8];
