@@ -35,6 +35,10 @@ static volatile uint32_t g_nextBleReconnectAtMs = 0;
 static StateManager*   g_stateManager = nullptr;
 static size_t          g_remoteRingIdx = 0;
 static BleHidRemoteTofRangeAdjustCallback g_tofRangeAdjustCallback = nullptr;
+static BleHidRemotePerformanceModeCallback g_perfModeCallback = nullptr;
+static BleHidRemoteBrightnessAdjustCallback g_brightnessAdjustCallback = nullptr;
+static BleHidRemoteDemoToggleCallback g_demoToggleCallback = nullptr;
+static BleHidRemoteAquariumButtonCallback g_aquariumButtonCallback = nullptr;
 
 static void syncRemoteRingFromState() {
   if (!g_stateManager) {
@@ -62,23 +66,42 @@ void bleHidRemoteSetTofRangeAdjustCallback(BleHidRemoteTofRangeAdjustCallback ca
   g_tofRangeAdjustCallback = callback;
 }
 
+void bleHidRemoteSetPerformanceModeCallback(BleHidRemotePerformanceModeCallback callback) {
+  g_perfModeCallback = callback;
+}
+
+void bleHidRemoteSetBrightnessAdjustCallback(BleHidRemoteBrightnessAdjustCallback callback) {
+  g_brightnessAdjustCallback = callback;
+}
+
+void bleHidRemoteSetDemoToggleCallback(BleHidRemoteDemoToggleCallback callback) {
+  g_demoToggleCallback = callback;
+}
+
+void bleHidRemoteSetAquariumButtonCallback(BleHidRemoteAquariumButtonCallback callback) {
+  g_aquariumButtonCallback = callback;
+}
+
 struct HidReportSample {
   uint8_t len;
   uint8_t data[16];
 };
 static QueueHandle_t g_hidQueue = nullptr;
 
-static constexpr uint8_t kMaskX_byte7 = 0x08;
 static constexpr uint8_t kMaskYBtn    = 0x10;
 static constexpr uint8_t kMaskA_byte8 = 0x08;
-static constexpr uint8_t kMaskB_byte7 = 0x80;
 static constexpr uint8_t kMaskOpt_b8  = 0x04;
-static bool              g_prevX        = false;
+/** Demo toggle: pressed report ends ... 09 02 00 (idle is ... 09 00 00). */
+static constexpr uint8_t kMaskDemo_byte7 = 0x02;
 static bool              g_prevYBtn     = false;
 static bool              g_prevA        = false;
-static bool              g_prevB        = false;
 static bool              g_prevOpt      = false;
 static bool              g_prevTop      = false;
+static bool              g_prevDemoBtn  = false;
+static bool              g_prevBrightDown = false;
+static bool              g_prevBrightUp   = false;
+static bool              g_prevInteractNext = false;
+static bool              g_prevInteractPrev = false;
 static uint8_t           g_prevSuffix[5] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static bool              g_havePrevSuffix  = false;
 
@@ -137,6 +160,10 @@ void bleHidRemoteSyncEffectRingFromState(void) {
 }
 
 static void onRemoteAquarium() {
+  if (g_aquariumButtonCallback) {
+    g_aquariumButtonCallback();
+    return;
+  }
   if (!g_stateManager) {
     return;
   }
@@ -161,7 +188,7 @@ static void onRemoteTofDebugToggle() {
   ESP_LOGI(kTag, "TOF debug overlay %s", st->tofDebugView ? "on" : "off");
 }
 
-static void onRemoteIncreaseTofRange() {
+[[maybe_unused]] static void onRemoteIncreaseTofRange() {
   if (!g_tofRangeAdjustCallback) {
     return;
   }
@@ -173,6 +200,54 @@ static void onRemoteDecreaseTofRange() {
     return;
   }
   g_tofRangeAdjustCallback(-250);
+}
+
+static void onRemoteCyclePerformanceMode(int direction) {
+  if (!g_perfModeCallback) {
+    return;
+  }
+  g_perfModeCallback(direction);
+  ESP_LOGI(kTag, "Performance mode cycle %s", direction >= 0 ? "next" : "prev");
+}
+
+static bool isBrightnessDownReport(const uint8_t* d) {
+  // 80 80 7F 7F 00 00 09 00 00
+  return d[0] == 0x80 && d[1] == 0x80 && d[2] == 0x7F && d[3] == 0x7F && d[4] == 0x00 &&
+         d[5] == 0x00 && d[6] == 0x09 && d[7] == 0x00 && d[8] == 0x00;
+}
+
+static bool isBrightnessUpReport(const uint8_t* d) {
+  // 80 80 80 80 00 00 09 00 00
+  return d[0] == 0x80 && d[1] == 0x80 && d[2] == 0x80 && d[3] == 0x80 && d[4] == 0x00 &&
+         d[5] == 0x00 && d[6] == 0x09 && d[7] == 0x00 && d[8] == 0x00;
+}
+
+static bool isInteractionModeNextReport(const uint8_t* d) {
+  // A: 80 80 80 80 00 00 09 00 08
+  return d[0] == 0x80 && d[1] == 0x80 && d[2] == 0x80 && d[3] == 0x80 && d[4] == 0x00 &&
+         d[5] == 0x00 && d[6] == 0x09 && d[7] == 0x00 && d[8] == 0x08;
+}
+
+static bool isInteractionModePrevReport(const uint8_t* d) {
+  // Y: 80 80 80 80 00 00 09 10 00
+  return d[0] == 0x80 && d[1] == 0x80 && d[2] == 0x80 && d[3] == 0x80 && d[4] == 0x00 &&
+         d[5] == 0x00 && d[6] == 0x09 && d[7] == 0x10 && d[8] == 0x00;
+}
+
+static void onRemoteBrightnessAdjust(int delta) {
+  if (!g_brightnessAdjustCallback) {
+    return;
+  }
+  g_brightnessAdjustCallback(delta);
+  ESP_LOGI(kTag, "Brightness adjust %+d", delta);
+}
+
+static void onRemoteDemoToggle() {
+  if (!g_demoToggleCallback) {
+    return;
+  }
+  g_demoToggleCallback();
+  ESP_LOGI(kTag, "Aquarium demo toggle");
 }
 
 class ClientCallbacks : public NimBLEClientCallbacks {
@@ -192,7 +267,8 @@ class ClientCallbacks : public NimBLEClientCallbacks {
     (void)pClient;
     g_connected = false;
     g_nextBleReconnectAtMs = millis() + kReconnectIntervalMs;
-    g_prevX = g_prevYBtn = g_prevA = g_prevB = g_prevOpt = g_prevTop = false;
+    g_prevYBtn = g_prevA = g_prevOpt = g_prevTop = g_prevDemoBtn = g_prevBrightDown = g_prevBrightUp =
+        g_prevInteractNext = g_prevInteractPrev = false;
     g_havePrevSuffix = false;
     memset(g_prevSuffix, 0xFF, sizeof(g_prevSuffix));
     Serial.printf("[CB] disconnected reason=%d (%s)\n", reason,
@@ -282,7 +358,8 @@ static void dumpGattAndSubscribe(NimBLEClient* client) {
     }
   }
   Serial.println(
-      "Ready — A: next effect, Y: prev, X/B: TOF range +/-, OPT: TOF debug toggle, TOP: Aquarium; [RAW] on change.\n");
+      "Ready — stick L/R: brightness -/+10, A/Y: interaction mode +/-, OPT: TOF debug toggle, "
+      "TOP: Aquarium / fake CO2, 09/02: demo toggle; [RAW] on change.\n");
 }
 
 static void processHidReports() {
@@ -303,24 +380,25 @@ static void processHidReports() {
       g_havePrevSuffix = true;
     }
 
-    const bool x   = (d[7] & kMaskX_byte7) != 0;
-    const bool y   = (d[7] & kMaskYBtn) != 0;
-    const bool a   = (d[8] & kMaskA_byte8) != 0;
-    const bool b   = (d[7] & kMaskB_byte7) != 0;
-    const bool opt = (d[8] & kMaskOpt_b8) != 0;
-    const bool top = (d[5] == 0xFF);
+    const bool opt            = (d[8] & kMaskOpt_b8) != 0;
+    const bool top            = (d[5] == 0xFF);
+    const bool demoBtn        = (d[7] & kMaskDemo_byte7) != 0;
+    const bool brightDown     = isBrightnessDownReport(d);
+    const bool brightUp       = isBrightnessUpReport(d);
+    const bool interactNext   = isInteractionModeNextReport(d) || ((d[8] & kMaskA_byte8) != 0);
+    const bool interactPrev   = isInteractionModePrevReport(d) || ((d[7] & kMaskYBtn) != 0);
 
-    if (a && !g_prevA) {
-      onRemoteNextEffect();
+    if (brightDown && !g_prevBrightDown) {
+      onRemoteBrightnessAdjust(-10);
     }
-    if (x && !g_prevX) {
-      onRemoteIncreaseTofRange();
+    if (brightUp && !g_prevBrightUp) {
+      onRemoteBrightnessAdjust(+10);
     }
-    if (y && !g_prevYBtn) {
-      onRemotePrevEffect();
+    if (interactNext && !g_prevInteractNext) {
+      onRemoteCyclePerformanceMode(+1);
     }
-    if (b && !g_prevB) {
-      onRemoteDecreaseTofRange();
+    if (interactPrev && !g_prevInteractPrev) {
+      onRemoteCyclePerformanceMode(-1);
     }
     if (opt && !g_prevOpt) {
       onRemoteTofDebugToggle();
@@ -328,13 +406,19 @@ static void processHidReports() {
     if (top && !g_prevTop) {
       onRemoteAquarium();
     }
+    if (demoBtn && !g_prevDemoBtn) {
+      onRemoteDemoToggle();
+    }
 
-    g_prevX    = x;
-    g_prevYBtn = y;
-    g_prevA    = a;
-    g_prevB    = b;
-    g_prevOpt  = opt;
-    g_prevTop  = top;
+    g_prevYBtn         = interactPrev;
+    g_prevA            = interactNext;
+    g_prevOpt          = opt;
+    g_prevTop          = top;
+    g_prevDemoBtn      = demoBtn;
+    g_prevBrightDown   = brightDown;
+    g_prevBrightUp     = brightUp;
+    g_prevInteractNext = interactNext;
+    g_prevInteractPrev = interactPrev;
   }
 }
 

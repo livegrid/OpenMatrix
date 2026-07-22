@@ -6,21 +6,26 @@
 #include <Fonts/Font5x7Fixed.h>
 #include <Matrix.h>
 #include <scd40.h>
+#include <SCD40Settings.h>
 
 #include <vector>
 
 #include "AquariumSettings.h"
 #include "AquariumStateManager.h"
+#include "AquariumLayout.h"
 #include "BoidManager.h"
 #include "Fish.h"
 #include "Food.h"
 #include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
-// #include "PlanktonField.h"  // TEST: plankton disabled
+#include "PlanktonField.h"
 #include "Motion/MotionProfile.h"
 #include "../TOFSensor/TOFSensor.h"
 #include "../TOFSensor/TOFInteractionManager.h"
+#ifdef ADXL345_ENABLED
+#include "../AutoRotate/AutoRotate.h"
+#endif
 
 class Aquarium {
  private:
@@ -35,7 +40,7 @@ class Aquarium {
   AquariumStateManager aquariumStateManager;
   unsigned long lastSaveTime;
   char buffer[100];
-  // PlanktonField planktonField;  // TEST: plankton disabled
+  PlanktonField planktonField;
   // TOF sensor interaction
   TOFInteractionManager* interactionManager = nullptr;
   TOFSensor* tofSensor = nullptr;  // Store sensor pointer for lazy init
@@ -46,6 +51,10 @@ class Aquarium {
   float aquariumPalmVelocityY = 0;
   unsigned long aquariumPalmLastSeenMs = 0;
   unsigned long aquariumPalmLastUpdateMs = 0;
+  uint8_t lastKnownRotation = 255;
+#ifdef ADXL345_ENABLED
+  AutoRotate* autoRotateSource = nullptr;
+#endif
 
   // Demo settings
   bool demoMode;
@@ -55,10 +64,70 @@ class Aquarium {
   float demoHumidity;
   float demoCO2;
   bool demoFinished;
+  /** Remote/video override: ramp CO2 toward CO2_REALBAD (or back to sensor) over 10s. */
+  bool fakeHighCo2 = false;
+  bool fakeCo2Ramping = false;
+  float fakeCo2Applied = 400.0f;
+  float fakeCo2RampFrom = 400.0f;
+  float fakeCo2RampTo = 400.0f;
+  unsigned long fakeCo2RampStartMs = 0;
+  static constexpr unsigned long kFakeCo2RampMs = 10000UL;
 
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
+  // Curated "performance" modes layered on top of the natural aquarium.
+  enum class PerformanceMode : uint8_t { Natural, Ring, Orchestra, Fountain, Jump, Count };
+  PerformanceMode performanceMode = PerformanceMode::Natural;
+  float ringPhase = 0.0f;
+  PVector ringAttractorTarget;  // smoothed goal (palm or screen center)
+  PVector ringAttractor;        // formation center — fish/boids orbit here
+  bool ringAttractorInit = false;
+  float orchestraPhase = 0.0f;  // global micro-orbit phase for Orchestra mode
+  bool fountainAnchorsPending = true;  // assign spawn anchors on next hands-up (no teleport)
+  JumpGridActivityState jumpGridActivity{};
+  float jumpPhase = 0.0f;
+  unsigned long performanceModeLabelUntilMs = 0;
+  static constexpr unsigned long kPerformanceModeLabelMs = 2500;
+
+  static const char* performanceModeName(PerformanceMode mode) {
+    switch (mode) {
+      case PerformanceMode::Natural: return "Natural";
+      case PerformanceMode::Ring: return "Ring";
+      case PerformanceMode::Orchestra: return "Orchestra";
+      case PerformanceMode::Fountain: return "Fountain";
+      case PerformanceMode::Jump: return "Jump";
+      default: return "?";
+    }
+  }
+
  public:
+  const char* getPerformanceModeName() const { return performanceModeName(performanceMode); }
+
+  void setPerformanceMode(PerformanceMode mode) {
+    if (mode == performanceMode) return;
+    performanceMode = mode;
+    performanceModeLabelUntilMs = millis() + kPerformanceModeLabelMs;
+    // Active formation modes re-assign targets every frame; clear so Natural starts clean.
+    for (auto& fish : fishArray) {
+      fish->clearFormationTarget();
+      fish->setFountainMode(false);
+    }
+    if (mode == PerformanceMode::Fountain) fountainAnchorsPending = true;
+    if (mode == PerformanceMode::Jump) {
+      jumpGridActivity = {};
+      jumpPhase = 0.0f;
+    }
+    log_i("Aquarium performance mode -> %s", performanceModeName(mode));
+  }
+
+  void cyclePerformanceMode(int direction) {
+    int count = (int)PerformanceMode::Count;
+    int next = (((int)performanceMode + direction) % count + count) % count;
+    setPerformanceMode((PerformanceMode)next);
+  }
+
+  PerformanceMode getPerformanceMode() const { return performanceMode; }
+
   Aquarium(Matrix* m, SCD40* s, StateManager* stateManager)
       : matrix(m),
         scd40(s),
@@ -68,27 +137,116 @@ class Aquarium {
         seaFloor(m),
         demoMode(false),
         demoStep(0),
-        demoFinished(false) {}
-        // planktonField(m) — TEST: plankton disabled
+        demoFinished(false),
+        planktonField(m) {}
 
   void begin() {
     loadState();
+    syncOrientation(true);
     seaFloor.generate();
-    // planktonField.init();  // TEST: plankton disabled
+    planktonField.init();
     boidManager.initializeBoids();
+  }
+
+#ifdef ADXL345_ENABLED
+  void setAutoRotate(AutoRotate* source) { autoRotateSource = source; }
+#endif
+
+  void syncOrientation(bool force = false) {
+    uint8_t rot = lastKnownRotation < 4 ? lastKnownRotation : 0;
+#ifdef ADXL345_ENABLED
+    if (autoRotateSource && autoRotateSource->isSensorWorking()) {
+      rot = autoRotateSource->getStableRotation();
+    }
+#endif
+
+    if (matrix->getRotation() != 0) {
+      matrix->setRotation(0);
+    }
+
+    if (!force && rot == lastKnownRotation) return;
+    lastKnownRotation = rot;
+    seaFloor.setOrientation(rot);
+    if (interactionManager) {
+      interactionManager->setHandRaiseOrientation(rot);
+    }
   }
 
   bool isDemoFinished() const {
     return demoFinished;
   }
 
+  bool isDemoMode() const {
+    return demoMode;
+  }
+
   void startDemo() {
     demoMode = true;
+    demoFinished = false;
     demoStep = 0;
     demoStartTime = millis();
     demoTemperature = 25.0f;
     demoHumidity = 50.0f;
     demoCO2 = 400.0f;
+  }
+
+  void stopDemo() {
+    if (!demoMode) {
+      return;
+    }
+    demoMode = false;
+    demoFinished = true;
+    buffer[0] = '\0';
+  }
+
+  bool isFakeHighCo2() const { return fakeHighCo2; }
+
+  void setFakeHighCo2(bool enabled) {
+    fakeHighCo2 = enabled;
+    fakeCo2RampFrom = fakeCo2Applied;
+    fakeCo2RampTo = enabled ? (float)CO2_REALBAD : getSensorCo2();
+    fakeCo2RampStartMs = millis();
+    fakeCo2Ramping = true;
+    log_i("Aquarium fake high CO2 %s — ramping %.0f -> %.0f ppm over %lu ms",
+          fakeHighCo2 ? "on" : "off", fakeCo2RampFrom, fakeCo2RampTo,
+          (unsigned long)kFakeCo2RampMs);
+  }
+
+  bool toggleFakeHighCo2() {
+    setFakeHighCo2(!fakeHighCo2);
+    return fakeHighCo2;
+  }
+
+  float getSensorCo2() const {
+    return (scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400.0f;
+  }
+
+  void updateFakeCo2() {
+    if (demoMode) {
+      return;
+    }
+    if (fakeCo2Ramping) {
+      const unsigned long elapsed = millis() - fakeCo2RampStartMs;
+      if (elapsed >= kFakeCo2RampMs) {
+        fakeCo2Applied = fakeCo2RampTo;
+        fakeCo2Ramping = false;
+      } else {
+        const float t = (float)elapsed / (float)kFakeCo2RampMs;
+        fakeCo2Applied = fakeCo2RampFrom + (fakeCo2RampTo - fakeCo2RampFrom) * t;
+      }
+    } else if (fakeHighCo2) {
+      fakeCo2Applied = (float)CO2_REALBAD;
+    } else {
+      fakeCo2Applied = getSensorCo2();
+    }
+  }
+
+  /** CO2 used by fish/boids: demo value, else smoothed applied value. */
+  float getEffectiveCo2() const {
+    if (demoMode) {
+      return demoCO2;
+    }
+    return fakeCo2Applied;
   }
 
   void updateDemo() {
@@ -422,14 +580,8 @@ class Aquarium {
     MotionProfileDebug::tick(matrix->getXResolution() * PHYSICS_SCALE,
                              matrix->getYResolution() * PHYSICS_SCALE);
 #endif
-    float co2;
-    
-    if (demoMode) {
-      co2 = demoCO2;
-    } else {
-      co2 = (scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400;
-    }
-    
+    float co2 = getEffectiveCo2();
+
     InteractionData* interaction = nullptr;
     InteractionData interactionData;
     if (interactionOverride) {
@@ -490,12 +642,20 @@ class Aquarium {
     }
   }
 
+  void drawPerformanceModeOverlay() {
+    unsigned long now = millis();
+    if (performanceModeLabelUntilMs == 0 || now >= performanceModeLabelUntilMs) return;
+    snprintf(buffer, sizeof(buffer), "Mode: %s", performanceModeName(performanceMode));
+    drawMultilineText(matrix->foreground, buffer, TOP, TextAlignment::CENTER, &Font4x7Fixed,
+                      CRGB(70, 210, 255));
+  }
+
   void updateSensorData(bool showSensorData) {
     if (showSensorData && !demoMode) {
       if (scd40 && scd40->isFirstReadingReceived()) {
         float temperature = scd40->getTemperature();
         float humidity = scd40->getHumidity();
-        float co2 = scd40->getCO2();
+        float co2 = getEffectiveCo2();
         
         if (stateManager->getState()->temperatureUnit == TemperatureUnit::FAHRENHEIT) {
             // Convert to Fahrenheit
@@ -523,6 +683,8 @@ class Aquarium {
   // General update function that updates all components of the aquarium
   void update(bool showSensorData = false) {
     handleTouchInput();
+    syncOrientation();
+    updateFakeCo2();
 
     // Lazily create interaction manager when sensor becomes active
     ensureInteractionManager();
@@ -543,22 +705,272 @@ class Aquarium {
         interactionData.hasBlob = false;
       }
       augmentAquariumInteraction(interactionData);
-      // planktonField.update(interactionData);  // TEST: plankton disabled
+      planktonField.update(interactionData);
 
-      updateWater();
-      // planktonField.draw();  // TEST: plankton disabled
+      if (performanceMode == PerformanceMode::Ring) {
+        updateRingPerformance(interactionData);
+      } else if (performanceMode == PerformanceMode::Orchestra) {
+        updateOrchestraPerformance(interactionData);
+      } else if (performanceMode == PerformanceMode::Fountain) {
+        updateFountainPerformance(interactionData);
+      } else if (performanceMode == PerformanceMode::Jump) {
+        updateJumpPerformance(interactionData);
+      } else {
+        updateWater();
+        planktonField.draw(); 
 
-      boidManager.updateBoids((scd40 && scd40->isFirstReadingReceived()) ? scd40->getCO2() : 400,
-                              &interactionData);
-      boidManager.renderBoids();
+        boidManager.updateBoids(getEffectiveCo2(), &interactionData);
+        boidManager.renderBoids();
 
-      updateFish(&interactionData);
-      // updateFood();
+        updateFish(&interactionData);
+        // updateFood();
 
-      updatePlants();
+        updatePlants();
+      }
       updateSensorData(showSensorData);
+      drawPerformanceModeOverlay();
       periodicSave();
     }
+  }
+
+  // The Ring: boids draw a small circular ring; fish orbit on concentric circles at several
+  // radii. Interaction: a smoothed attractor drifts toward the palm; formation eases behind it.
+  void updateRingPerformance(InteractionData& interaction) {
+    float w = (float)matrix->getXResolution();
+    float h = (float)matrix->getYResolution();
+    PVector screenCenter(w * 0.5f, h * 0.5f);
+
+    float baseRadius = min(w, h) * 0.5f - RING_MARGIN_PX;
+    if (baseRadius < 1.0f) baseRadius = 1.0f;
+
+    if (!ringAttractorInit) {
+      ringAttractorTarget = screenCenter;
+      ringAttractor = screenCenter;
+      ringAttractorInit = true;
+    }
+
+    // Layer 1: ease the attractor *goal* toward palm or screen center (never snap).
+    bool hasPalm = interaction.hasPalmHold && interaction.palmStrength > 0.01f;
+    PVector goalTarget = screenCenter;
+    if (hasPalm) {
+      goalTarget = PVector(constrain(interaction.palmNormX, 0.0f, 1.0f) * w,
+                           constrain(interaction.palmNormY, 0.0f, 1.0f) * h);
+    }
+    ringAttractorTarget += (goalTarget - ringAttractorTarget) * RING_ATTRACTOR_TARGET_SMOOTH;
+    ringAttractorTarget.x =
+        constrain(ringAttractorTarget.x, w * RING_ATTRACTOR_CLAMP_X0, w * RING_ATTRACTOR_CLAMP_X1);
+    ringAttractorTarget.y =
+        constrain(ringAttractorTarget.y, h * RING_ATTRACTOR_CLAMP_Y0, h * RING_ATTRACTOR_CLAMP_Y1);
+
+    // Layer 2: formation center trails the goal (slower — the visible "pull" of the ring).
+    float followRate = hasPalm ? RING_ATTRACTOR_FOLLOW : RING_ATTRACTOR_RETURN;
+    ringAttractor += (ringAttractorTarget - ringAttractor) * followRate;
+
+    float rotSpeed = RING_ROTATION_SPEED;
+    if (hasPalm) {
+      rotSpeed += interaction.palmVelocityMag * RING_VELOCITY_SPIN;
+    }
+    ringPhase += rotSpeed;
+
+    static const float kLayerRadiusFrac[] = {0.50f, 0.68f, 0.84f, 0.98f};
+    static const float kLayerSpeedMul[]   = {1.55f, 1.25f, 1.0f, 0.80f};
+    constexpr int kLayers = 4;
+
+    int n = (int)fishArray.size();
+    for (int i = 0; i < n; i++) {
+      int layer = i % kLayers;
+      float r = baseRadius * kLayerRadiusFrac[layer];
+      float theta = ringPhase * kLayerSpeedMul[layer] +
+                    (TWO_PI * (float)i) / (float)(n > 0 ? n : 1);
+      PVector slot(ringAttractor.x + r * cosf(theta), ringAttractor.y + r * sinf(theta));
+      fishArray[i]->setFormationTarget(slot);
+    }
+
+    float co2 = getEffectiveCo2();
+    float boidRadius = baseRadius * RING_BOID_RADIUS_FRAC;
+
+    updateWater();
+    boidManager.updateBoidsRing(co2, ringAttractor, boidRadius, ringPhase, &interaction);
+    boidManager.renderBoids();
+    updateFish(&interaction);
+    updatePlants();
+  }
+
+  // Orchestra: each fish holds an assigned slot on a grid that mirrors the 8x8 TOF cells,
+  // micro-orbiting its home so it stays alive (and keeps a defined heading). The conductor's
+  // palm energizes nearby fish — they swing wider and the whole orchestra speeds up with hand
+  // motion. Boids are a loose flock that follows the conductor's hand.
+  void updateOrchestraPerformance(InteractionData& interaction) {
+    float w = (float)matrix->getXResolution();
+    float h = (float)matrix->getYResolution();
+
+    bool hasPalm = interaction.hasPalmHold && interaction.palmStrength > 0.01f;
+    PVector palmScreen(interaction.palmNormX * w, interaction.palmNormY * h);
+    float influence = ORCH_INFLUENCE_FRAC * w;
+    if (influence < 1.0f) influence = 1.0f;
+
+    // Whole orchestra speeds up when the hand moves fast.
+    float globalSwell = hasPalm ? constrain(interaction.palmVelocityMag, 0.0f, 1.0f) : 0.0f;
+    orchestraPhase += ORCH_SPIN_BASE * (1.0f + ORCH_SPIN_VEL_GAIN * globalSwell);
+
+    float mx = w * ORCH_MARGIN_X_FRAC;
+    float my = h * ORCH_MARGIN_Y_FRAC;
+    float cellW = (w - 2.0f * mx) / (float)ORCH_COLS;
+    float cellH = (h - 2.0f * my) / (float)ORCH_ROWS;
+
+    int n = (int)fishArray.size();
+    for (int i = 0; i < n; i++) {
+      int col = i % ORCH_COLS;
+      int row = (i / ORCH_COLS) % ORCH_ROWS;
+      PVector home(mx + ((float)col + 0.5f) * cellW, my + ((float)row + 0.5f) * cellH);
+
+      // Proximity energy: 1 right at the hand, fading to 0 at the influence radius.
+      float energy = 0.0f;
+      if (hasPalm) {
+        float dist = (home - palmScreen).mag();
+        energy = 1.0f - constrain(dist / influence, 0.0f, 1.0f);
+      }
+
+      float microRadius = ORCH_MICRO_MIN + energy * (ORCH_MICRO_MAX - ORCH_MICRO_MIN);
+
+      uint32_t hsh = (uint32_t)(i + 1) * 2654435761u;
+      float offset = (float)(hsh % 6283u) * 0.001f;
+      float mult = 0.85f + (float)((hsh >> 13) % 31u) * 0.01f;  // 0.85..1.15
+      float dir = (col & 1) ? 1.0f : -1.0f;                      // alternate spin per column
+      float angle = dir * orchestraPhase * mult + offset;
+
+      PVector slot(home.x + microRadius * cosf(angle), home.y + microRadius * sinf(angle));
+      fishArray[i]->setFormationTarget(slot);
+    }
+
+    float co2 = getEffectiveCo2();
+
+    updateWater();
+    // Boids follow the conductor: existing profile logic chases the palm when present.
+    boidManager.updateBoids(co2, &interaction);
+    boidManager.renderBoids();
+    updateFish(&interaction);
+    updatePlants();
+  }
+
+  // Fountain: hands raised — fish rise from wherever they are. Point attractors shape the
+  // stream. Respawn only after exiting above the canvas; never teleport while visible.
+  void updateFountainPerformance(InteractionData& interaction) {
+    float w = (float)matrix->getXResolution();
+    float h = (float)matrix->getYResolution();
+    PVector center(w * 0.5f, h * 0.5f);
+    bool active = interaction.handsRaised;
+
+    for (auto& fish : fishArray) {
+      fish->clearFormationTarget();
+      fish->setFountainMode(active);
+      if (!active) {
+        fish->clearFountainSteering();
+        fountainAnchorsPending = true;
+      }
+    }
+
+    // First hands-up: set per-fish anchor points from current positions — do not teleport.
+    if (active && fountainAnchorsPending) {
+      for (auto& fish : fishArray) {
+        PVector p = fish->getPosition();
+        fish->setFountainAnchor(p.x, h + FOUNTAIN_RESPAWN_MARGIN_PX);
+      }
+      fountainAnchorsPending = false;
+    }
+
+    float co2 = getEffectiveCo2();
+
+    updateWater();
+    planktonField.draw();
+    boidManager.updateBoidsFountain(co2, center, w, h, active);
+    boidManager.renderBoids();
+
+    InteractionData* fishInteraction = active ? nullptr : &interaction;
+
+    std::vector<PVector> schoolPositions;
+    schoolPositions.reserve(fishArray.size());
+    for (const auto& fish : fishArray) {
+      schoolPositions.push_back(fish->getPosition());
+    }
+
+    int fishIndex = 0;
+    for (auto it = fishArray.begin(); it != fishArray.end();) {
+      if (active) {
+        (*it)->setFountainSteering(center, w, h);
+      }
+
+      bool destroy = (*it)->update(co2, demoMode, fishInteraction, &schoolPositions, fishIndex);
+
+      if (active) {
+        PVector p = (*it)->getPosition();
+        if (p.y < -FOUNTAIN_RESPAWN_MARGIN_PX) {
+          int n = (int)fishArray.size();
+          float spawnX, spawnY;
+          fountainSpawnPosition(fishIndex, n > 0 ? n : 1, w, h, spawnX, spawnY, true);
+          (*it)->setPosition(PVector(spawnX, spawnY));
+          (*it)->setFountainAnchor(spawnX, spawnY);
+          (*it)->setVelocity(PVector(0, -FOUNTAIN_RESPAWN_RISE_SPEED));
+        }
+      }
+
+      if (destroy) {
+        it = fishArray.erase(it);
+      } else {
+        (*it)->display();
+        ++it;
+      }
+      fishIndex++;
+    }
+
+    if (fishArray.size() < NUM_FISH_IDEAL) {
+      for (auto& fish : fishArray) {
+        if (fish->tryReproduce()) {
+          PVector newPos = fish->getPosition();
+          fishArray.emplace_back(std::make_unique<Fish>(matrix, newPos));
+          break;
+        }
+      }
+    }
+
+    updatePlants();
+  }
+
+  // Jump: fish hold random homes inside a border buffer (orchestra-style formation) and
+  // hop continuously. TOF grid |Δdepth| activity speeds up / amplifies the hops.
+  void updateJumpPerformance(InteractionData& interaction) {
+    float w = (float)matrix->getXResolution();
+    float h = (float)matrix->getYResolution();
+
+    float activity = stepJumpGridActivity(interaction.depthMap, TOF_MIN_DETECTION_DIST,
+                                          TOF_MAX_DETECTION_DIST, jumpGridActivity);
+    float spin = JUMP_SPIN_BASE + activity * (JUMP_SPIN_MAX - JUMP_SPIN_BASE);
+    float hopAmp = JUMP_HOP_AMP_MIN + activity * (JUMP_HOP_AMP_MAX - JUMP_HOP_AMP_MIN);
+    jumpPhase += spin;
+
+    int n = (int)fishArray.size();
+    for (int i = 0; i < n; i++) {
+      float homeX, homeY;
+      jumpHomePosition(i, w, h, homeX, homeY);
+
+      uint32_t hsh = (uint32_t)(i + 1) * 2654435761u;
+      float offset = (float)(hsh % 6283u) * 0.001f;
+      float mult = 0.85f + (float)((hsh >> 13) % 31u) * 0.01f;
+      float angle = jumpPhase * mult + offset;
+      // Vertical-biased hop: sin drives Y, small cos for X sway.
+      float sx = homeX + JUMP_HOP_WOBBLE_X * cosf(angle);
+      float sy = homeY - hopAmp * fabsf(sinf(angle));  // hop up from home, land back
+      fishArray[i]->setFormationTarget(PVector(sx, sy));
+    }
+
+    float co2 = getEffectiveCo2();
+
+    updateWater();
+    planktonField.draw();
+    boidManager.updateBoids(co2, nullptr);
+    boidManager.renderBoids();
+    updateFish(&interaction);
+    updatePlants();
   }
 
   void display() {
@@ -579,6 +991,9 @@ class Aquarium {
     if (tofSensor && tofSensor->isActive()) {
       log_i("Aquarium: Creating TOFInteractionManager - sensor is active");
       interactionManager = new TOFInteractionManager(tofSensor);
+      if (lastKnownRotation < 4) {
+        interactionManager->setHandRaiseOrientation(lastKnownRotation);
+      }
       interactionManager->calibrateBaseline();  // Calibrate background for subtraction
     }
   }

@@ -10,7 +10,7 @@
 
 #define AQUARIUM_ENABLED 1
 // #define SCD40_ENABLED 1  // Temperature/Humidity/CO2 sensor (disable to save ~2KB RAM + reduce I2C contention)
-// #define ADXL345_ENABLED 1   //AUTOROTATE
+#define ADXL345_ENABLED 1   //AUTOROTATE
 // #define BH1750_ENABLED 1
 // #define TOUCH_ENABLED 1
 #define VL53L8CX_ENABLED 1  // Time-of-Flight sensor
@@ -26,11 +26,11 @@
 // WiFi Buffer Configuration for ESP32-S3 RAM constraints
 // Reduces WiFi buffers to minimum viable for connection (saves ~10KB RAM during init)
 #ifdef WIFI_ENABLED
-  #define WIFI_STATIC_RX_BUFFER_NUM  4   // Default: 10 (reduce to 4)
-  #define WIFI_DYNAMIC_RX_BUFFER_NUM 8   // Default: 32 (reduce to 8)
-  #define WIFI_DYNAMIC_TX_BUFFER_NUM 8   // Default: 32 (reduce to 8)
-  #define WIFI_RX_MAX_SINGLE_PKT_LEN 1600  // Default: 1600 (keep)
-  #define WIFI_TX_PKT_NUM_MIN       4    // Default: 6 (reduce to 4)
+  // #define WIFI_STATIC_RX_BUFFER_NUM  4   // Default: 10 (reduce to 4)
+  // #define WIFI_DYNAMIC_RX_BUFFER_NUM 8   // Default: 32 (reduce to 8)
+  // #define WIFI_DYNAMIC_TX_BUFFER_NUM 8   // Default: 32 (reduce to 8)
+  // #define WIFI_RX_MAX_SINGLE_PKT_LEN 1600  // Default: 1600 (keep)
+  // #define WIFI_TX_PKT_NUM_MIN       4    // Default: 6 (reduce to 4)
 #endif
 
 #define STATE_SAVE_INTERVAL 30  //in minutes

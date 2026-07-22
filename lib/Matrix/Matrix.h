@@ -27,6 +27,8 @@ class Matrix {
   virtual void rotate90() = 0;
   virtual void clearScreen() = 0;
 
+  uint8_t getRotation() const { return rotation; }
+
   virtual void update() = 0;
 
   GFX_Layer* background = nullptr;

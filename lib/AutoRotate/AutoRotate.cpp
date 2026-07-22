@@ -1,20 +1,71 @@
 #include "AutoRotate.h"
 
-AutoRotate::AutoRotate(Matrix* matrix) : matrix(matrix), accel(12345), sensorWorking(false), x(0), y(0), z(0), currentRotation(5) { // Initialize with an invalid rotation
-}
+#include <math.h>
+
+// Dominant axis must exceed this (m/s²) to claim a side; cross-axis must stay below cross max.
+static constexpr float kTiltMinG = 7.0f;
+static constexpr float kCrossAxisMaxG = 2.5f;
+static constexpr uint8_t kStableSamples = 2;  // ~1 s at 500 ms sensor poll
+
+AutoRotate::AutoRotate(Matrix* matrix)
+    : matrix(matrix),
+      accel(12345),
+      sensorWorking(false),
+      x(0),
+      y(0),
+      z(0),
+      sampleRotation(5),
+      stableRotation(0),
+      pendingRotation(5),
+      pendingCount(0),
+      hasStableRotation(false) {}
 
 void AutoRotate::init() {
-  if (!accel.begin()) {
-    log_e("Ooops, no ADXL345 detected ... Check your wiring!");
-    sensorWorking = false;
-    return;
-  }
-  sensorWorking = true;
-  accel.setRange(ADXL345_RANGE_16_G);
+  Wire.begin();
+  Wire.setClock(400000);
+  delay(10);
+  tryInitSensor("setup");
 }
 
-uint8_t AutoRotate::getCurrentRotation() {
-  return currentRotation;
+void AutoRotate::tryInitSensor(const char* context) {
+  if (accel.begin()) {
+    if (!sensorWorking) {
+      sensorWorking = true;
+      accel.setRange(ADXL345_RANGE_16_G);
+      log_i("AutoRotate: ADXL345 initialized (%s)", context);
+    }
+    return;
+  }
+  if (sensorWorking) {
+    log_w("AutoRotate: ADXL345 lost on I2C (%s)", context);
+    sensorWorking = false;
+  } else if (strcmp(context, "setup") == 0) {
+    log_e("AutoRotate: no ADXL345 on I2C (%s) — will retry every 5s", context);
+  }
+}
+
+uint8_t AutoRotate::getStableRotation() const {
+  if (hasStableRotation) return stableRotation;
+  if (pendingRotation < 4) return pendingRotation;
+  return 0;
+}
+
+void AutoRotate::updateStableRotation(uint8_t sample) {
+  sampleRotation = sample;
+  if (sample >= 4) {
+    return;
+  }
+  if (sample == pendingRotation) {
+    if (pendingCount < 255) pendingCount++;
+  } else {
+    pendingRotation = sample;
+    pendingCount = 1;
+  }
+  if (pendingCount >= kStableSamples &&
+      (!hasStableRotation || sample != stableRotation)) {
+    stableRotation = sample;
+    hasStableRotation = true;
+  }
 }
 
 void AutoRotate::displaySensorDetails() {
@@ -31,7 +82,7 @@ void AutoRotate::displaySensorDetails() {
 }
 
 void AutoRotate::setRange(int range) {
-  switch(range) {
+  switch (range) {
     case 0:
       accel.setRange(ADXL345_RANGE_2_G);
       break;
@@ -50,16 +101,39 @@ void AutoRotate::setRange(int range) {
   }
 }
 
-void AutoRotate::updateSensorValues() {
-  if (sensorWorking) {
-    sensors_event_t event; 
-    accel.getEvent(&event);
-    x = event.acceleration.x;
-    y = event.acceleration.y;
-    z = event.acceleration.z;
-    currentRotation = calculateRotation();
-    matrix->setRotation(currentRotation);
+void AutoRotate::updateSensorValues(bool applyToMatrix) {
+  if (!sensorWorking) {
+    static unsigned long lastRetryMs = 0;
+    unsigned long now = millis();
+    if (now - lastRetryMs >= 5000) {
+      lastRetryMs = now;
+      tryInitSensor("retry");
+    }
+    return;
   }
+
+  sensors_event_t event;
+  accel.getEvent(&event);
+  x = event.acceleration.x;
+  y = event.acceleration.y;
+  z = event.acceleration.z;
+  updateStableRotation(calculateRotation());
+
+  if (!applyToMatrix) return;
+
+  uint8_t rot = getStableRotation();
+  if (rot >= 4) return;
+
+  if (matrix->getRotation() != rot) {
+    matrix->setRotation(rot);
+  }
+}
+
+void AutoRotate::applyRotationToMatrix() {
+  if (!sensorWorking) return;
+  uint8_t rot = getStableRotation();
+  if (rot >= 4) return;
+  matrix->setRotation(rot);
 }
 
 float AutoRotate::getX() {
@@ -75,25 +149,22 @@ float AutoRotate::getZ() {
 }
 
 uint8_t AutoRotate::calculateRotation() {
-  uint8_t newRotation = 5;  //this will be assumed invalid
-  float buffer = 2.02; // Adjust buffer value as needed
+  const float ax = fabsf(x);
+  const float ay = fabsf(y);
 
-  if ((x > (10-buffer)) && (x < (10+buffer)) && (y > (-buffer)) && (y < buffer)) {
-    #ifdef PANEL_UPCYCLED
-    newRotation = 1;
-    #else
-    newRotation = 3;
-    #endif
-  } else if ((x > - buffer) && (x < buffer) && (y > (-10-buffer)) && (y < (-10+buffer))) {
-    newRotation = 2;
-  } else if ((x > (-10-buffer)) && (x < (-10+buffer)) && (y > -buffer) && (y < buffer)) {
-    #ifdef PANEL_UPCYCLED
-    newRotation = 3;
-    #else
-    newRotation = 1;
-    #endif
-  } else if ((x > -buffer) && (x < buffer) && (y > (10-buffer)) && (y < (10+buffer))) {
-    newRotation = 0;
+  if (ax < kTiltMinG && ay < kTiltMinG) {
+    return 5;
   }
-  return newRotation;
+
+  if (ax > ay) {
+    if (ay > kCrossAxisMaxG) return 5;
+#ifdef PANEL_UPCYCLED
+    return x > 0 ? 1 : 3;
+#else
+    return x > 0 ? 3 : 1;
+#endif
+  }
+
+  if (ax > kCrossAxisMaxG) return 5;
+  return y > 0 ? 0 : 2;
 }

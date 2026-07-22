@@ -1,4 +1,5 @@
 #include "BoidManager.h"
+#include "../Aquarium/AquariumLayout.h"
 #include "../TOFSensor/TOFInteractionManager.h"
 #include "Motion/MotionProfile.h"
 
@@ -333,6 +334,112 @@ void BoidManager::updateBoids(long co2, const InteractionData* interaction) {
         boid.avoidBorders();
       }
       globalSlot++;
+    }
+  }
+}
+
+void BoidManager::updateBoidsRing(long co2, PVector center, float baseRadius, float ringPhase,
+                                  const InteractionData* interaction) {
+  (void)interaction;
+  float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
+  speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f) / 100.0f;
+  if (speedMultiplier < 0.2f) speedMultiplier = 0.2f;
+
+  if (baseRadius < 1.0f) baseRadius = 1.0f;
+
+  // Three groups on slightly different rings/speeds so they don't collapse into one clump
+  // when the attractor moves. Each boid keeps an assigned slot angle on its group's ring.
+  static const float kGroupRadiusMul[]  = {0.88f, 1.0f, 1.12f};
+  static const float kGroupSwirlMul[]   = {1.10f, 1.0f, 0.90f};
+  static const float kGroupPhaseOffset[] = {0.0f, 2.094395f, 4.188790f};  // 0, 120°, 240°
+
+  int groupIdx = 0;
+  for (auto& group : boidGroups) {
+    const int gi = groupIdx % BOID_GROUPS;
+    const float radius = baseRadius * kGroupRadiusMul[gi];
+    const float swirl = RING_BOID_SWIRL_SPEED * kGroupSwirlMul[gi] * speedMultiplier;
+    const float groupPhase = ringPhase * kGroupSwirlMul[gi] + kGroupPhaseOffset[gi];
+
+    uint8_t groupCount = (uint8_t)group.size();
+    int boidIdx = 0;
+    for (auto& boid : group) {
+      float slotPhi = groupPhase;
+      if (groupCount > 0) {
+        slotPhi += (TWO_PI * (float)boidIdx) / (float)groupCount;
+      }
+      float cphi = cosf(slotPhi), sphi = sinf(slotPhi);
+
+      PVector ringPt(center.x + radius * cphi, center.y + radius * sphi);
+      PVector toRing = ringPt - boid.location;
+      PVector tang(-sphi, cphi);
+
+      PVector desiredVel = tang * swirl + toRing * RING_BOID_HUG_GAIN;
+      PVector steer = desiredVel - boid.velocity;
+      steer.limit(boid.maxforce * 2.0f);
+      boid.applyForce(steer);
+
+      PVector sep = boid.separate(group.data(), groupCount) * RING_BOID_SEP_WEIGHT;
+      boid.applyForce(sep);
+
+      boid.velocity += boid.acceleration;
+      boid.velocity.limit(swirl + boid.maxspeed * speedMultiplier);
+      boid.location += boid.velocity;
+      boid.acceleration *= 0;
+      boidIdx++;
+    }
+    groupIdx++;
+  }
+}
+
+void BoidManager::updateBoidsFountain(long co2, PVector center, float width, float height,
+                                     bool active) {
+  float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
+  speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f) / 100.0f;
+  if (speedMultiplier < 0.2f) speedMultiplier = 0.2f;
+
+  if (width < 1.0f) width = 1.0f;
+  if (height < 1.0f) height = 1.0f;
+
+  int totalBoids = 0;
+  for (const auto& group : boidGroups) totalBoids += (int)group.size();
+
+  int globalIdx = 0;
+  for (auto& group : boidGroups) {
+    for (auto& boid : group) {
+      boid.acceleration *= 0;
+
+      if (active) {
+        float fx = 0.0f;
+        float fy = 0.0f;
+        fountainPointSteeringBoid(boid.location.x, boid.location.y, boid.fountainAnchorX,
+                                boid.fountainAnchorY, center.x, height, fx, fy);
+        PVector force(fx, fy - FOUNTAIN_BOID_UP_FORCE);
+        boid.applyForce(force);
+
+        boid.velocity += boid.acceleration;
+
+        float riseCap = FOUNTAIN_BOID_MAX_SPEED * speedMultiplier;
+        float maxVx = FOUNTAIN_MAX_VX * 0.65f;
+        boid.velocity.x = constrain(boid.velocity.x, -maxVx, maxVx);
+        if (boid.velocity.y > -riseCap * 0.4f) boid.velocity.y = -riseCap * 0.4f;
+        if (boid.velocity.y < -riseCap) boid.velocity.y = -riseCap;
+
+        boid.location += boid.velocity;
+        boid.acceleration *= 0;
+
+        if (boid.location.y < -FOUNTAIN_RESPAWN_MARGIN_PX) {
+          float spawnX, spawnY;
+          fountainSpawnPosition(globalIdx, totalBoids > 0 ? totalBoids : 1, width, height,
+                                spawnX, spawnY, true);
+          boid.location = PVector(spawnX, spawnY);
+          boid.fountainAnchorX = spawnX;
+          boid.fountainAnchorY = spawnY;
+          boid.velocity = PVector(0, -FOUNTAIN_BOID_MAX_SPEED * 0.65f * speedMultiplier);
+        }
+      } else {
+        boid.run(group.data(), (uint8_t)group.size(), speedMultiplier);
+      }
+      globalIdx++;
     }
   }
 }

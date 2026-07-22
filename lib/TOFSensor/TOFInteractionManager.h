@@ -62,7 +62,7 @@ private:
     static constexpr uint8_t kPalmOffFrames = 2;
     static constexpr int kBlobMinCells = 3;
     static constexpr bool kHandRaiseEnabled = true;
-    // Depth (cells) of the raised-hand band along physical up (left columns; see TOFInteractionManager.cpp).
+    // Depth (cells) of the raised-hand band along gravity-up (orientation 0–3).
     static constexpr int kHandRaiseTopRows = 2;
     static constexpr float kHandRaiseMassExcess = 1.25f;
     static constexpr uint8_t kHandRaiseOnFrames = 2;
@@ -117,6 +117,8 @@ private:
     uint8_t hand_raise_off_streak;
     int last_hand_raise_top_mass;
     float last_hand_raise_mass_excess;
+    // AutoRotate / aquarium mounting: 0=top rows, 1=left cols, 2=bottom rows, 3=right cols.
+    uint8_t hand_raise_orientation;
 
     uint8_t palm_on_streak;
     uint8_t palm_off_streak;
@@ -139,6 +141,9 @@ public:
     void update();
     InteractionData getInteractionData() const { return data; }
     void setDistanceRange(int16_t minDist, int16_t maxDist);
+    /** Gravity-up edge of the display-aligned TOF grid (matches AutoRotate 0–3). */
+    void setHandRaiseOrientation(uint8_t rot);
+    uint8_t getHandRaiseOrientation() const { return hand_raise_orientation; }
     void calibrateBaseline();
     bool isBaselineReady() const { return analysis_ready; }
 };

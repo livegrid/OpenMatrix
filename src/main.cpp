@@ -110,6 +110,66 @@ static void onBleRemoteTofRangeAdjust(int deltaMm) {
 }
 #endif
 
+#ifdef BLE_HID_REMOTE_ENABLED
+// Remote X/B buttons cycle the Aquarium performance mode. Force AQUARIUM mode so the
+// change is visible regardless of what was on screen.
+static void onBleRemotePerformanceModeCycle(int direction) {
+  State* st = stateManager.getState();
+  st->tofDebugView = false;
+  st->mode = OpenMatrixMode::AQUARIUM;
+  stateManager.save();
+  aquarium.cyclePerformanceMode(direction);
+  log_i("BLE remote: performance mode -> %s", aquarium.getPerformanceModeName());
+}
+
+static void onBleRemoteBrightnessAdjust(int delta) {
+  State* st = stateManager.getState();
+  st->autobrightness = false;
+  int next = (int)st->brightness + delta;
+  if (next < 0) {
+    next = 0;
+  } else if (next > 255) {
+    next = 255;
+  }
+  if (next == st->brightness) {
+    return;
+  }
+  st->brightness = (uint8_t)next;
+  matrix.setBrightness(st->brightness);
+  stateManager.save();
+  log_i("BLE remote: brightness %u", (unsigned)st->brightness);
+}
+
+// MOCUTE report 80 80 7F 7F 00 00 09 02 00 — start demo; press again to stop.
+static void onBleRemoteDemoToggle() {
+  State* st = stateManager.getState();
+  st->tofDebugView = false;
+  st->mode = OpenMatrixMode::AQUARIUM;
+  stateManager.save();
+  if (aquarium.isDemoMode()) {
+    aquarium.stopDemo();
+    log_i("BLE remote: aquarium demo stopped");
+  } else {
+    aquarium.startDemo();
+    log_i("BLE remote: aquarium demo started");
+  }
+}
+
+// TOP (80 80 80 80 00 FF 09 01 02): enter Aquarium, or toggle fake high CO2 if already there.
+static void onBleRemoteAquariumButton() {
+  State* st = stateManager.getState();
+  if (st->mode == OpenMatrixMode::AQUARIUM && !st->tofDebugView) {
+    const bool on = aquarium.toggleFakeHighCo2();
+    log_i("BLE remote: fake high CO2 %s", on ? "on" : "off");
+    return;
+  }
+  st->tofDebugView = false;
+  st->mode = OpenMatrixMode::AQUARIUM;
+  stateManager.save();
+  log_i("BLE remote: Mode -> AQUARIUM");
+}
+#endif
+
 #include "ImageDraw.h"
 ImageDraw imageDraw(&matrix);
 
@@ -189,19 +249,6 @@ void demoTask(void* parameter) {
 }
 #endif
 
-/** IO0 cycles the same effect ring as BLE remote A (Space Invaders -> Gravity Flap -> Asteroid -> Constellation). */
-static void cycleIo0PrimaryView() {
-#if defined(BLE_HID_REMOTE_ENABLED)
-  bleHidRemoteNextEffect();
-#else
-  State* st = stateManager.getState();
-  st->tofDebugView = false;
-  st->mode         = OpenMatrixMode::EFFECT;
-  stateManager.save();
-  log_i("IO0: BLE remote disabled, mode -> EFFECT");
-#endif
-}
-
 void displayTask(void* parameter) {
   // Give some time for system to stabilize after boot
   vTaskDelay(pdMS_TO_TICKS(1000));
@@ -210,7 +257,7 @@ void displayTask(void* parameter) {
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setRotation(0);
-  matrix.setBrightness(200);
+  matrix.setBrightness(250);
   
   const uint8_t idealFPS = 30;  // Set your desired FPS here
   const TickType_t xFrequency = pdMS_TO_TICKS(1000 / idealFPS);
@@ -247,10 +294,15 @@ void displayTask(void* parameter) {
   log_i("Aquarium begin: routing heap allocs >= 64 B to PSRAM (internal free=%u)",
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   heap_caps_malloc_extmem_enable(64);
+#ifdef ADXL345_ENABLED
+  aquarium.setAutoRotate(&autoRotate);
+#endif
   aquarium.begin();
   log_i("Aquarium begin done (internal free=%u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
+#ifdef BLE_HID_REMOTE_ENABLED
   pinMode(0, INPUT_PULLUP);
+#endif
 
   esp_task_wdt_add(NULL);
 
@@ -259,6 +311,7 @@ void displayTask(void* parameter) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
+#ifdef BLE_HID_REMOTE_ENABLED
       {
         static constexpr unsigned long kIo0BootDebounceMs = 240;
         static bool io0_was_high                       = true;
@@ -269,17 +322,29 @@ void displayTask(void* parameter) {
         if (io0_was_high && !io0_high &&
             io0_now - io0_prevTriggerMs >= kIo0BootDebounceMs) {
           io0_prevTriggerMs = io0_now;
-          cycleIo0PrimaryView();
+          bleHidRemotePrevEffect();
         }
         io0_was_high = io0_high;
       }
+#endif
       // Pin 2 disabled - now used by TOF sensor power enable
       // digitalWrite(2, LOW);
       if (currentMode != stateManager.getState()->mode) {
+        OpenMatrixMode nextMode = stateManager.getState()->mode;
+#ifdef ADXL345_ENABLED
+        if (currentMode == OpenMatrixMode::AQUARIUM && nextMode != OpenMatrixMode::AQUARIUM) {
+          autoRotate.applyRotationToMatrix();
+        }
+#endif
         if (currentMode == OpenMatrixMode::IMAGE) {
           imageDraw.closeGIF();
         }
-        currentMode = stateManager.getState()->mode;
+        currentMode = nextMode;
+#ifdef ADXL345_ENABLED
+        if (currentMode == OpenMatrixMode::AQUARIUM) {
+          matrix.setRotation(0);
+        }
+#endif
         switch (currentMode) {
           case OpenMatrixMode::EFFECT:
             break;
@@ -335,13 +400,8 @@ void displayTask(void* parameter) {
             tofScreensaverPresenceLastMs = now;
           } else if (st->effects.selected != Effects::CONSTELLATION &&
                      (now - tofScreensaverPresenceLastMs >= kTofScreensaverIdleMs)) {
-            st->tofDebugView = false;
-            st->mode         = OpenMatrixMode::EFFECT;
             st->effects.selected = Effects::CONSTELLATION;
             stateManager.save();
-#if defined(BLE_HID_REMOTE_ENABLED)
-            bleHidRemoteSyncEffectRingFromState();
-#endif
             tofScreensaverPresenceLastMs = now;
           }
         } else if (st->mode == OpenMatrixMode::EFFECT && !tofSensor.isActive()) {
@@ -618,23 +678,34 @@ void tofTask(void* parameter) {
 #endif
 
 void sensorTask(void* parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(1000);  // 1 second
-  TickType_t xLastWakeTime = xTaskGetTickCount();
+  TickType_t lastBh1750Ms = xTaskGetTickCount();
+  TickType_t lastAdxlMs = xTaskGetTickCount();
+  const TickType_t bh1750Period = pdMS_TO_TICKS(1000);
+  const TickType_t adxlPeriod = pdMS_TO_TICKS(500);  // 2 Hz — light I2C load
 
   for (;;) {
+    const TickType_t now = xTaskGetTickCount();
+
 #ifdef BH1750_ENABLED
-    autoBrightness.updateSensorValues();
-    if (stateManager.getState()->autobrightness) {
-      matrix.setBrightness(autoBrightness.matrixBrightness());
+    if (now - lastBh1750Ms >= bh1750Period) {
+      lastBh1750Ms = now;
+      autoBrightness.updateSensorValues();
+      if (stateManager.getState()->autobrightness) {
+        matrix.setBrightness(autoBrightness.matrixBrightness());
+      }
     }
 #endif
-    vTaskDelay(pdMS_TO_TICKS(5));  // 5 milliseconds delay
 
 #ifdef ADXL345_ENABLED
-    autoRotate.updateSensorValues();
+    if (now - lastAdxlMs >= adxlPeriod) {
+      lastAdxlMs = now;
+      const bool applyMatrixRotation =
+          stateManager.getState()->mode != OpenMatrixMode::AQUARIUM;
+      autoRotate.updateSensorValues(applyMatrixRotation);
+    }
 #endif
 
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
@@ -705,6 +776,12 @@ void setup(void) {
   
   // Restore State
   stateManager.restore();
+  // Boot into Aquarium mode (default).
+  {
+    State* st = stateManager.getState();
+    st->mode = OpenMatrixMode::AQUARIUM;
+    stateManager.save();
+  }
   // stateManager.startPeriodicSave();
 
   
@@ -779,6 +856,10 @@ void setup(void) {
 #if defined(VL53L8CX_ENABLED)
   bleHidRemoteSetTofRangeAdjustCallback(onBleRemoteTofRangeAdjust);
 #endif
+  bleHidRemoteSetPerformanceModeCallback(onBleRemotePerformanceModeCycle);
+  bleHidRemoteSetBrightnessAdjustCallback(onBleRemoteBrightnessAdjust);
+  bleHidRemoteSetDemoToggleCallback(onBleRemoteDemoToggle);
+  bleHidRemoteSetAquariumButtonCallback(onBleRemoteAquariumButton);
   // Runs after WiFi phase; long connect/GATT work stays off the main setup path.
   log_i("BLE HID remote: starting NimBLE task...");
   TaskManager::getInstance().createTask("BleHidRemote", bleHidRemoteTask, 8192, 1, 0, false);

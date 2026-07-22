@@ -105,6 +105,85 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define PROFILE_HOLD_MIN_MS 1200             // per-fish min dwell in Hold
 #define PROFILE_HOLD_MAX_MS 3500             // per-fish max dwell in Hold
 
+// ---- Heading stability ----
+// Below this speed (physics units/frame) the fish keeps its last heading instead of
+// re-deriving angle from a near-zero velocity vector (which causes spin/jitter when stopped).
+#define HEADING_UPDATE_MIN_SPEED 1.5f
+
+// ---- Formation profile (curated "performance" modes: ring, orchestra, ...) ----
+// A fish in Formation seeks an externally-assigned target with arrival damping.
+#define FORMATION_SEEK_FORCE 5.5f
+#define FORMATION_ARRIVE_RADIUS (2 * PHYSICS_SCALE)  // tight arrival so fish keep pace on the ring
+#define FORMATION_MIN_SPEED_FRAC 0.15f
+#define FORMATION_MAX_SPEED_FRAC 1.25f
+#define FORMATION_DAMPING 0.94f
+#define FORMATION_SIN_SCALE 0.10f
+#define FORMATION_NOISE_SCALE 0.04f
+
+// ---- Ring performance ----
+// All orbits are circles: radius = min(screenW, screenH) * 0.5 * fraction (minus margin).
+#define RING_MARGIN_PX 3.0f
+#define RING_ROTATION_SPEED 0.014f    // base ring angular speed (rad/frame)
+#define RING_VELOCITY_SPIN 0.010f
+// Attractor: raw palm/center goal, then smoothed formation center (no hard jumps).
+#define RING_ATTRACTOR_TARGET_SMOOTH 0.055f  // filters 8x8 palm grid steps
+#define RING_ATTRACTOR_FOLLOW 0.028f         // formation center eases toward target
+#define RING_ATTRACTOR_RETURN 0.018f         // drift back to screen center when hand leaves
+#define RING_ATTRACTOR_CLAMP_X0 0.30f        // keep formation on-screen while following palm
+#define RING_ATTRACTOR_CLAMP_X1 0.70f
+#define RING_ATTRACTOR_CLAMP_Y0 0.30f
+#define RING_ATTRACTOR_CLAMP_Y1 0.70f
+#define RING_BOID_RADIUS_FRAC 0.38f   // boid ring base: fraction of the base circle radius
+#define RING_BOID_SWIRL_SPEED 1.4f
+#define RING_BOID_HUG_GAIN 0.14f
+#define RING_BOID_SEP_WEIGHT 1.8f     // separation while on the ring (within each group)
+
+// ---- Orchestra performance ----
+// Fish hold a grid of "music stands" (mirrors the 8x8 TOF cells) and micro-orbit their home.
+// The conductor's palm energizes nearby fish (wider orbit) and speeds up the whole orchestra.
+#define ORCH_COLS 7                   // grid columns across the (wide) display
+#define ORCH_ROWS 3                   // grid rows
+#define ORCH_MARGIN_X_FRAC 0.06f      // horizontal margin as fraction of width
+#define ORCH_MARGIN_Y_FRAC 0.14f      // vertical margin as fraction of height
+#define ORCH_SPIN_BASE 0.05f          // base micro-orbit angular speed (rad/frame)
+#define ORCH_SPIN_VEL_GAIN 1.5f       // global speed-up multiplier from palm velocity
+#define ORCH_MICRO_MIN 1.5f           // idle micro-orbit radius (screen px)
+#define ORCH_MICRO_MAX 18.0f           // fully energized micro-orbit radius (screen px)
+#define ORCH_INFLUENCE_FRAC 0.28f     // palm influence radius as fraction of width
+
+// ---- Fountain performance ----
+// Hands raised: fish and boids rise; exit top (+margin) and respawn below (+margin).
+// Hourglass profile: wide at top/bottom, pinched at vertical center (screen midline).
+#define FOUNTAIN_RESPAWN_MARGIN_PX 50.0f
+#define FOUNTAIN_SPAWN_Y_SPREAD_PX 90.0f    // vertical stagger below canvas (fish/boids)
+#define FOUNTAIN_SPAWN_X_MARGIN_PX 8.0f     // keep spawns off the side edges
+#define FOUNTAIN_UP_FORCE 6.0f              // physics units; upward push (fish)
+#define FOUNTAIN_ANCHOR_GAIN 0.10f          // physics; pull toward personal spawn point (bottom)
+#define FOUNTAIN_WAIST_GAIN 0.072f          // physics; pull toward center waist point
+#define FOUNTAIN_TOP_GAIN 0.062f            // physics; push away from top-center point
+#define FOUNTAIN_POINT_RADIUS 62.0f         // screen px — spawn/top point influence radius
+#define FOUNTAIN_WAIST_RADIUS 44.0f         // screen px — waist point influence radius
+#define FOUNTAIN_MAX_VX 3.2f                // screen px/frame lateral cap
+#define FOUNTAIN_RISE_MIN 1.0f              // screen px/frame minimum upward speed (fish)
+#define FOUNTAIN_RISE_MAX 1.8f              // screen px/frame maximum upward speed (fish)
+#define FOUNTAIN_RESPAWN_RISE_SPEED 2.5f    // screen px/frame initial kick after respawn
+#define FOUNTAIN_BOID_UP_FORCE 0.10f        // boid upward acceleration (screen px/frame^2)
+#define FOUNTAIN_BOID_POINT_GAIN 0.030f     // boid point-attractor strength (screen)
+#define FOUNTAIN_BOID_MAX_SPEED 1.85f       // screen px/frame cap while rising
+
+// ---- Jump performance ----
+// Continuous hops around random on-screen homes (orchestra-style formation).
+// TOF grid change rate speeds up / slows down the hop cadence.
+#define JUMP_MARGIN_X_FRAC 0.08f            // keep homes inside this border buffer
+#define JUMP_MARGIN_Y_FRAC 0.12f
+#define JUMP_HOP_AMP_MIN 4.0f               // idle hop height (screen px)
+#define JUMP_HOP_AMP_MAX 16.0f              // hop height at full grid activity
+#define JUMP_HOP_WOBBLE_X 2.5f              // slight horizontal sway while hopping
+#define JUMP_SPIN_BASE 0.035f               // idle hop angular speed (rad/frame)
+#define JUMP_SPIN_MAX 0.22f                 // hop speed at full grid activity
+#define JUMP_GRID_CHANGE_SMOOTH 0.18f       // EMA on summed |depth| deltas
+#define JUMP_GRID_CHANGE_NORM_MM 1800.0f    // sum of |Δmm| that maps to "full" activity
+
 // Boid profile tuning (screen pixels unless noted)
 #define BOID_CHASE_ARRIVE_DIST 10.0f
 #define BOID_CHASE_SLOT_SPREAD 14.0f

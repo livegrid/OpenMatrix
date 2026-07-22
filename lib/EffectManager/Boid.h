@@ -16,6 +16,8 @@ public:
     float mass;
     boolean enabled;
     PVector limits;
+    float fountainAnchorX = 0;
+    float fountainAnchorY = 0;
 
     Boid();
     Boid(float x, float y, PVector* limits);

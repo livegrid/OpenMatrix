@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "AquariumSettings.h"
+#include "AquariumLayout.h"
 #include "Body/BodyVariations/BodyFactory.h"
 #include "Food.h"
 #include "Motion/MotionFactory.h"
@@ -233,6 +234,40 @@ class Fish {
       }
     }
     return false;
+  }
+
+  // Assign a screen-space formation target (converted to physics units internally).
+  void setFormationTarget(const PVector& targetScreen) {
+    if (motion) motion->setFormationTarget(targetScreen * PHYSICS_SCALE);
+  }
+
+  void clearFormationTarget() {
+    if (motion) motion->clearFormationTarget();
+  }
+
+  void setFountainMode(bool active) {
+    if (motion) motion->setFountainMode(active);
+  }
+
+  void setFountainSteering(const PVector& center, float width, float height) {
+    if (motion) motion->setFountainSteering(center.x, width, height);
+  }
+
+  void setFountainAnchor(float anchorX, float anchorY) {
+    if (motion) motion->setFountainAnchor(anchorX, anchorY);
+  }
+
+  void clearFountainSteering() {
+    if (motion) motion->clearFountainSteering();
+  }
+
+  void setPosition(const PVector& screenPos) {
+    if (motion) motion->setPositionPhysics(screenPos * PHYSICS_SCALE);
+    pos = screenPos;
+  }
+
+  void setVelocity(const PVector& screenVel) {
+    if (motion) motion->setVelocityPhysics(screenVel * PHYSICS_SCALE);
   }
 
   PVector getPosition() const {

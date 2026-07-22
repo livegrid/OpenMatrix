@@ -46,8 +46,21 @@ int countInBandInTopRows(const int16_t grid[8][8], int16_t minD, int16_t maxD, i
     return n;
 }
 
-// Hand-raise band along physical "up" when the sensor grid is rotated 90° CW vs row-major
-// "top" (using left columns = 90° CCW from top rows).
+int countInBandInBottomRows(const int16_t grid[8][8], int16_t minD, int16_t maxD, int numRows) {
+    if (numRows <= 0) return 0;
+    int n = 0;
+    int startY = 8 - (numRows < 8 ? numRows : 8);
+    for (int y = startY; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            int16_t d = grid[y][x];
+            if (d > minD && d < maxD) n++;
+        }
+    }
+    return n;
+}
+
+// Hand-raise band along gravity-up in the display-aligned grid (matches AquariumLayout /
+// AutoRotate: 0=top, 1=left, 2=bottom, 3=right).
 int countInBandInLeftColumns(const int16_t grid[8][8], int16_t minD, int16_t maxD, int numCols) {
     if (numCols <= 0) return 0;
     int n = 0;
@@ -59,6 +72,34 @@ int countInBandInLeftColumns(const int16_t grid[8][8], int16_t minD, int16_t max
         }
     }
     return n;
+}
+
+int countInBandInRightColumns(const int16_t grid[8][8], int16_t minD, int16_t maxD, int numCols) {
+    if (numCols <= 0) return 0;
+    int n = 0;
+    int startX = 8 - (numCols < 8 ? numCols : 8);
+    for (int y = 0; y < 8; y++) {
+        for (int x = startX; x < 8; x++) {
+            int16_t d = grid[y][x];
+            if (d > minD && d < maxD) n++;
+        }
+    }
+    return n;
+}
+
+int countHandRaiseBand(const int16_t grid[8][8], int16_t minD, int16_t maxD, int depth,
+                       uint8_t orientation) {
+    switch (orientation & 3) {
+        case 1:
+            return countInBandInLeftColumns(grid, minD, maxD, depth);
+        case 2:
+            return countInBandInBottomRows(grid, minD, maxD, depth);
+        case 3:
+            return countInBandInRightColumns(grid, minD, maxD, depth);
+        case 0:
+        default:
+            return countInBandInTopRows(grid, minD, maxD, depth);
+    }
 }
 
 }  // namespace
@@ -88,6 +129,7 @@ TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
       hand_raise_off_streak(0),
       last_hand_raise_top_mass(0),
       last_hand_raise_mass_excess(0),
+      hand_raise_orientation(0),
       palm_on_streak(0),
       palm_off_streak(0) {
     memset(analysis_grid, 0, sizeof(analysis_grid));
@@ -99,6 +141,21 @@ TOFInteractionManager::TOFInteractionManager(TOFSensor* tofSensor)
 void TOFInteractionManager::setDistanceRange(int16_t minDist, int16_t maxDist) {
     minDistance = minDist;
     maxDistance = maxDist;
+}
+
+void TOFInteractionManager::setHandRaiseOrientation(uint8_t rot) {
+    uint8_t next = rot < 4 ? rot : 0;
+    if (next == hand_raise_orientation) return;
+    hand_raise_orientation = next;
+    // Band moved — discard mass baseline so we don't false-trigger on the new edge.
+    baseline_hand_raise_init = false;
+    baseline_torso_row_ema = 0;
+    baseline_top_mass_ema = 0;
+    hand_raise_on_streak = 0;
+    hand_raise_off_streak = 0;
+    data.handsRaised = false;
+    last_hand_raise_top_mass = 0;
+    last_hand_raise_mass_excess = 0;
 }
 
 void TOFInteractionManager::resetState() {
@@ -427,7 +484,8 @@ void TOFInteractionManager::stepHandRaise(const int16_t grid[8][8], const BlobIn
         return;
     }
 
-    int topMass = countInBandInLeftColumns(grid, minDistance, maxDistance, kHandRaiseTopRows);
+    int topMass =
+        countHandRaiseBand(grid, minDistance, maxDistance, kHandRaiseTopRows, hand_raise_orientation);
     float cy = b.cy;
 
     if (!baseline_hand_raise_init) {

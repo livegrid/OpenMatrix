@@ -23,6 +23,7 @@ enum class MotionProfile : uint8_t {
   Chase,
   Flee,
   Friend,
+  Formation,
   Count
 };
 
@@ -35,6 +36,7 @@ inline const char* motionProfileName(MotionProfile profile) {
     case MotionProfile::Chase: return "Chase";
     case MotionProfile::Flee: return "Flee";
     case MotionProfile::Friend: return "Friend";
+    case MotionProfile::Formation: return "Formation";
     default: return "Unknown";
   }
 }
@@ -60,6 +62,9 @@ inline MotionProfileSpec getMotionProfileSpec(MotionProfile profile) {
     case MotionProfile::Friend:
       return {OrganicMotion::Low, PROFILE_FRIEND_SIN_SCALE, PROFILE_FRIEND_NOISE_SCALE,
               PROFILE_FRIEND_MIN_SPEED_FRAC, PROFILE_FRIEND_MAX_SPEED_FRAC, 1.0f};
+    case MotionProfile::Formation:
+      return {OrganicMotion::Low, FORMATION_SIN_SCALE, FORMATION_NOISE_SCALE,
+              FORMATION_MIN_SPEED_FRAC, FORMATION_MAX_SPEED_FRAC, FORMATION_DAMPING};
     case MotionProfile::Wander:
     default:
       return {OrganicMotion::Full, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};

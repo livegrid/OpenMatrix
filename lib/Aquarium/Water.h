@@ -36,6 +36,7 @@ class Water {
     noise.SetFrequency(0.01f);
   }
 
+  // Water stays in fixed GFX buffer space — orientation changes only affect foreground/seafloor.
   void update(long temperature = 25) {
     if (currentRow >= totalRows) {
       currentRow = 0;
@@ -49,7 +50,6 @@ class Water {
     float timeZ = (float)(millis() * simplexSpeed);
 
 #if AQUARIUM_WATER_GOD_RAYS_ENABLED
-    // God ray positions — computed once per batch, very slow drift
     float rayTime = (float)millis() * 0.000030f;
     float W = (float)totalCols;
     float rayX[3] = {
@@ -57,11 +57,9 @@ class Water {
       W * 0.52f + sinf(rayTime * 0.71f + 2.09f) * W * 0.09f,
       W * 0.80f + sinf(rayTime * 0.89f + 4.27f) * W * 0.09f,
     };
-    float rayHalfW = W * 0.05f; // soft, wide beams
+    float rayHalfW = W * 0.05f;
 #endif
 
-    // Small stack buffer for the current row batch only (rowsPerUpdate * totalCols floats)
-    // For 192 cols × 4 rows = 768 floats = 3 KB — well within the display task stack
     float batchNoise[rowsPerUpdate * 256];
     size_t batchCols = totalCols < 256 ? totalCols : 256;
 
@@ -76,38 +74,30 @@ class Water {
     for (size_t row = currentRow; row < endRow; ++row) {
       size_t batchRow = row - currentRow;
 
-      // Depth factor: 0.0 at top → 1.0 at bottom
       float depthT = (float)row / (float)(totalRows - 1);
-
-      // Light attenuation with depth (bright at surface, dark at floor)
       uint8_t depthScale = (uint8_t)(255.0f * (1.0f - depthT * 0.55f));
 
 #if AQUARIUM_WATER_GOD_RAYS_ENABLED
-      // God rays fade out toward the bottom (gone past ~70% depth)
       float rayDepthFade = 1.0f - depthT * 1.45f;
       if (rayDepthFade < 0.0f) rayDepthFade = 0.0f;
 #endif
 
       for (size_t col = 0; col < totalCols; ++col) {
         float n = batchNoise[col + batchRow * batchCols];
-        // Map noise [-1,1] -> [floor,255] so troughs keep a base tint instead of clipping to black
-        float nNorm = (n + 1.0f) * 0.5f;  // 0..1
+        float nNorm = (n + 1.0f) * 0.5f;
         uint8_t noiseFactor = (uint8_t)(AQUARIUM_WATER_AMBIENT_FLOOR
                                         + nNorm * (255.0f - AQUARIUM_WATER_AMBIENT_FLOOR));
         CRGB color = simplexColor;
         color.nscale8(noiseFactor);
-
-        // Depth attenuation
         color.nscale8(depthScale);
 
 #if AQUARIUM_WATER_GOD_RAYS_ENABLED
-        // God ray contribution — quadratic falloff per ray, additive cyan-white light
         if (rayDepthFade > 0.0f) {
           float rayIntensity = 0.0f;
           float x = (float)col;
           for (int r = 0; r < 3; r++) {
             float t = fabsf(x - rayX[r]) / rayHalfW;
-            if (t < 2.5f) rayIntensity += 1.0f - t * t * 0.16f; // smooth falloff
+            if (t < 2.5f) rayIntensity += 1.0f - t * t * 0.16f;
           }
           if (rayIntensity > 1.0f) rayIntensity = 1.0f;
           rayIntensity *= rayDepthFade;

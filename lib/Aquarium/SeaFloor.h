@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Matrix.h>
 #include "AquariumSettings.h"
+#include "AquariumLayout.h"
 
 // Element types — stored in draw order during generate()
 enum ElementType : uint8_t {
@@ -97,8 +98,11 @@ static const uint8_t MAX_ELEMENTS = NUM_ROCKS + NUM_MOSS_CLUSTERS +
 class SeaFloor {
  private:
   Matrix* matrix;
-  uint8_t screenWidth;
-  uint8_t screenHeight;
+  uint8_t matrixW;
+  uint8_t matrixH;
+  uint8_t layoutW;
+  uint8_t layoutH;
+  uint8_t layoutRotation;
 
   // Substrate: pre-generated sand colors
   CRGB substrateColors[GROUND_SUBSTRATE_HEIGHT][MAX_SCREEN_WIDTH];
@@ -114,9 +118,17 @@ class SeaFloor {
 
  public:
   SeaFloor(Matrix* m)
-      : matrix(m), elementCount(0) {
-    screenWidth = m->getXResolution();
-    screenHeight = m->getYResolution();
+      : matrix(m), elementCount(0), layoutRotation(0) {
+    matrixW = m->getXResolution();
+    matrixH = m->getYResolution();
+    aquariumLayoutDimensions(matrixW, matrixH, layoutRotation, layoutW, layoutH);
+  }
+
+  void setOrientation(uint8_t newRotation) {
+    if (newRotation >= 4 || newRotation == layoutRotation) return;
+    layoutRotation = newRotation;
+    aquariumLayoutDimensions(matrixW, matrixH, layoutRotation, layoutW, layoutH);
+    generate();
   }
 
   void generate() {
@@ -183,6 +195,40 @@ class SeaFloor {
     );
   }
 
+  void layoutDrawPixel(int16_t vx, int16_t vy, CRGB color) {
+    int16_t bx, by;
+    aquariumVisualToBuffer(vx, vy, layoutRotation, matrixW, matrixH, bx, by);
+    if (bx < 0 || by < 0 || bx >= (int16_t)matrixW || by >= (int16_t)matrixH) return;
+    matrix->foreground->drawPixel(bx, by, color);
+  }
+
+  void layoutDrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, CRGB color) {
+    int16_t bx0, by0, bx1, by1;
+    aquariumVisualToBuffer(x0, y0, layoutRotation, matrixW, matrixH, bx0, by0);
+    aquariumVisualToBuffer(x1, y1, layoutRotation, matrixW, matrixH, bx1, by1);
+    matrix->foreground->drawLine(bx0, by0, bx1, by1, color);
+  }
+
+  void layoutFillCircle(int16_t cx, int16_t cy, int16_t r, CRGB color) {
+    int16_t bx, by;
+    aquariumVisualToBuffer(cx, cy, layoutRotation, matrixW, matrixH, bx, by);
+    matrix->foreground->fillCircle(bx, by, r, color);
+  }
+
+  void layoutDrawCircle(int16_t cx, int16_t cy, int16_t r, CRGB color) {
+    int16_t bx, by;
+    aquariumVisualToBuffer(cx, cy, layoutRotation, matrixW, matrixH, bx, by);
+    matrix->foreground->drawCircle(bx, by, r, color);
+  }
+
+  void layoutFillRect(int16_t x, int16_t y, int16_t w, int16_t h, CRGB color) {
+    for (int16_t dy = 0; dy < h; dy++) {
+      for (int16_t dx = 0; dx < w; dx++) {
+        layoutDrawPixel(x + dx, y + dy, color);
+      }
+    }
+  }
+
   CRGB applyBloom(const GroundElement& el, CRGB base) {
     if (el.bloomState == 0) return base;
 
@@ -241,9 +287,11 @@ class SeaFloor {
 
   void updateGrowthDrift(GroundElement& el, float humidity) {
     if (el.type != ELEM_SEAGRASS && el.type != ELEM_PLANT) return;
-    float scale = map(humidity, 0, 100, 50, 250) / 100.0f;
+    // Match legacy Plants.h: humidity 0–100% → size scale 0–2.5x
+    float scale = map((long)constrain(humidity, 0.0f, 100.0f), 0L, 100L, 0L, 250L) / 100.0f;
     el.targetHeight = el.height * scale;
-    el.currentHeight += (el.targetHeight - el.currentHeight) * 0.001f;
+    // Settle in ~1–2s so demo + live humidity changes are visible (0.001 was effectively stuck)
+    el.currentHeight += (el.targetHeight - el.currentHeight) * 0.05f;
   }
 
   // ─── Generation ───
@@ -256,8 +304,8 @@ class SeaFloor {
     for (uint8_t i = 0; i < NUM_ROCKS; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_ROCK;
-      el.x = screenWidth * i / NUM_ROCKS + random(2, screenWidth / NUM_ROCKS - 2);
-      el.y = screenHeight - GROUND_SUBSTRATE_HEIGHT - 1;
+      el.x = layoutW * i / NUM_ROCKS + random(2, layoutW / NUM_ROCKS - 2);
+      el.y = layoutH - GROUND_SUBSTRATE_HEIGHT - 1;
       el.width = random(3, 7);
       el.height = random(2, 5);
       el.baseColor = CRGB(random(60, 90), random(55, 75), random(50, 65));
@@ -268,13 +316,13 @@ class SeaFloor {
     for (uint8_t i = 0; i < NUM_MOSS_CLUSTERS; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_MOSS;
-      el.y = screenHeight - GROUND_SUBSTRATE_HEIGHT - 1;
+      el.y = layoutH - GROUND_SUBSTRATE_HEIGHT - 1;
       el.width = random(3, 6);
       el.height = random(2, 4);
       if (random(0, 2) == 0 && i < NUM_ROCKS) {
         el.x = elements[i].x + random(-3, 4);
       } else {
-        el.x = random(0, screenWidth);
+        el.x = random(0, layoutW);
       }
       el.baseColor = CRGB(random(0, 15), random(50, 80), random(10, 25));
     }
@@ -285,8 +333,8 @@ class SeaFloor {
   void generateCoral() {
     for (uint8_t i = 0; i < NUM_CORAL; i++) {
       GroundElement& el = addElement();
-      el.y = screenHeight - 1;  // bottom of screen
-      el.x = random(8, screenWidth - 8);
+      el.y = layoutH - 1;  // bottom of layout
+      el.x = random(8, layoutW - 8);
       el.dataIndex = i;
 
       // Pick a rich coral hue — wider palette than before
@@ -412,12 +460,14 @@ class SeaFloor {
 
   void generatePlants() {
     const uint8_t accentHues[] = {0, 20, 32, 140, 200, 210};
+    const uint8_t numPlants =
+        aquariumPortraitScaledCount(NUM_BRANCHING_PLANTS, layoutRotation);
 
-    for (uint8_t i = 0; i < NUM_BRANCHING_PLANTS; i++) {
+    for (uint8_t i = 0; i < numPlants; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_PLANT;
-      el.x = screenWidth * (i + 1) / (NUM_BRANCHING_PLANTS + 1) + random(-5, 6);
-      el.y = screenHeight + 7;
+      el.x = layoutW * (i + 1) / (numPlants + 1) + random(-5, 6);
+      el.y = layoutH + 7;
       el.dataIndex = i;
       el.height = 10;
       el.currentHeight = 10.0f;
@@ -454,11 +504,14 @@ class SeaFloor {
   }
 
   void generateSeagrass() {
-    for (uint8_t i = 0; i < NUM_SEAGRASS; i++) {
+    const uint8_t numSeagrass =
+        aquariumPortraitScaledCount(NUM_SEAGRASS, layoutRotation);
+
+    for (uint8_t i = 0; i < numSeagrass; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_SEAGRASS;
-      el.x = screenWidth * i / NUM_SEAGRASS + random(0, screenWidth / NUM_SEAGRASS);
-      el.y = screenHeight - GROUND_SUBSTRATE_HEIGHT;
+      el.x = layoutW * i / numSeagrass + random(0, layoutW / numSeagrass);
+      el.y = layoutH - GROUND_SUBSTRATE_HEIGHT;
       el.height = random(5, 11);
       el.currentHeight = (float)el.height;
       el.targetHeight = (float)el.height;
@@ -477,8 +530,8 @@ class SeaFloor {
     for (uint8_t i = 0; i < NUM_ANEMONES; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_ANEMONE;
-      el.x = random(10, screenWidth - 10);
-      el.y = screenHeight - GROUND_SUBSTRATE_HEIGHT - 1;
+      el.x = random(10, layoutW - 10);
+      el.y = layoutH - GROUND_SUBSTRATE_HEIGHT - 1;
       el.width = random(2, 4);
       el.height = random(4, 7);
       el.dataIndex = i;
@@ -535,7 +588,7 @@ class SeaFloor {
         uint8_t variation = ((drawX * 7 + rowY * 13) & 0x0F);
         CRGB color = el.baseColor;
         color.nscale8(240 + variation);
-        matrix->foreground->drawPixel(drawX, rowY, color);
+        layoutDrawPixel(drawX, rowY, color);
       }
     }
   }
@@ -550,7 +603,7 @@ class SeaFloor {
         uint8_t shade = 200 + ((col * 7 + row * 3) & 0x3F);
         if (shade > 255) shade = 255;
         color.nscale8(shade);
-        matrix->foreground->drawPixel(baseX + col, drawY, color);
+        layoutDrawPixel(baseX + col, drawY, color);
       }
     }
   }
@@ -588,20 +641,20 @@ class SeaFloor {
         int8_t offX = (int8_t)round(-dy / len);
         int8_t offY = (int8_t)round(dx / len);
         // Center line
-        matrix->foreground->drawLine(px0, py0, px1, py1, segColor);
+        layoutDrawLine(px0, py0, px1, py1, segColor);
         // Offset lines for thickness
-        matrix->foreground->drawLine(px0 + offX, py0 + offY, px1 + offX, py1 + offY, segColor);
-        matrix->foreground->drawLine(px0 - offX, py0 - offY, px1 - offX, py1 - offY, segColor);
+        layoutDrawLine(px0 + offX, py0 + offY, px1 + offX, py1 + offY, segColor);
+        layoutDrawLine(px0 - offX, py0 - offY, px1 - offX, py1 - offY, segColor);
         // Small circle at base for grounding
-        matrix->foreground->fillCircle(px0, py0, 1, segColor);
+        layoutFillCircle(px0, py0, 1, segColor);
       } else if (seg.depth == 1) {
         // Mid branches: regular line connecting from trunk tip
-        matrix->foreground->drawLine(px0, py0, px1, py1, segColor);
+        layoutDrawLine(px0, py0, px1, py1, segColor);
         // Small dot at tip for visual weight
-        matrix->foreground->drawPixel(px1, py1, tipCol);
+        layoutDrawPixel(px1, py1, tipCol);
       } else {
         // Fine tips: single line, brighter
-        matrix->foreground->drawLine(px0, py0, px1, py1, tipCol);
+        layoutDrawLine(px0, py0, px1, py1, tipCol);
       }
     }
   }
@@ -623,7 +676,7 @@ class SeaFloor {
       // Alternate colors between base and accent for mottled look
       uint8_t colorShift = (seg.depth * 73) & 0xFF;
       CRGB blobColor = lerpColor(baseCol, tipCol, colorShift);
-      matrix->foreground->fillCircle(cx, cy, r, blobColor);
+      layoutFillCircle(cx, cy, r, blobColor);
     }
 
     // Second pass: draw outline rings in a darker shade for brain-fold texture
@@ -635,12 +688,12 @@ class SeaFloor {
       int16_t cy = el.y + seg.y0;
       uint8_t r = seg.x1;
       if (r >= 2) {
-        matrix->foreground->drawCircle(cx, cy, r, outlineCol);
+        layoutDrawCircle(cx, cy, r, outlineCol);
       }
     }
 
     // Highlight spot on top of the cluster for dimension
-    matrix->foreground->drawPixel(el.x, el.y - el.width + 1, tipCol);
+    layoutDrawPixel(el.x, el.y - el.width + 1, tipCol);
   }
 
   // Fan coral: radiating rays from base with color gradient along each ray
@@ -671,20 +724,22 @@ class SeaFloor {
         int16_t py = py0 + (int16_t)((py1 - py0) * t);
         uint8_t colorT = (uint8_t)(t * 255);
         CRGB pixColor = lerpColor(baseCol, tipCol, colorT);
-        matrix->foreground->drawPixel(px, py, pixColor);
+        layoutDrawPixel(px, py, pixColor);
       }
     }
 
     // Draw a small base/stalk for grounding
-    matrix->foreground->drawPixel(el.x, el.y, baseCol);
-    matrix->foreground->drawPixel(el.x, el.y - 1, baseCol);
+    layoutDrawPixel(el.x, el.y, baseCol);
+    layoutDrawPixel(el.x, el.y - 1, baseCol);
   }
 
   // ─── Other Drawing ───
 
   void drawSeagrass(const GroundElement& el) {
     float timeVal = millis() / 5000.0f;
-    uint8_t drawHeight = (uint8_t)constrain(el.currentHeight, 1.0f, (float)GROUND_MAX_HEIGHT);
+    // Allow humidity scale up to ~2.5x base height (GROUND_MAX_HEIGHT alone left almost no headroom)
+    float maxH = max((float)GROUND_MAX_HEIGHT, el.height * 2.5f);
+    uint8_t drawHeight = (uint8_t)constrain(el.currentHeight, 1.0f, maxH);
 
     for (uint8_t row = 0; row < drawHeight; row++) {
       float sway = sin(timeVal + el.phase) * (row * 0.3f);
@@ -695,7 +750,7 @@ class SeaFloor {
       uint8_t brightScale = 180 + (row * 75 / drawHeight);
       color.nscale8(brightScale);
 
-      matrix->foreground->drawPixel(drawX, drawY, color);
+      layoutDrawPixel(drawX, drawY, color);
     }
   }
 
@@ -711,7 +766,7 @@ class SeaFloor {
 
       int16_t n0x = (int16_t)(branch.nodes[0].x * sizeFactor) + el.x;
       int16_t n0y = (int16_t)(branch.nodes[0].y * sizeFactor) + el.y;
-      matrix->foreground->drawLine(n0x, n0y, (int16_t)el.x, (int16_t)el.y, el.baseColor);
+      layoutDrawLine(n0x, n0y, (int16_t)el.x, (int16_t)el.y, el.baseColor);
 
       for (uint8_t j = 1; j < branch.nodeCount; j++) {
         float sway = branchSin * (0.8f * j);
@@ -721,13 +776,13 @@ class SeaFloor {
         int16_t curX  = (int16_t)(branch.nodes[j].x * sizeFactor + sway) + el.x;
         int16_t curY  = (int16_t)(branch.nodes[j].y * sizeFactor) + el.y;
 
-        matrix->foreground->drawLine(prevX, prevY, curX, curY, el.baseColor);
+        layoutDrawLine(prevX, prevY, curX, curY, el.baseColor);
 
         if (j == branch.nodeCount - 1 && glowFactor > 0) {
           uint8_t intensity = (uint8_t)(glowFactor * 1000);
           CRGB flowerColor;
           hsv2rgb_rainbow(CHSV((uint8_t)pd.accentHue, 220, intensity), flowerColor);
-          matrix->foreground->fillCircle(curX, curY, 1, flowerColor);
+          layoutFillCircle(curX, curY, 1, flowerColor);
         }
       }
     }
@@ -738,7 +793,7 @@ class SeaFloor {
     CRGB bodyColor = applyBloom(el, el.baseColor);
 
     int16_t baseX = el.x - el.width / 2;
-    matrix->foreground->fillRect(baseX, el.y - 1, el.width, 2, bodyColor);
+    layoutFillRect(baseX, el.y - 1, el.width, 2, bodyColor);
 
     float timeVal = millis() / 3000.0f;
     for (uint8_t t = 0; t < ad.tentacleCount; t++) {
@@ -755,7 +810,7 @@ class SeaFloor {
         int16_t py = tentBaseY - p;
         uint8_t blend = (p * 255) / drawLength;
         CRGB color = lerpColor(bodyColor, tent.tipColor, blend);
-        matrix->foreground->drawPixel(tentX, py, color);
+        layoutDrawPixel(tentX, py, color);
       }
     }
   }

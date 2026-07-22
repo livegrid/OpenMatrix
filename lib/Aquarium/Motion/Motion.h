@@ -8,6 +8,7 @@
 #include <SCD40Settings.h>
 #include "../TOFSensor/TOFInteractionManager.h"
 #include "MotionProfile.h"
+#include "../AquariumLayout.h"
 
 class Motion {
  public:
@@ -60,6 +61,19 @@ class Motion {
   unsigned long holdUntil = 0;
   bool fleeLatched = false;
   unsigned long fleeClearAfterMs = 0;
+
+  // Externally-driven formation target (curated performance modes, e.g. the ring).
+  bool formationActive = false;
+  PVector formationTarget;
+
+  // Fountain performance: skip borders; Flee profile + dedicated locomotion path.
+  bool fountainModeActive = false;
+  bool fountainSteeringActive = false;
+  float fountainCenterX = 0;
+  float fountainScreenW = 1;
+  float fountainScreenH = 1;
+  float fountainAnchorX = 0;
+  float fountainAnchorY = 0;
 
   bool isOffCanvas() const {
     return pos.x < 0.0f || pos.y < 0.0f ||
@@ -214,6 +228,19 @@ class Motion {
     }
   }
 
+  void applyFormationSteering() {
+    if (!formationActive) return;
+    PVector to = formationTarget - pos;
+    float dist = to.mag();
+    if (dist <= INTERACTION_DISTANCE_EPSILON) return;
+    float force = FORMATION_SEEK_FORCE;
+    if (dist < FORMATION_ARRIVE_RADIUS) {
+      force *= dist / FORMATION_ARRIVE_RADIUS;  // arrival: ease off near the slot
+    }
+    to.setMag(force);
+    applyForce(to);
+  }
+
   void applyFriendSteering() {
 #if AQUARIUM_TOF_PALM_INTERACTION_ENABLED
     float flowMag = interactionFlow.mag();
@@ -267,6 +294,10 @@ class Motion {
         }
         break;
 
+      case MotionProfile::Formation:
+        applyFormationSteering();
+        break;
+
       case MotionProfile::Alert:
       case MotionProfile::Wander:
       default:
@@ -275,8 +306,23 @@ class Motion {
   }
 
   void applyProfileSpeedLimits(const MotionProfileSpec& spec, PVector& desiredVel) {
-    float effMin = (float)minSpeed * spec.minSpeedFrac;
-    float effMax = (float)maxSpeed * spec.maxSpeedFrac;
+    if (fountainModeActive) {
+      float riseMin = FOUNTAIN_RISE_MIN * (float)PHYSICS_SCALE;
+      float riseMax = FOUNTAIN_RISE_MAX * (float)PHYSICS_SCALE;
+      riseMax = map(co2, CO2_BAD, CO2_REALBAD, riseMax, riseMin);
+      if (riseMax < riseMin) riseMax = riseMin;
+
+      if (desiredVel.y > -riseMin) desiredVel.y = -riseMin;
+      if (desiredVel.y < -riseMax) desiredVel.y = -riseMax;
+
+      float maxVx = FOUNTAIN_MAX_VX * (float)PHYSICS_SCALE;
+      desiredVel.x = constrain(desiredVel.x, -maxVx, maxVx);
+      return;
+    }
+
+    MotionProfileSpec effSpec = spec;
+    float effMin = (float)minSpeed * effSpec.minSpeedFrac;
+    float effMax = (float)maxSpeed * effSpec.maxSpeedFrac;
 
     if (effMin > 0.0f) {
       float effMinSq = effMin * effMin;
@@ -299,7 +345,11 @@ class Motion {
       profile = forced;
     }
 #else
-    if (followingFood) {
+    if (fountainModeActive) {
+      profile = MotionProfile::Flee;
+    } else if (formationActive) {
+      profile = MotionProfile::Formation;
+    } else if (followingFood) {
       profile = MotionProfile::Chase;
     } else if (shouldFlee()) {
       profile = MotionProfile::Flee;
@@ -442,6 +492,33 @@ class Motion {
     }
   }
 
+  bool updateFountainLocomotion() {
+    if (!fountainModeActive || !fountainSteeringActive) return false;
+
+    outOfBoundary = false;
+    activeProfile = MotionProfile::Flee;
+
+    float sx = pos.x / (float)PHYSICS_SCALE;
+    float sy = pos.y / (float)PHYSICS_SCALE;
+
+    float fx = 0.0f;
+    float fy = 0.0f;
+    fountainPointSteering(sx, sy, fountainAnchorX, fountainAnchorY, fountainCenterX,
+                          fountainScreenH, fx, fy);
+    vel.x += fx;
+    vel.y += fy;
+    vel.y -= FOUNTAIN_UP_FORCE * 0.40f;
+
+    applyProfileSpeedLimits(getMotionProfileSpec(MotionProfile::Flee), vel);
+    pos += vel;
+    acc *= 0;
+
+    if (vel.magSq() > HEADING_UPDATE_MIN_SPEED * HEADING_UPDATE_MIN_SPEED) {
+      angle = vel.heading();
+    }
+    return true;
+  }
+
   void update(float age = AGE_ADULT, long co2 = CO2_OK,
               bool stayInside = false) {
     this->co2 = co2;
@@ -452,9 +529,16 @@ class Motion {
     }
 
     activeProfile = resolveProfile();
+    if (updateFountainLocomotion()) {
+      followingFood = false;
+      return;
+    }
+
     const bool fleeing = activeProfile == MotionProfile::Flee;
 
-    if (!fleeing) {
+    if (fountainModeActive) {
+      outOfBoundary = false;
+    } else if (!fleeing) {
       if (stayInside || co2 > CO2_BAD) {
         boundaryCheck(BOUNDARY_FORCE * 10);
       } else {
@@ -465,12 +549,15 @@ class Motion {
     }
 
     MotionProfileSpec spec = getMotionProfileSpec(activeProfile);
+    if (fountainModeActive) {
+      spec = getMotionProfileSpec(MotionProfile::Flee);
+    }
 
     if (spec.damping < 0.999f) {
       vel *= spec.damping;
     }
 
-    if (activeProfile == MotionProfile::Flee) {
+    if (activeProfile == MotionProfile::Flee && !fountainModeActive) {
       PVector away = pos - getFleeThreatPoint();
       if (away.magSq() <= INTERACTION_DISTANCE_EPSILON) {
         away = PVector::fromAngle(angle + PI);
@@ -499,7 +586,11 @@ class Motion {
     }
 
     acc *= 0;
-    angle = vel.heading();
+    // Only re-derive heading when actually moving; a near-zero velocity vector has an
+    // unstable heading() that makes a stopped/holding fish spin and jitter.
+    if (vel.magSq() > HEADING_UPDATE_MIN_SPEED * HEADING_UPDATE_MIN_SPEED) {
+      angle = vel.heading();
+    }
 
     followingFood = false;
   }
@@ -573,6 +664,41 @@ class Motion {
  public:
   void applyExternalForce(const PVector& force) {
     applyForce(force);
+  }
+
+  // Drive this fish toward an externally-assigned point (physics coords) for curated
+  // performances. While active it overrides the normal interaction state machine.
+  void setFormationTarget(const PVector& targetPhysics) {
+    formationTarget = targetPhysics;
+    formationActive = true;
+  }
+
+  void clearFormationTarget() { formationActive = false; }
+
+  void setFountainMode(bool active) {
+    fountainModeActive = active;
+    if (!active) fountainSteeringActive = false;
+  }
+
+  void setFountainSteering(float centerX, float width, float height) {
+    fountainCenterX = centerX;
+    fountainScreenW = width;
+    fountainScreenH = height;
+    fountainSteeringActive = true;
+  }
+
+  void setFountainAnchor(float anchorX, float anchorY) {
+    fountainAnchorX = anchorX;
+    fountainAnchorY = anchorY;
+  }
+
+  void clearFountainSteering() { fountainSteeringActive = false; }
+
+  void setPositionPhysics(const PVector& physicsPos) { pos = physicsPos; }
+
+  void setVelocityPhysics(const PVector& physicsVel) {
+    vel = physicsVel;
+    acc = PVector(0, 0);
   }
 
   void followFood(PVector foodPos) {
