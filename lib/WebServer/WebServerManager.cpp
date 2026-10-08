@@ -20,10 +20,11 @@ void WebServerManager::begin() {
 }
 
 void WebServerManager::initWiFi() {
-  // Initialize WiFi early (in setup) before DisplayTask to preserve heap.
-  // NetWizard's autoConnect triggers esp_wifi_init which needs ~30KB free internal RAM.
-  // If called after aquarium.begin(), heap may be too low causing ESP_ERR_NO_MEM (error 257).
-  log_i("[WiFi] Initializing WiFi early (heap=%u, internal=%u)",
+  // Called from ServerTask after the matrix DMA buffer and aquarium objects
+  // exist. Those aquarium allocations are routed to PSRAM, so internal RAM
+  // stays high enough for esp_wifi_init (~30KB). Running this here keeps
+  // association retries off the display core.
+  log_i("[WiFi] Initializing WiFi (heap=%u, internal=%u)",
         (unsigned)ESP.getFreeHeap(),
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   setupNetWizard();

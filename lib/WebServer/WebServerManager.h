@@ -19,8 +19,8 @@ public:
                      ImageDraw* imageDraw, StateManager* stateManager,
                      TaskManager* taskManager);
     void begin();
-    void initWiFi();  // Call early in setup() before DisplayTask to preserve heap
-    void setupAfterWiFi();  // Call later in ServerTask after display is initialized
+    void initWiFi();  // Call from ServerTask after DisplayTask has entered its render loop
+    void setupAfterWiFi();  // Call from ServerTask after initWiFi()
     void handleClient();
     void setupUniqueHostname();
     NetWizard nw;

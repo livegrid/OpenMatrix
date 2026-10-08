@@ -80,6 +80,13 @@ Edmx& dmx = Edmx::getInstance();
 
 #include "MQTTManager.h"
 
+#ifdef WIFI_ENABLED
+// Given by DisplayTask once the matrix is initialized and the render loop is
+// about to start. ServerTask waits on it so WiFi/DMX/web setup runs after the
+// first frame instead of blocking the panel.
+static SemaphoreHandle_t s_displayReady = nullptr;
+#endif
+
 #ifdef TOUCH_ENABLED
 #include "TouchMenu.h"
 TouchMenu touchMenu(&matrix, &stateManager, &webServerManager, &aquarium);
@@ -111,10 +118,9 @@ void demoTask(void* parameter) {
 #endif
 
 void displayTask(void* parameter) {
-  // Give time for WiFi to stabilize after init in setup()
-  vTaskDelay(pdMS_TO_TICKS(1000));
-
-  // Initialize matrix in this task (after WiFi init has claimed its memory)
+  // Start the panel immediately. WiFi association can take seconds (auth
+  // retries) and used to run in setup() before this task existed, which left
+  // the matrix black until the network finished.
   log_i("Initializing matrix display...");
   matrix.init();
   matrix.setBrightness(stateManager.getState()->brightness);
@@ -149,6 +155,14 @@ void displayTask(void* parameter) {
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
   stateManager.save();
+
+#ifdef WIFI_ENABLED
+  // Unblock ServerTask. Network init runs on core 0 while this loop draws.
+  if (s_displayReady) {
+    xSemaphoreGive(s_displayReady);
+  }
+#endif
+  log_i("Display ready, entering render loop");
 
   esp_task_wdt_add(NULL);
 
@@ -281,9 +295,17 @@ void touchTask(void* parameter) {
 
 #ifdef WIFI_ENABLED
 void serverTask(void* parameter) {
-  // WiFi is already initialized in setup() (before DisplayTask) to avoid heap exhaustion.
-  // Delay for DisplayTask to init matrix and aquarium.
-  vTaskDelay(pdMS_TO_TICKS(3000));
+  // Wait until the matrix and aquarium exist, then bring up the network on
+  // this core. esp_wifi_init still runs after the DMA buffer allocation (that
+  // was the ESP_ERR_NO_MEM case), but it no longer blocks the first frame.
+  if (s_displayReady) {
+    xSemaphoreTake(s_displayReady, portMAX_DELAY);
+  }
+
+  log_i("[ServerTask] Display is up. Starting WiFi (heap=%u, internal=%u)",
+        (unsigned)ESP.getFreeHeap(),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  webServerManager.initWiFi();
 
   log_i("[ServerTask] Starting network services (heap=%u, internal=%u)",
         (unsigned)ESP.getFreeHeap(),
@@ -479,6 +501,49 @@ void setup(void) {
     log_e("Failed to initialize task watchdog timer: %s", esp_err_to_name(err));
   }
 
+  // Mount storage and restore state before any sensor init. SCD40's self-test
+  // holds the I2C mutex for about 10 seconds, and the light/accel inits block
+  // on that same mutex. Creating DisplayTask first lets the aquarium draw
+  // while setup is parked on the lock.
+  LittleFS.begin(true);
+
+  stateManager.restore();
+  stateManager.startPeriodicSave();
+
+#ifdef RUN_DEMO
+  if (stateManager.getState()->firstBoot) {
+    aquarium.startDemo();
+  }
+#endif
+
+#ifdef VL53L8CX_ENABLED
+  aquarium.setTOFInteractionManager(&tofInteractionManager);
+#endif
+
+  // DisplayTask starts the aquarium immediately. ServerTask (core 0) waits
+  // until that init finishes, then starts WiFi. Aquarium objects >= 64 B are
+  // routed to PSRAM, which leaves enough internal RAM for esp_wifi_init.
+#ifdef WIFI_ENABLED
+  s_displayReady = xSemaphoreCreateBinary();
+#endif
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
+
+#ifdef TOUCH_ENABLED
+  touchMenu.setupInterrupts();
+#endif
+
+#ifdef WIFI_ENABLED
+  // Run ServerTask on internal RAM stack for better web/network stability.
+  // PSRAM stacks can be fragile under bursty HTTP callback load.
+  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, false);
+#endif
+
+#ifdef TOUCH_ENABLED
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
+#endif
+
+  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
+
 #ifdef SCD40_ENABLED
   delay(50);
   scd40.init();
@@ -491,67 +556,11 @@ void setup(void) {
   autoRotate.init();
 #endif
 
-#ifdef TOUCH_ENABLED
-  delay(50);
-  touchMenu.setupInterrupts();
-#endif
-
 #ifdef BH1750_ENABLED
   delay(50);
   autoBrightness.init();
 #endif
 
-  // Start LittleFS
-  LittleFS.begin(true);
-
-  // Restore State
-  stateManager.restore();
-  // Start periodic save task
-  stateManager.startPeriodicSave();
-
-  #ifdef RUN_DEMO
-  if(stateManager.getState()->firstBoot) {
-    aquarium.startDemo();
-  }
-  #endif
-
-#ifdef VL53L8CX_ENABLED
-  aquarium.setTOFInteractionManager(&tofInteractionManager);
-#endif
-
-  // === CRITICAL: WiFi init MUST run before DisplayTask ===
-  // DisplayTask allocates matrix buffers + aquarium (~40KB+). If WiFi init runs
-  // after that, heap drops too low and esp_wifi_init fails with ESP_ERR_NO_MEM.
-  // Initialize WiFi here in setup() when heap is still ~75KB+.
-#ifdef WIFI_ENABLED
-  log_i("Phase 0: Initializing WiFi (before DisplayTask to preserve heap)...");
-  log_i("Free heap before WiFi: %u bytes (internal=%u)",
-        (unsigned)ESP.getFreeHeap(),
-        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-  webServerManager.initWiFi();
-  log_i("WiFi phase complete. Free heap: %u bytes (internal=%u)",
-        (unsigned)ESP.getFreeHeap(),
-        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-#endif
-
-  // === Create tasks ===
-  // DisplayTask initializes matrix and aquarium (with PSRAM routing)
-  TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
-
-#ifdef WIFI_ENABLED
-  // Run ServerTask on internal RAM stack for better web/network stability.
-  // PSRAM stacks can be fragile under bursty HTTP callback load.
-  TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, false);
-#endif
-
-#ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
-#endif
-
-  // Initialize MQTT
-  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
-
-// Create the combined sensor task
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
   TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
 #endif
