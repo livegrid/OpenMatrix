@@ -9,29 +9,28 @@
   }
 #endif
 
-// CIE - Lookup table for converting between perceived LED brightness and PWM
-// https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
-
-// 8 bit lookup table as we're only passing through 8 bit colour data so pointless to scale it up
-// to 14-bit or 16-bit values for mbi_set_pixel as it'll just take longer to load the data to the
-// panel because of more bit iterations.
-const uint16_t CIE[256] = {
-    0,    0,    0,    0,    0,    1,    1,    1,    1,    1,    1,    1,    1,    1,    2,    2,
-    2,    2,    2,    2,    2,    2,    2,    3,    3,    3,    3,    3,    3,    3,    3,    4,
-    4,    4,    4,    4,    4,    5,    5,    5,    5,    5,    6,    6,    6,    6,    6,    7,
-    7,    7,    7,    8,    8,    8,    8,    9,    9,    9,   10,   10,   10,   10,   11,   11,
-   11,   12,   12,   12,   13,   13,   13,   14,   14,   15,   15,   15,   16,   16,   17,   17,
-   17,   18,   18,   19,   19,   20,   20,   21,   21,   22,   22,   23,   23,   24,   24,   25,
-   25,   26,   26,   27,   28,   28,   29,   29,   30,   31,   31,   32,   32,   33,   34,   34,
-   35,   36,   37,   37,   38,   39,   39,   40,   41,   42,   43,   43,   44,   45,   46,   47,
-   47,   48,   49,   50,   51,   52,   53,   54,   54,   55,   56,   57,   58,   59,   60,   61,
-   62,   63,   64,   65,   66,   67,   68,   70,   71,   72,   73,   74,   75,   76,   77,   79,
-   80,   81,   82,   83,   85,   86,   87,   88,   90,   91,   92,   94,   95,   96,   98,   99,
-  100,  102,  103,  105,  106,  108,  109,  110,  112,  113,  115,  116,  118,  120,  121,  123,
-  124,  126,  128,  129,  131,  132,  134,  136,  138,  139,  141,  143,  145,  146,  148,  150,
-  152,  154,  155,  157,  159,  161,  163,  165,  167,  169,  171,  173,  175,  177,  179,  181,
-  183,  185,  187,  189,  191,  193,  196,  198,  200,  202,  204,  207,  209,  211,  214,  216,
-  218,  220,  223,  225,  228,  230,  232,  235,  237,  240,  242,  245,  247,  250,  252,  255,
+// Gamma 2.2, 8-bit channel to 14-bit PWM (0..16383).
+// The MBI5153 is configured for 14-bit grayscale and the frame sender already
+// clocks 16 bits per channel. Writing only the top 8 left the lower 6 PWM bits
+// at 0 (steps of 64). Brightness scaling then rounded a code of 1 down to 0,
+// so dark water became black speckles.
+const uint16_t GAMMA14[256] = {
+        0,     0,     0,     1,     2,     3,     4,     6,     8,    10,    13,    16,    20,    23,    28,    32,
+       37,    42,    48,    54,    61,    67,    75,    82,    90,    99,   108,   117,   127,   137,   148,   159,
+      170,   182,   195,   207,   221,   234,   249,   263,   278,   294,   310,   326,   343,   361,   379,   397,
+      416,   435,   455,   475,   496,   517,   539,   561,   583,   607,   630,   654,   679,   704,   730,   756,
+      783,   810,   838,   866,   894,   924,   953,   983,  1014,  1045,  1077,  1110,  1142,  1176,  1210,  1244,
+     1279,  1314,  1350,  1387,  1424,  1461,  1499,  1538,  1577,  1617,  1657,  1698,  1739,  1781,  1823,  1866,
+     1910,  1954,  1998,  2044,  2089,  2136,  2182,  2230,  2278,  2326,  2375,  2425,  2475,  2525,  2577,  2629,
+     2681,  2734,  2787,  2841,  2896,  2951,  3007,  3063,  3120,  3178,  3236,  3295,  3354,  3414,  3474,  3535,
+     3596,  3658,  3721,  3784,  3848,  3913,  3978,  4043,  4110,  4176,  4244,  4312,  4380,  4449,  4519,  4589,
+     4660,  4732,  4804,  4876,  4950,  5024,  5098,  5173,  5249,  5325,  5402,  5479,  5557,  5636,  5715,  5795,
+     5876,  5957,  6039,  6121,  6204,  6287,  6372,  6456,  6542,  6628,  6714,  6801,  6889,  6978,  7067,  7156,
+     7247,  7337,  7429,  7521,  7614,  7707,  7801,  7896,  7991,  8087,  8183,  8281,  8378,  8477,  8576,  8675,
+     8775,  8876,  8978,  9080,  9183,  9286,  9390,  9495,  9600,  9706,  9812,  9920, 10027, 10136, 10245, 10355,
+    10465, 10576, 10688, 10800, 10913, 11027, 11141, 11256, 11371, 11487, 11604, 11721, 11840, 11958, 12078, 12198,
+    12318, 12440, 12562, 12684, 12807, 12931, 13056, 13181, 13307, 13433, 13561, 13688, 13817, 13946, 14076, 14206,
+    14337, 14469, 14602, 14735, 14868, 15003, 15138, 15273, 15410, 15547, 15685, 15823, 15962, 16102, 16242, 16383,
 };
 
 UMatrix::UMatrix() {
@@ -251,21 +250,20 @@ void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
   if (x >= PANEL_RES_X || x < 0 || y >= PANEL_RES_Y || y < 0)
     return;
 
-  uint8_t r_data = CIE[_r_data];
-  uint8_t g_data = CIE[_g_data];
-  uint8_t b_data = CIE[_b_data];
-
   int16_t _x = x, _y = y;
   int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
   transform(_x, _y, _w, _h);
-  CRGB color = CRGB(r_data, g_data, b_data);
-  color.nscale8(brightness);
 
-  // Merged mbi_set_pixel functionality
   if (_x >= PANEL_MBI_RES_X || _y >= PANEL_MBI_RES_Y) {
     log_e("Pixel position out of bounds: x=%u, y=%u", _x, _y);
     return;
   }
+
+  // Scale in 14-bit so a dim code stays non-zero, then left-align into the
+  // 16-bit shift word. 14-bit mode ignores the bottom two bits.
+  uint16_t r_pwm = (uint16_t)(((uint32_t)GAMMA14[_r_data] * brightness) >> 8) << 2;
+  uint16_t g_pwm = (uint16_t)(((uint32_t)GAMMA14[_g_data] * brightness) >> 8) << 2;
+  uint16_t b_pwm = (uint16_t)(((uint32_t)GAMMA14[_b_data] * brightness) >> 8) << 2;
 
   _x += 2;  // offset for missing pixels on the left
 
@@ -279,21 +277,20 @@ void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
   int y_normalised = _y % PANEL_SCAN_LINES;
   int bit_start_pos = (1280 * y_normalised) + ((_x % 16) * 80) + ((_x / 16) * 16);
 
-  int subpixel_colour_bit = 8;
-  uint8_t mask;
+  int subpixel_colour_bit = 16;
   while (subpixel_colour_bit > 0) {
     subpixel_colour_bit--;
     dma_grey_gpio_data[bit_start_pos] &= _colourbitsclear;
 
-    mask = 1 << subpixel_colour_bit;
+    uint16_t mask = (uint16_t)1 << subpixel_colour_bit;
 
-    if (color.g & mask) {
+    if (g_pwm & mask) {
       dma_grey_gpio_data[bit_start_pos] |= g_gpio_bitmask;
     }
-    if (color.b & mask) {
+    if (b_pwm & mask) {
       dma_grey_gpio_data[bit_start_pos] |= b_gpio_bitmask;
     }
-    if (color.r & mask) {
+    if (r_pwm & mask) {
       dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
     }
 
