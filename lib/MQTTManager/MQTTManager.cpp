@@ -238,76 +238,149 @@ void MQTTManager::handleIncomingMessage(char* topic, char* payload, AsyncMqttCli
   checkSettingsAndReconnect();
 }
 
-void MQTTManager::publishHomeAssistantConfig() {
-  const char* sensors[] = {"temperature", "humidity", "co2"};
-  const char* units[] = {"°C", "%", "ppm"};
-  const char* icons[] = {"mdi:thermometer", "mdi:water-percent", "mdi:molecule-co2"};
+namespace {
 
-  for (int i = 0; i < 3; i++) {
-    char discoveryTopic[128];
-    snprintf(discoveryTopic, sizeof(discoveryTopic), "homeassistant/sensor/%s_%s/config", deviceId.c_str(), sensors[i]);
+// Home Assistant only offers sensors with device_class "temperature" to a
+// thermostat. Units must be the real degree sign (U+00B0), not a lookalike.
+struct HaSensorDef {
+  const char* id;
+  const char* name;
+  const char* unit;
+  const char* deviceClass;
+  int precision;
+};
 
-    DynamicJsonDocument doc(512);
-    doc["name"] = String("Livegrid ") + sensors[i];
-    doc["unique_id"] = deviceId + String("_") + sensors[i];
-    doc["state_topic"] = sensorsStateTopic;
-    doc["unit_of_measurement"] = units[i];
-    doc["value_template"] = String("{{ value_json.") + sensors[i] + " }}";
-    doc["icon"] = icons[i];
-    JsonObject dev = doc["device"].to<JsonObject>();
-    dev["identifiers"][0] = deviceId;
-    dev["name"] = "Livegrid Device";
-    dev["model"] = "Livegrid v1.0";
-    dev["manufacturer"] = "Livegrid.tech";
+const HaSensorDef kHaSensors[] = {
+    {"temperature", "Temperature", "\xC2\xB0" "C", "temperature", 1},
+    {"humidity", "Humidity", "%", "humidity", 0},
+    {"co2", "CO2", "ppm", "carbon_dioxide", 0},
+};
 
-    char payload[512];
-    serializeJson(doc, payload);
+String haDeviceName(StateManager* stateManager) {
+  const String& name = stateManager->getState()->settings.mqtt.client_id;
+  if (!name.isEmpty()) return name;
+  return String("Livegrid");
+}
 
-    publish(discoveryTopic, 0, true, payload); // Ensure retain flag is true
+void addHaDevice(JsonDocument& doc, StateManager* stateManager, const String& deviceId) {
+  JsonObject dev = doc["device"].to<JsonObject>();
+  JsonArray ids = dev["identifiers"].to<JsonArray>();
+  // Stable hardware id. Keep this first so an existing "Livegrid Device"
+  // entry is updated in place instead of forked.
+  ids.add(deviceId);
+
+  // Older firmware published a lowercase, unpadded MAC id. Listing it here
+  // makes Home Assistant merge that registry entry into this device.
+  char legacyId[40];
+  snprintf(legacyId, sizeof(legacyId), "livegrid_%x",
+           (unsigned)(uint32_t)ESP.getEfuseMac());
+  if (deviceId != legacyId) {
+    ids.add(legacyId);
   }
 
-  // Add MQTT text component configuration
-  char textDiscoveryTopic[128];
-  snprintf(textDiscoveryTopic, sizeof(textDiscoveryTopic), "homeassistant/text/%s/display_text/config", deviceId.c_str());
+  // The name set in the app is also an identifier, so a second empty device
+  // registered under that client id is merged into the device that has data.
+  const String& clientId = stateManager->getState()->settings.mqtt.client_id;
+  if (!clientId.isEmpty() && clientId != deviceId && clientId != legacyId) {
+    ids.add(clientId);
+  }
 
-  DynamicJsonDocument textDoc(512);
-  textDoc["name"] = "Matrix Text";
+  dev["name"] = haDeviceName(stateManager);
+  dev["manufacturer"] = "Livegrid.tech";
+  dev["model"] = "Livegrid v1.0";
+
+  String mac = WiFi.macAddress();
+  mac.toLowerCase();
+  if (mac.length() && mac != "00:00:00:00:00:00") {
+    JsonArray connections = dev["connections"].to<JsonArray>();
+    JsonArray conn = connections.add<JsonArray>();
+    conn.add("mac");
+    conn.add(mac);
+  }
+
+  if (WiFi.isConnected()) {
+    dev["configuration_url"] = String("http://") + WiFi.localIP().toString() + "/";
+  }
+}
+
+void publishDiscovery(MQTTManager& mqtt, const char* topic, JsonDocument& doc) {
+  String payload;
+  serializeJson(doc, payload);
+  if (!payload.length()) {
+    log_e("HA discovery JSON empty for %s", topic);
+    return;
+  }
+  mqtt.publish(topic, 0, true, payload.c_str());
+  log_i("HA discovery %s (%u bytes)", topic, (unsigned)payload.length());
+}
+
+void clearLegacyDiscovery(MQTTManager& mqtt) {
+  // Retained configs from older firmware. An empty retained payload removes
+  // the entity and, once nothing else references it, the extra device.
+  const char* topics[] = {
+      "homeassistant/sensor/livegrid/temperature/config",
+      "homeassistant/sensor/livegrid/humidity/config",
+      "homeassistant/sensor/livegrid/co2/config",
+      "homeassistant/sensor/livegrid_temperature/config",
+      "homeassistant/sensor/livegrid_humidity/config",
+      "homeassistant/sensor/livegrid_co2/config",
+      "homeassistant/text/livegrid/matrix_text/config",
+  };
+  for (const char* topic : topics) {
+    mqtt.publish(topic, 0, true, "");
+  }
+}
+
+}  // namespace
+
+void MQTTManager::publishHomeAssistantConfig() {
+  for (const HaSensorDef& sensor : kHaSensors) {
+    char discoveryTopic[128];
+    snprintf(discoveryTopic, sizeof(discoveryTopic), "homeassistant/sensor/%s_%s/config",
+             deviceId.c_str(), sensor.id);
+
+    JsonDocument doc;
+    doc["name"] = sensor.name;
+    doc["unique_id"] = deviceId + String("_") + sensor.id;
+    doc["state_topic"] = sensorsStateTopic;
+    doc["device_class"] = sensor.deviceClass;
+    doc["state_class"] = "measurement";
+    doc["unit_of_measurement"] = sensor.unit;
+    doc["suggested_display_precision"] = sensor.precision;
+    doc["value_template"] = String("{{ value_json.") + sensor.id + " }}";
+    doc["avty_t"] = availabilityTopic;
+    addHaDevice(doc, stateManager, deviceId);
+    publishDiscovery(*this, discoveryTopic, doc);
+  }
+
+  char textDiscoveryTopic[128];
+  snprintf(textDiscoveryTopic, sizeof(textDiscoveryTopic), "homeassistant/text/%s/display_text/config",
+           deviceId.c_str());
+
+  JsonDocument textDoc;
+  textDoc["name"] = "Display text";
   textDoc["unique_id"] = deviceId + String("_matrix_text");
   textDoc["command_topic"] = stateManager->getState()->settings.mqtt.matrix_text_topic;
   textDoc["state_topic"] = stateManager->getState()->settings.mqtt.matrix_text_topic;
-  JsonObject textDev = textDoc["device"].to<JsonObject>();
-  textDev["identifiers"][0] = deviceId;
-  textDev["name"] = "Livegrid Device";
-  textDev["model"] = "Livegrid v1.0";
-  textDev["manufacturer"] = "Livegrid.tech";
+  textDoc["avty_t"] = availabilityTopic;
+  addHaDevice(textDoc, stateManager, deviceId);
+  publishDiscovery(*this, textDiscoveryTopic, textDoc);
 
-  char textPayload[512];
-  serializeJson(textDoc, textPayload);
-
-  publish(textDiscoveryTopic, 0, true, textPayload); // Ensure retain flag is true
-
-  // Light entity discovery (on/off + brightness)
   char lightTopic[128];
   snprintf(lightTopic, sizeof(lightTopic), "homeassistant/light/%s/light/config", deviceId.c_str());
 
-  DynamicJsonDocument lightDoc(768);
-  lightDoc["name"] = "Livegrid Light";
-  lightDoc["unique_id"] = String(deviceId) + "_light";
+  JsonDocument lightDoc;
+  lightDoc["name"] = "Light";
+  lightDoc["unique_id"] = deviceId + String("_light");
   lightDoc["cmd_t"] = lightCommandTopic;
   lightDoc["stat_t"] = lightStateTopic;
   lightDoc["schema"] = "json";
   lightDoc["brightness"] = true;
   lightDoc["avty_t"] = availabilityTopic;
-  // group the light with sensors/text as a single device
-  JsonObject dev = lightDoc["device"].to<JsonObject>();
-  dev["identifiers"][0] = deviceId;
-  dev["name"] = "Livegrid Device";
-  dev["model"] = "Livegrid v1.0";
-  dev["manufacturer"] = "Livegrid.tech";
+  addHaDevice(lightDoc, stateManager, deviceId);
+  publishDiscovery(*this, lightTopic, lightDoc);
 
-  char lightPayload[512];
-  serializeJson(lightDoc, lightPayload);
-  publish(lightTopic, 0, true, lightPayload);
+  clearLegacyDiscovery(*this);
 }
 
 void MQTTManager::publishSensorData(float temperature, float humidity, int co2, const char* topic) {
@@ -376,7 +449,7 @@ void MQTTManager::computeTopics() {
 void MQTTManager::publishAutoBrightnessConfig() {
   char topic[128];
   snprintf(topic, sizeof(topic), "homeassistant/switch/%s/autobrightness/config", deviceId.c_str());
-  DynamicJsonDocument doc(512);
+  JsonDocument doc;
   doc["name"] = "Auto Brightness";
   doc["unique_id"] = deviceId + String("_autobrightness");
   doc["command_topic"] = String("livegrid/") + deviceId + "/autobrightness/set";
@@ -384,14 +457,8 @@ void MQTTManager::publishAutoBrightnessConfig() {
   doc["payload_on"] = "ON";
   doc["payload_off"] = "OFF";
   doc["avty_t"] = availabilityTopic;
-  JsonObject dev = doc["device"].to<JsonObject>();
-  dev["identifiers"][0] = deviceId;
-  dev["name"] = "Livegrid Device";
-  dev["model"] = "Livegrid v1.0";
-  dev["manufacturer"] = "Livegrid.tech";
-  char payload[512];
-  serializeJson(doc, payload);
-  publish(topic, 0, true, payload);
+  addHaDevice(doc, stateManager, deviceId);
+  publishDiscovery(*this, topic, doc);
 }
 
 void MQTTManager::publishAutoBrightnessState() {
