@@ -9,11 +9,25 @@ class Water {
   Matrix* matrix = nullptr;
 
   CRGB simplexColor = CRGB(0, 100, 100);
+  // One hand-picked color per slot across 10–35°C. Teal is held at the
+  // comfortable point, and the last slot is full red at 34–35°C.
   CRGBPalette16 palette = CRGBPalette16(
-      CRGB(0, 20, 80),   // cold
-      CRGB(0, 100, 80),  // normal low
-      CRGB(0, 100, 80),  // normal high
-      CRGB(100, 0, 20)   // warm
+      CRGB(0, 28, 72),    // 10°C deep blue
+      CRGB(0, 32, 80),
+      CRGB(0, 40, 88),
+      CRGB(0, 52, 96),
+      CRGB(0, 64, 96),
+      CRGB(0, 84, 92),
+      CRGB(0, 96, 86),
+      CRGB(0, 100, 80),   // 21°C anchor
+      CRGB(0, 100, 80),   // keep the anchor broad
+      CRGB(12, 96, 72),   // first step off teal
+      CRGB(28, 88, 56),
+      CRGB(56, 76, 36),
+      CRGB(80, 60, 20),
+      CRGB(96, 36, 12),
+      CRGB(100, 16, 8),   // deep red
+      CRGB(100, 0, 0)     // 34–35°C full red
   );
 
   FastNoiseLite noise;
@@ -40,9 +54,17 @@ class Water {
       return;
     }
 
-    uint8_t limitTemperature = constrain(temperature, 0, 50);
-    uint8_t colorIndex = map(limitTemperature, 0, 50, 0, 245);
-    simplexColor = ColorFromPalette(palette, colorIndex);
+    // The palette blend wraps the last slot back toward slot 0, so 34–35°C
+    // was mixing cold blue into the red and going dim. Hold the endpoints.
+    if (temperature <= 10) {
+      simplexColor = palette[0];
+    } else if (temperature >= 34) {
+      simplexColor = palette[15];
+    } else {
+      uint8_t colorIndex = map(temperature, 10, 35, 0, 255);
+      colorIndex = min<uint8_t>(colorIndex, 235);
+      simplexColor = ColorFromPalette(palette, colorIndex, 255, LINEARBLEND);
+    }
 
     float timeZ = (float)(millis() * simplexSpeed);
 
