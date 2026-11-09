@@ -41,6 +41,7 @@ class TouchMenu {
   std::string itemToConfirm;
 
   unsigned long lastTapTime[3] = {0, 0, 0};
+  unsigned long ignoreTouchUntil = 0;
   static const unsigned long DOUBLE_TAP_INTERVAL = 500; // ms
 
   static TouchMenu* instance;

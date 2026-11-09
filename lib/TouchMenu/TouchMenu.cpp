@@ -1,5 +1,28 @@
 #include "TouchMenu.h"
 #include "Aquarium.h"
+#include "driver/touch_sensor.h"
+
+namespace {
+
+bool touchBaselinesReady(const uint8_t* pins, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    int8_t pad = digitalPinToTouchChannel(pins[i]);
+    if (pad <= 0) {
+      return false;
+    }
+    uint32_t benchmark = 0;
+    if (touch_pad_read_benchmark((touch_pad_t)pad, &benchmark) != ESP_OK) {
+      return false;
+    }
+    // 0 and the max sample are the pre-measurement values, not a real baseline.
+    if (benchmark == 0 || benchmark >= TOUCH_PAD_THRESHOLD_MAX) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
 
 TouchMenu* TouchMenu::instance = nullptr;
 
@@ -288,8 +311,38 @@ void TouchMenu::displayBrightnessControl() {
 }
 
 void TouchMenu::setupInterrupts() {
-  touchAttachInterrupt(11, gotTouch1, touchThreshold);
-  touchAttachInterrupt(13, gotTouch2, touchThreshold);
+  const uint8_t pins[2] = {11, 13};
+  // A touch is (reading - benchmark) > threshold. The benchmark powers up as
+  // the max sample, so arming the real threshold immediately latches the pad
+  // active until a physical press forces it to update.
+  touchAttachInterrupt(pins[0], gotTouch1, TOUCH_PAD_THRESHOLD_MAX);
+  touchAttachInterrupt(pins[1], gotTouch2, TOUCH_PAD_THRESHOLD_MAX);
+
+  delay(50);
+  for (int attempt = 0; attempt < 5; attempt++) {
+    touch_pad_reset_benchmark(TOUCH_PAD_MAX);
+    delay(20);
+    if (touchBaselinesReady(pins, 2)) {
+      break;
+    }
+  }
+
+  for (uint8_t pin : pins) {
+    int8_t pad = digitalPinToTouchChannel(pin);
+    if (pad < 0) {
+      log_e("No touch channel on GPIO%d", pin);
+      continue;
+    }
+    uint32_t benchmark = 0;
+    touch_pad_read_benchmark((touch_pad_t)pad, &benchmark);
+    touch_pad_set_thresh((touch_pad_t)pad, (uint32_t)touchThreshold);
+    log_i("Touch GPIO%d benchmark=%u threshold=%u", pin, benchmark, (unsigned)touchThreshold);
+  }
+
+  touch_pad_intr_clear((touch_pad_intr_mask_t)(TOUCH_PAD_INTR_MASK_ACTIVE | TOUCH_PAD_INTR_MASK_INACTIVE));
+  ignoreTouchUntil = millis() + 200;
+  touch1detected = false;
+  touch2detected = false;
 }
 
 void TouchMenu::update() {
@@ -306,6 +359,12 @@ void TouchMenu::update() {
 
     if (*touchDetected) {
       *touchDetected = false;
+      if (now < ignoreTouchUntil) {
+        if (pin == 13 && aquarium) {
+          aquarium->onTouchReleased();
+        }
+        continue;
+      }
       if (touchInterruptGetLastStatus(pin)) {
         log_i(" --- T%d Touched", i + 1);
         
