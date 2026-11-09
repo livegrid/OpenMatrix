@@ -179,9 +179,17 @@ void UMatrix::update() {
   assert(initialized);
 
   mbi_update_frame(true);
-  spi_transfer_loop_stop();
+  if (spi_transfer_loop_stop() != ESP_OK) {
+    log_e("GCLK loop stop failed");
+  }
   mbi_v_sync_dma();
-  spi_transfer_loop_start();
+  if (spi_transfer_loop_start() != ESP_OK) {
+    log_e("GCLK loop start failed, retrying");
+    spi_transfer_loop_stop();
+    if (spi_transfer_loop_start() != ESP_OK) {
+      log_e("GCLK loop restart failed");
+    }
+  }
 
   // log_e("tsfr count: %d", dma_bus.get_transfer_count());
 

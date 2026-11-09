@@ -30,6 +30,7 @@
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
 #include <esp_check.h>
+#include <esp_rom_sys.h>
 #include <esp_private/spi_common_internal.h> // need to latest version alpha of esp32-idf for this file
 #include <freertos/queue.h>
 #include <hal/spi_hal.h>
@@ -67,17 +68,18 @@
 
 /**************************************************************************************/
 
-intr_handle_t intr_handle;
-static void default_isr_handler(void *args);
-
 DMA_ATTR volatile int  spi_seg_transfer_count = 0;
-DMA_ATTR volatile bool spi_seg_transfer_complete = false;
 
 esp_err_t spi_transfer_initial_payload();
 esp_err_t spi_dma_seg_setup();
+static bool spi_wait_usr_idle(uint32_t timeout_us);
 
-DMA_ATTR static uint32_t spi_seg_conf_1[4];
-DMA_ATTR static uint32_t spi_seg_conf_2[4];
+// Must be >= 2 segment periods: a stop request can land just after the DMA
+// fetched the CONF word for the next segment.
+#define SPI_SEG_STOP_TIMEOUT_US 50000
+
+// The CPU rewrites the CONF word while GDMA reads it every lap.
+DMA_ATTR static volatile uint32_t spi_seg_conf_1[4];
 
 DMA_ATTR static uint32_t spi_seg_conf_value_nxt_true;
 DMA_ATTR static uint32_t spi_seg_conf_value_nxt_false;
@@ -102,19 +104,6 @@ static spi_device_handle_t spi_device;
 
 
 /**************************************************************************************/
-IRAM_ATTR static void default_isr_handler(void *args)
-{
-  spi_seg_transfer_count++;
-
-  //assert(false);
-
-  spi_seg_transfer_complete = true;
-
-  spi_ll_clear_intr(&GPSPI2, SPI_LL_INTR_TRANS_DONE); // need this for the transacion to start
-  spi_ll_clear_intr(&GPSPI2, SPI_LL_INTR_SEG_DONE); // need this for the transacion to start
-
-}
- 
 int spi_get_transfer_count () {
   return spi_seg_transfer_count;
 }
@@ -158,8 +147,8 @@ void lldesc_setup_chain(lldesc_t *dmadesc, int dma_desc_count, bool loop) {
 
   dma_desc_count--;
 
-  // Link last to first
-  dmadesc[dma_desc_count].eof = 1;      
+  // A circular ring must not mark its tail as EOF, or GDMA raises EOF every lap.
+  dmadesc[dma_desc_count].eof = loop ? 0 : 1;
 
   if ( loop == true) {
     dmadesc[dma_desc_count].qe.stqe_next = &dmadesc[0];     
@@ -292,9 +281,11 @@ esp_err_t spi_transfer_initial_payload()
   trans.rxlength = 0;
 
   CHECK_CALLE(spi_device_polling_start(spi_device, &trans, portMAX_DELAY), "Could not start SPI transfer");
+  // polling_start() only kicks the transfer off. The peripheral must be idle
+  // before the segmented loop is armed.
+  CHECK_CALLE(spi_device_polling_end(spi_device, portMAX_DELAY), "Could not end SPI transfer");
 
-
-  log_d("spi_transfer_loop_start() complete");
+  log_d("spi_transfer_initial_payload() complete");
 
   return ESP_OK;
 }
@@ -347,7 +338,7 @@ esp_err_t spi_dma_seg_setup()
 
   // Future note: Each SPI segment must be < 32kB.
   int offset = 0;
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_seg_conf_1, 4*3, 0); // setup dma link list descriptor for CONF data
+  offset = lldesc_setup_chunk(dma_data_lldesc, (const void *)spi_seg_conf_1, 4*3, 0); // setup dma link list descriptor for CONF data
   //offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_octal_payload, sizeof(spi_tx_octal_payload), offset); // setup dma link list descriptors for payload
   offset = lldesc_setup_chunk(dma_data_lldesc, spi_tx_octal_payload, (GCLK_TOTAL_SIZE * sizeof(uint8_t)), offset); // setup dma link list descriptors for payload
 
@@ -359,15 +350,24 @@ esp_err_t spi_dma_seg_setup()
 
 esp_err_t spi_transfer_loop_start()
 {
-  esp_err_t ret;
-
-  // Need to do first start first to set registers.
-  // log_d("Starting Output Loop");
+  // Writing cmd.usr = 1 while it is still 1 is silently ignored, which leaves
+  // GCLK dead. Refuse to start unless the engine is really idle.
+  if (!spi_wait_usr_idle(SPI_SEG_STOP_TIMEOUT_US)) {
+    log_e("spi_transfer_loop_start(): SPI peripheral did not go idle");
+    return ESP_ERR_TIMEOUT;
+  }
 
   // Ensure we keep looping, not interrupt when it reads the conf word
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_true; // If this bit is set, it means this configurable segmented transfer will continue its next 
+  __sync_synchronize();
 
   GPSPI2.slave.dma_seg_magic_value = 0xA;
+
+  for (int i = 0; i < dma_lldesc_required; i++) {
+    dma_data_lldesc[i].owner = 1;
+  }
+  dma_data_lldesc[dma_lldesc_required - 1].eof = 0;
+  dma_data_lldesc[dma_lldesc_required - 1].qe.stqe_next = &dma_data_lldesc[0];
 
   const spi_bus_attr_t* bus_attr = spi_bus_get_attr(SPI2_HOST); 
 
@@ -384,13 +384,11 @@ esp_err_t spi_transfer_loop_start()
   
   GPSPI2.misc.cs0_dis = 1;    // turn off client select pin
 
-  // Clear interrupt vectors
+  // Clear interrupt vectors. These are polled, never enabled: the SPI master
+  // driver's own ISR would not clear dma_seg_trans_done and would re-enter forever.
   GPSPI2.dma_int_clr.dma_seg_trans_done = 1; 
   GPSPI2.dma_int_clr.trans_done = 1; 
-
-  // Enable if not already enabled
-  GPSPI2.dma_int_ena.dma_seg_trans_done = 1;
-  GPSPI2.dma_int_ena.trans_done = 1; 
+  GPSPI2.dma_int_clr.seg_magic_err = 1;
 
   // Further Reduce time between segment loops. These registers are not changed by CONF.
   GPSPI2.cmd.conf_bitlen = 0;         /*Define the APB cycles of  SPI_CONF state. Can be configured in CONF state.*/
@@ -400,39 +398,57 @@ esp_err_t spi_transfer_loop_start()
   GPSPI2.user1.usr_addr_bitlen = 0;   /*The length in bits of address phase. The register value shall be (bit_num-1). Can be configured in CONF state.*/
 
 
-  ret = esp_intr_free(intr_handle);
-
-  ret = esp_intr_alloc_intrstatus(ETS_SPI2_INTR_SOURCE, ESP_INTR_FLAG_SHARED, (uint32_t)&GPSPI2.dma_int_st.val, (SPI_DMA_SEG_TRANS_DONE_INT_ENA_M | SPI_SEG_MAGIC_ERR_INT_ENA_M | SPI_TRANS_DONE_INT_ENA_M), default_isr_handler,  NULL, &intr_handle); 
-  assert(ret == ESP_OK);
-
-  ret = esp_intr_enable(intr_handle);
-  assert(ret == ESP_OK);
-
   GPSPI2.cmd.update = 1;
   while (GPSPI2.cmd.update);    //waiting config applied  
 
   // start trans
   GPSPI2.cmd.usr = 1;  
 
-  spi_seg_transfer_complete = false;
+  if (GPSPI2.cmd.usr == 0) {
+    log_e("spi_transfer_loop_start(): cmd.usr did not latch");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  spi_seg_transfer_count++;
 
   return ESP_OK;
 
 }
 
+// dma_seg_trans_done fires at the end of every segment, so it cannot prove the
+// engine stopped. cmd.usr == 0 is the real idle condition.
+static bool spi_wait_usr_idle(uint32_t timeout_us)
+{
+  while (GPSPI2.cmd.usr != 0) {
+    if (GPSPI2.dma_int_raw.seg_magic_err) {
+      GPSPI2.dma_int_clr.seg_magic_err = 1;
+      log_e("seg_magic_err while waiting for SPI idle");
+      return false;
+    }
+    if (timeout_us == 0) {
+      log_e("SPI idle timeout, cmd=%08lx raw=%08lx",
+            (unsigned long)GPSPI2.cmd.val, (unsigned long)GPSPI2.dma_int_raw.val);
+      return false;
+    }
+    esp_rom_delay_us(1);
+    timeout_us--;
+  }
+  return true;
+}
 
-// This will generate an interrupt due to the SPI_USR_CONF_NST being ZERO'd
 esp_err_t spi_transfer_loop_stop(void) {
 
-  // log_d("Calling spi_transfer_loop_stop()");  
+  GPSPI2.dma_int_clr.dma_seg_trans_done = 1;
 
-  //spi_seg_conf_2[1]  = GPSPI2.user.val & ~(SPI_USR_CONF_NXT); // If this bit is set, it means this configurable segmented transfer will continue its next 
-  spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_false; // If this bit is set, it means this configurable segmented transfer will continue its next 
+  // Ask the segmented engine not to continue past the next segment boundary.
+  spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_false;
+  __sync_synchronize();
 
-  // Wait until completion.
-  while (!spi_seg_transfer_complete);
+  bool ok = spi_wait_usr_idle(SPI_SEG_STOP_TIMEOUT_US);
 
-  return ESP_OK;
+  GPSPI2.dma_int_clr.dma_seg_trans_done = 1;
+
+  return ok ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
 
