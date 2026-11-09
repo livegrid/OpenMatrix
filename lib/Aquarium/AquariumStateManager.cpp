@@ -3,9 +3,8 @@
 const char* AquariumStateManager::FILENAME = "/aquarium_state.json";
 
 AquariumStateManager::AquariumStateManager() {
-    if (!LittleFS.begin(true)) {
-        log_e("An error occurred while mounting LittleFS");
-    }
+    // Mount from setup(). This object is global, and LittleFS is not ready
+    // while global constructors are still running.
 }
 
 void AquariumStateManager::saveState(const std::vector<std::unique_ptr<Fish>>& fishArray) {
@@ -80,12 +79,15 @@ bool AquariumStateManager::loadState(std::vector<std::unique_ptr<Fish>>& fishArr
     file.close();
 
     if (error) {
-        log_e("[LOAD] Failed to parse state.json");
+        log_e("[LOAD] Failed to parse %s (%s). Removing it.", FILENAME, error.c_str());
+        LittleFS.remove(FILENAME);
         return false;
     }
 
     fishArray.clear();
     JsonArray fishesJson = doc["fishes"];
+    int loaded = 0;
+    int skipped = 0;
     for (JsonObject fishJson : fishesJson) {
         Fish::FishDefinition fishDef;
         fishDef.age = fishJson["age"];
@@ -105,9 +107,21 @@ bool AquariumStateManager::loadState(std::vector<std::unique_ptr<Fish>>& fishArr
             fishDef.colors.push_back(color);
         }
 
-        fishArray.emplace_back(std::make_unique<Fish>(matrix, fishDef));
+        auto fish = std::make_unique<Fish>(matrix, fishDef);
+        if (!fish->isRestorable()) {
+            skipped++;
+            continue;
+        }
+        fishArray.emplace_back(std::move(fish));
+        loaded++;
     }
 
-    log_i("[LOAD] State loaded successfully");
+    if (loaded == 0) {
+        log_e("[LOAD] No usable fish in %s (%d skipped). Removing it.", FILENAME, skipped);
+        LittleFS.remove(FILENAME);
+        return false;
+    }
+
+    log_i("[LOAD] State loaded successfully (%d fish, %d skipped)", loaded, skipped);
     return true;
 }

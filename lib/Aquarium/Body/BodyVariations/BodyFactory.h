@@ -161,6 +161,15 @@ class BodyFactory {
     Tail* tail = createTail(tailType);
     Fin* fin = createFin(finType);
 
+    // A saved fish from older firmware can name a part this build does not
+    // know. Building the body anyway crashes on the first frame.
+    if (!head || !tail || !fin) {
+      delete head;
+      delete tail;
+      delete fin;
+      return nullptr;
+    }
+
     if (type == "Fish") {
       return new FishBody(matrix, head, tail, fin);
     } else if (type == "Turtle") {

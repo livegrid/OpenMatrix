@@ -24,20 +24,20 @@ void MQTTManager::begin(const char* host, uint16_t port, StateManager* stateMana
   updateSettingsFromState();
   computeTopics();
 
-  // Reconnect MQTT when WiFi recovers
+  // MQTT can only connect once WiFi has an IP. Before that the lwIP stack is
+  // not running and AsyncTCP::connect crashes on a null tcpip mailbox.
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     MQTTManager& mgr = MQTTManager::getInstance();
     if (!mgr.isConnected()) {
-      log_i("WiFi reconnected, triggering MQTT reconnect");
-      xTimerStart(mgr.mqttReconnectTimer, 0);
+      log_i("WiFi got IP, connecting MQTT");
+      mgr.connect();
     }
   }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
 
-  const State* state = stateManager->getState();
-  if (!state->settings.mqtt.host.isEmpty() && state->settings.mqtt.host != "0") {
+  if (WiFi.isConnected()) {
     connect();
   } else {
-    log_i("MQTT host not defined or set to 0. Skipping initial connection.");
+    log_i("WiFi not connected yet. MQTT will connect once WiFi has an IP.");
   }
 }
 
@@ -69,6 +69,10 @@ void MQTTManager::connect() {
   const State* state = stateManager->getState();
   if (state->settings.mqtt.host.isEmpty() || state->settings.mqtt.host == "0") {
     log_i("MQTT host not defined or set to 0. Skipping connection attempt.");
+    return;
+  }
+  if (!WiFi.isConnected()) {
+    log_i("WiFi not connected. Skipping MQTT connection attempt.");
     return;
   }
   
@@ -429,10 +433,19 @@ void MQTTManager::checkSettingsAndReconnect() {
     settingsChanged = true;
   }
 
-  if (settingsChanged) {
-    log_i("MQTT host changed. Reconnecting...");
-    pendingImmediateReconnect = true;
+  if (!settingsChanged) {
+    return;
+  }
+
+  const bool hostSet = !state->settings.mqtt.host.isEmpty() && state->settings.mqtt.host != "0";
+  if (mqttClient.connected()) {
+    log_i("MQTT settings changed. Reconnecting...");
+    pendingImmediateReconnect = hostSet;
     disconnect();
+  } else if (hostSet) {
+    // Never connected, so no disconnect callback will fire to reconnect.
+    log_i("MQTT settings changed. Connecting...");
+    connect();
   }
 }
 

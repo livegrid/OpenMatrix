@@ -67,11 +67,17 @@ class Fish {
                                     matrix->getXResolution() * PHYSICS_SCALE,
                                     matrix->getYResolution() * PHYSICS_SCALE);
 
+    fishDefinition = fishDef;
+    // Unusable saved fish are dropped by the loader via isRestorable().
+    if (!this->body || !this->motion) {
+      log_e("Saved fish is not usable (body=%s, motion=%s)",
+            fishDef.bodyType.c_str(), fishDef.motionType.c_str());
+      return;
+    }
+
     if (!fishDef.colors.empty()) {
       body->setColorPaletteHSV(fishDef.colors);
     }
-
-    fishDefinition = fishDef;
   }
 
   Fish(Matrix* matrix, PVector pos = PVector(0, 0), float age = 0,
@@ -210,6 +216,10 @@ class Fish {
 
   Food* getFood() {
     return food;
+  }
+
+  bool isRestorable() const {
+    return body != nullptr && motion != nullptr;
   }
 
   float getHealth() const {
