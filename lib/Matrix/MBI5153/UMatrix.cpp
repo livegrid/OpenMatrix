@@ -76,6 +76,7 @@ void UMatrix::init() {
 
   // Fill with zeros to start with
   memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+  restoreFrameLatchBits();
 
   dma_cmd_data = (ESP32_GREY_DMA_STORAGE_TYPE*)heap_caps_calloc(
       MBI_CMD_BUFFER_ENTRIES, sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
@@ -173,6 +174,7 @@ void UMatrix::rotate90() {
 
 void UMatrix::clearScreen() {
   memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+  restoreFrameLatchBits();
 }
 
 void UMatrix::update() {
@@ -183,7 +185,7 @@ void UMatrix::update() {
     refreshMatrixConfig();
   }
 
-  mbi_update_frame(true);
+  mbi_update_frame();
   if (spi_transfer_loop_stop() != ESP_OK) {
     log_e("GCLK loop stop failed");
   }
@@ -201,36 +203,20 @@ void UMatrix::update() {
   clearScreen();
 }
 
-void UMatrix::mbi_update_frame(bool configure_latches) {
-  int counter = 0;
-  for (int row = 0; row < PANEL_SCAN_LINES; row++) {
-    for (int chan = 0; chan < PANEL_MBI_LED_CHANS; chan++) {
-      for (int ic = 0; ic < PANEL_MBI_CHAIN_LEN;
-           ic++) {  // number of chained ICs
-
-        // data latch on the last bit, when sending the last byte set latch=1
-        int latch = 0;
-        if (ic == 4) {
-          latch = 1;
-        }  // latch on last channel / ic
-
-        int bit_offset = 16;
-        while (bit_offset > 0)  // shift out MSB first per the documentation.
-        {
-          bit_offset--;  // start from 15
-
-          if (latch == 1 && bit_offset == 0) {
-            dma_grey_gpio_data[counter] |= BIT_LAT;
-          }
-          counter++;
-        }
-      }
-    }
-  }
-
-  // log_d(TAG, "Sending greyscale data buffer out via LCD DMA.");
+void UMatrix::mbi_update_frame() {
   dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size,
                           true);  // sending payload hence TRUE
+}
+
+// Data latch on the last bit of the last chained IC for every row/channel.
+// Pixel writes only touch RGB lanes, so these survive until the next clear.
+void UMatrix::restoreFrameLatchBits() {
+  for (int row = 0; row < PANEL_SCAN_LINES; row++) {
+    for (int chan = 0; chan < PANEL_MBI_LED_CHANS; chan++) {
+      dma_grey_gpio_data[row * PANEL_MBI_LED_CHANS * PANEL_MBI_CHAIN_LEN * 16 +
+                         (chan + 1) * PANEL_MBI_CHAIN_LEN * 16 - 1] |= BIT_LAT;
+    }
+  }
 }
 
 void UMatrix::updateRegisters() {

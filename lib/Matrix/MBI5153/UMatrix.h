@@ -40,7 +40,8 @@ class UMatrix : public Matrix {
                                 // value of 26 bytes
 
   void transform(int16_t &x, int16_t &y, int16_t &w, int16_t &h);
-  void mbi_update_frame(bool configure_latches);
+  void mbi_update_frame();
+  void restoreFrameLatchBits();
   void mbi_set_pixel(uint8_t x, uint8_t y,  uint8_t _r_data, uint8_t _g_data, uint8_t _b_data);
   void mbi_pre_active_dma();
   void mbi_v_sync_dma();
