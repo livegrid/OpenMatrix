@@ -11,6 +11,8 @@ private:
     std::vector<std::vector<Boid>> boidGroups;
     Matrix* matrix;
     PVector limits;
+    // 1 = healthy green, 0 = white; uses the same CO2 health rates as Fish
+    float health = 1.0f;
 
 public:
     BoidManager(Matrix* m);

@@ -58,7 +58,26 @@ public:
   }
 
   void displayEgg() {
-    matrix->foreground->drawPixel(pos.x, pos.y, CRGB(colorPalette->colors[0].r, colorPalette->colors[0].g, colorPalette->colors[0].b));
+    const int x = (int)pos.x;
+    const int y = (int)pos.y;
+    if (x < 0 || y < 0 || x >= matrix->getXResolution() ||
+        y >= matrix->getYResolution()) {
+      return;
+    }
+
+    // Twinkle via alpha over the background. Never fade the egg toward black —
+    // Stack treats CRGB(0,0,0) as transparent, so dimming RGB would look like a
+    // dead pixel instead of disappearing into the water.
+    const float phase =
+        millis() * EGG_TWINKLE_SPEED + pos.x * 17.0f + pos.y * 31.0f;
+    const float wave = (sinf(phase) + 1.0f) * 0.5f;
+    const uint8_t alpha = (uint8_t)(EGG_TWINKLE_MIN_ALPHA +
+                                    wave * (EGG_TWINKLE_MAX_ALPHA -
+                                            EGG_TWINKLE_MIN_ALPHA));
+
+    const CRGB eggColor = colorPalette->colors[0];
+    const CRGB bgColor = matrix->background->pixels->data[y][x];
+    matrix->foreground->drawPixel(x, y, blend(bgColor, eggColor, alpha));
   }
   
   void setColorPaletteHSV(const std::vector<CHSV>& palette) {

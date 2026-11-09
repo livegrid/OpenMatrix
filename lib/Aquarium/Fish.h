@@ -54,7 +54,7 @@ class Fish {
 
   Fish(Matrix* matrix, const FishDefinition& fishDef)
       : matrix(matrix),
-        pos(PVector(0, 0)),
+        pos(randomOutsideEdgePosition(matrix)),
         age(fishDef.age),
         health(fishDef.health) {  // Member initializer list
     BodyFactory bodyFactory(matrix);
@@ -86,6 +86,12 @@ class Fish {
     BodyFactory bodyFactory(matrix);
     initializeAgingRate();
 
+    // Default / unspecified spawn: enter from a random outside edge.
+    // Do this before creating motion so physics starts at the edge position.
+    if (pos.x == 0 && pos.y == 0) {
+      this->pos = randomOutsideEdgePosition(matrix);
+    }
+
     std::vector<BodyMotionType> types = {{"Fish", "Fish", 0.5},
                                          {"Star", "Star", 0.1},
                                          {"Turtle", "Turtle", 0.2},
@@ -103,20 +109,15 @@ class Fish {
 
     // Ensure the motion is created successfully
     this->motion = MotionFactory::createMotion(
-        selectedType.motionType, pos * PHYSICS_SCALE,
+        selectedType.motionType, this->pos * PHYSICS_SCALE,
         matrix->getXResolution() * PHYSICS_SCALE,
         matrix->getYResolution() * PHYSICS_SCALE);
     if (!this->motion) {
       // Fallback to a default motion type if creation fails
       this->motion = MotionFactory::createMotion(
-          "Fish", pos * PHYSICS_SCALE, matrix->getXResolution() * PHYSICS_SCALE,
+          "Fish", this->pos * PHYSICS_SCALE,
+          matrix->getXResolution() * PHYSICS_SCALE,
           matrix->getYResolution() * PHYSICS_SCALE);
-    }
-
-    // Initialize position to a random location if not provided
-    if (pos.x == 0 && pos.y == 0) {
-      this->pos = PVector(random(matrix->getXResolution()),
-                          random(matrix->getYResolution()));
     }
 
     fishDefinition = {age,
@@ -244,6 +245,22 @@ class Fish {
  private:
   unsigned long lastUpdateTime = millis();
   float agingRate;
+
+  static PVector randomOutsideEdgePosition(Matrix* matrix) {
+    const float w = (float)matrix->getXResolution();
+    const float h = (float)matrix->getYResolution();
+    const float margin = FISH_SPAWN_EDGE_MARGIN;
+    switch (random(0, 4)) {
+      case 0:  // top
+        return PVector(random(0, (long)w), -margin);
+      case 1:  // bottom
+        return PVector(random(0, (long)w), h - 1.0f + margin);
+      case 2:  // left
+        return PVector(-margin, random(0, (long)h));
+      default:  // right
+        return PVector(w - 1.0f + margin, random(0, (long)h));
+    }
+  }
 
   void initializeAgingRate() {
     float baseRate = 1.0f / (FISH_LIFESPAN_DAYS * 24 * 60 * 60 *

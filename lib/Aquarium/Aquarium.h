@@ -239,14 +239,9 @@ class Aquarium {
 
   // Initialize fish and store them in a vector of unique pointers
   void initializeFish() {
-    PVector centerPos(matrix->getXResolution() / 2,
-                      matrix->getYResolution() / 2);
     for (int i = 0; i < NUM_FISH_START; i++) {
-      fishArray.emplace_back(
-          std::make_unique<Fish>(matrix,
-                                 PVector(random(0, matrix->getXResolution()),
-                                         random(0, matrix->getYResolution())),
-                                 0.5f));
+      // Default Fish ctor spawns from a random outside edge.
+      fishArray.emplace_back(std::make_unique<Fish>(matrix, PVector(0, 0), 0.5f));
     }
   }
 

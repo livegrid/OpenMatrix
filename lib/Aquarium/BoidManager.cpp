@@ -24,9 +24,17 @@ void BoidManager::updateBoids(long co2) {
   float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
   speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f);
   speedMultiplier /= 100.0f;
+  if (co2 >= CO2_REALBAD) {
+    health -= HEALTH_REDUCTION_RATE_REALBAD;
+  } else if (co2 >= CO2_BAD) {
+    health -= HEALTH_REDUCTION_RATE_BAD;
+  } else {
+    health += HEALTH_INCREASE_RATE_GOOD;
+  }
+  health = constrain(health, 0.0f, 1.0f);
   for (auto& group : boidGroups) {
     for (auto& boid : group) {
-      boid.run(group.data(), group.size(),speedMultiplier);
+      boid.run(group.data(), group.size(), speedMultiplier);
       boid.avoidBorders();
     }
   }
@@ -44,6 +52,10 @@ void BoidManager::applyAttractor(float x, float y, float strength) {
 }
 
 void BoidManager::renderBoids() {
+  // Desaturate toward white as CO2 rises, matching the big fish health look.
+  CRGB color = blend(CRGB(220, 220, 220), CRGB(50, 200, 100),
+                     (uint8_t)(health * 255.0f));
+
   for (const auto& group : boidGroups) {
     for (const auto& boid : group) {
       // Calculate the second point of the line
@@ -51,8 +63,8 @@ void BoidManager::renderBoids() {
       int x2 = boid.location.x + cos(angle);
       int y2 = boid.location.y + sin(angle);
 
-      // Draw the line
-      matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2, CRGB(50, 200, 100));
+      matrix->foreground->drawLine(boid.location.x, boid.location.y, x2, y2,
+                                   color);
     }
   }
 }
