@@ -1,3 +1,4 @@
+#pragma GCC optimize("O2")
 #include "UMatrix.h"
 
 #ifndef _swap_int16_t
@@ -76,7 +77,16 @@ void UMatrix::init() {
 
   // Fill with zeros to start with
   memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-  restoreFrameLatchBits();
+
+  // PSRAM keeps internal RAM free for WiFi; only update() reads it, once per frame.
+  framebuffer_size = sizeof(Rgb8) * PANEL_MBI_RES_Y * PANEL_MBI_RES_X;
+  framebuffer = (Rgb8(*)[PANEL_MBI_RES_X])heap_caps_calloc(
+      1, framebuffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (framebuffer == nullptr) {
+    framebuffer = (Rgb8(*)[PANEL_MBI_RES_X])heap_caps_calloc(
+        1, framebuffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  }
+  assert(framebuffer != nullptr);
 
   dma_cmd_data = (ESP32_GREY_DMA_STORAGE_TYPE*)heap_caps_calloc(
       MBI_CMD_BUFFER_ENTRIES, sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
@@ -173,8 +183,7 @@ void UMatrix::rotate90() {
 }
 
 void UMatrix::clearScreen() {
-  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-  restoreFrameLatchBits();
+  memset(framebuffer, 0, framebuffer_size);
 }
 
 void UMatrix::update() {
@@ -185,6 +194,7 @@ void UMatrix::update() {
     refreshMatrixConfig();
   }
 
+  flushFramebuffer();
   mbi_update_frame();
   if (spi_transfer_loop_stop() != ESP_OK) {
     log_e("GCLK loop stop failed");
@@ -208,13 +218,76 @@ void UMatrix::mbi_update_frame() {
                           true);  // sending payload hence TRUE
 }
 
-// Data latch on the last bit of the last chained IC for every row/channel.
-// Pixel writes only touch RGB lanes, so these survive until the next clear.
-void UMatrix::restoreFrameLatchBits() {
+// Transpose a 16x16 bit matrix in place. On entry each value is one GPIO
+// lane's 16-bit PWM word (lane n at index 15 - n); on exit each value is one
+// parallel DMA sample, MSB first.
+static inline void transpose16x16(uint16_t A[16]) {
+  uint16_t t;
+  for (int k = 0; k < 8; k++) {
+    t = (A[k] ^ (A[k + 8] >> 8)) & 0x00FF;
+    A[k] ^= t;
+    A[k + 8] ^= (t << 8);
+  }
+  for (int k = 0; k < 16; k += 8) {
+    for (int j = 0; j < 4; j++) {
+      t = (A[k + j] ^ (A[k + j + 4] >> 4)) & 0x0F0F;
+      A[k + j] ^= t;
+      A[k + j + 4] ^= (t << 4);
+    }
+  }
+  for (int k = 0; k < 16; k += 4) {
+    for (int j = 0; j < 2; j++) {
+      t = (A[k + j] ^ (A[k + j + 2] >> 2)) & 0x3333;
+      A[k + j] ^= t;
+      A[k + j + 2] ^= (t << 2);
+    }
+  }
+  for (int k = 0; k < 16; k += 2) {
+    t = (A[k] ^ (A[k + 1] >> 1)) & 0x5555;
+    A[k] ^= t;
+    A[k + 1] ^= (t << 1);
+  }
+}
+
+// Rewrites every word of the greyscale buffer, including the data latch on
+// the last bit of the last chained IC for every row/channel.
+void UMatrix::flushFramebuffer() {
+  // Scale in 14-bit so a dim code stays non-zero, then left-align into the
+  // 16-bit shift word. 14-bit mode ignores the bottom two bits.
+  uint16_t pwm[256];
+  const uint32_t b = brightness;
+  for (int i = 0; i < 256; i++) {
+    pwm[i] = (uint16_t)(((uint32_t)GAMMA14[i] * b) >> 8) << 2;
+  }
+
+  constexpr int kGroups = PANEL_MBI_RES_Y / PANEL_SCAN_LINES;
+  constexpr int kWordsPerIc = PANEL_MBI_CHAIN_LEN * 16;
+  constexpr int kWordsPerRow = PANEL_MBI_LED_CHANS * kWordsPerIc;
+
   for (int row = 0; row < PANEL_SCAN_LINES; row++) {
-    for (int chan = 0; chan < PANEL_MBI_LED_CHANS; chan++) {
-      dma_grey_gpio_data[row * PANEL_MBI_LED_CHANS * PANEL_MBI_CHAIN_LEN * 16 +
-                         (chan + 1) * PANEL_MBI_CHAIN_LEN * 16 - 1] |= BIT_LAT;
+    ESP32_GREY_DMA_STORAGE_TYPE* row_out = dma_grey_gpio_data + row * kWordsPerRow;
+    for (int x = 0; x < PANEL_MBI_RES_X; x++) {
+      uint16_t lanes[16] = {};
+      uint16_t any = 0;
+      for (int g = 0; g < kGroups; g++) {
+        const Rgb8& p = framebuffer[g * PANEL_SCAN_LINES + row][x];
+        lanes[15 - g * 3] = pwm[p.g];
+        lanes[14 - g * 3] = pwm[p.b];
+        lanes[13 - g * 3] = pwm[p.r];
+        any |= lanes[15 - g * 3] | lanes[14 - g * 3] | lanes[13 - g * 3];
+      }
+      if (any) {
+        transpose16x16(lanes);
+      }
+
+      ESP32_GREY_DMA_STORAGE_TYPE* out =
+          row_out + (x % PANEL_MBI_LED_CHANS) * kWordsPerIc + (x / PANEL_MBI_LED_CHANS) * 16;
+      for (int s = 0; s < 16; s++) {
+        out[s] = lanes[s];
+      }
+      if (x / PANEL_MBI_LED_CHANS == PANEL_MBI_CHAIN_LEN - 1) {
+        out[15] |= BIT_LAT;
+      }
     }
   }
 }
@@ -242,55 +315,19 @@ void UMatrix::refreshMatrixConfig() {
 
 void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
                             uint8_t _g_data, uint8_t _b_data) {
-  if (x >= PANEL_RES_X || x < 0 || y >= PANEL_RES_Y || y < 0)
+  if (x >= PANEL_RES_X || y >= PANEL_RES_Y)
     return;
 
   int16_t _x = x, _y = y;
   int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
   transform(_x, _y, _w, _h);
 
+  _x += 2;  // offset for missing pixels on the left
   if (_x >= PANEL_MBI_RES_X || _y >= PANEL_MBI_RES_Y) {
-    log_e("Pixel position out of bounds: x=%u, y=%u", _x, _y);
     return;
   }
 
-  // Scale in 14-bit so a dim code stays non-zero, then left-align into the
-  // 16-bit shift word. 14-bit mode ignores the bottom two bits.
-  uint16_t r_pwm = (uint16_t)(((uint32_t)GAMMA14[_r_data] * brightness) >> 8) << 2;
-  uint16_t g_pwm = (uint16_t)(((uint32_t)GAMMA14[_g_data] * brightness) >> 8) << 2;
-  uint16_t b_pwm = (uint16_t)(((uint32_t)GAMMA14[_b_data] * brightness) >> 8) << 2;
-
-  _x += 2;  // offset for missing pixels on the left
-
-  uint16_t _colourbitsoffset = (_y / PANEL_SCAN_LINES) * 3;
-  uint16_t _colourbitsclear = ~(0b111 << _colourbitsoffset);
-
-  uint16_t g_gpio_bitmask = BIT_G1 << _colourbitsoffset;
-  uint16_t b_gpio_bitmask = BIT_B1 << _colourbitsoffset;
-  uint16_t r_gpio_bitmask = BIT_R1 << _colourbitsoffset;
-
-  int y_normalised = _y % PANEL_SCAN_LINES;
-  int bit_start_pos = (1280 * y_normalised) + ((_x % 16) * 80) + ((_x / 16) * 16);
-
-  int subpixel_colour_bit = 16;
-  while (subpixel_colour_bit > 0) {
-    subpixel_colour_bit--;
-    dma_grey_gpio_data[bit_start_pos] &= _colourbitsclear;
-
-    uint16_t mask = (uint16_t)1 << subpixel_colour_bit;
-
-    if (g_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= g_gpio_bitmask;
-    }
-    if (b_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= b_gpio_bitmask;
-    }
-    if (r_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
-    }
-
-    bit_start_pos++;
-  }
+  framebuffer[_y][_x] = {_r_data, _g_data, _b_data};
 }
 
 void UMatrix::mbi_pre_active_dma() {

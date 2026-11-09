@@ -171,6 +171,7 @@ void displayTask(void* parameter) {
     unsigned long currentTime = millis();
 
     if (stateManager.getState()->power) {
+      const int64_t frameStartUs = esp_timer_get_time();
       if (currentMode != stateManager.getState()->mode) {
         if (currentMode == OpenMatrixMode::IMAGE) {
           imageDraw.closeGIF();
@@ -230,6 +231,7 @@ void displayTask(void* parameter) {
       }
 
       static int64_t updateTimeUs = 0;
+      static int64_t frameTimeUs = 0;
       const int64_t updateStartUs = esp_timer_get_time();
 #ifdef PANEL_UPCYCLED
       if (currentTime - lastRefreshTime >= refreshInterval) {
@@ -242,7 +244,9 @@ void displayTask(void* parameter) {
 #else
       matrix.update();
 #endif
-      updateTimeUs += esp_timer_get_time() - updateStartUs;
+      const int64_t frameEndUs = esp_timer_get_time();
+      updateTimeUs += frameEndUs - updateStartUs;
+      frameTimeUs += frameEndUs - frameStartUs;
 
       frameCount++;
 
@@ -253,13 +257,15 @@ void displayTask(void* parameter) {
         unsigned long now = millis();
         float secondsElapsed = (now - lastFramerateCheckTime) / 1000.0f;
         float framerate = secondsElapsed > 0 ? (frameCount / secondsElapsed) : 0.0f;
-        log_i("Framerate: %.2f, avg update: %lu us", framerate,
+        log_i("Framerate: %.2f, avg frame: %lu us (update: %lu us)", framerate,
+              frameCount ? (unsigned long)(frameTimeUs / frameCount) : 0UL,
               frameCount ? (unsigned long)(updateTimeUs / frameCount) : 0UL);
 
         lastFramerateLogTime = now;
         lastFramerateCheckTime = now;
         frameCount = 0;
         updateTimeUs = 0;
+        frameTimeUs = 0;
       }
 
       // Apply manual brightness changes when autobrightness is disabled
