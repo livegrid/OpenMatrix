@@ -89,6 +89,8 @@
 #define PANEL_MBI_LED_CHANS     16  // number of led channels per MBI IC
 #define PANEL_MBI_CHAIN_LEN      5  // number of ic's changed for each subpixel
 
+#define MBI_CMD_BUFFER_ENTRIES 600 // largest command payload is the Vsync
+
 #define PANEL_RES_X 78
 #define PANEL_RES_Y 78
 

@@ -27,6 +27,9 @@ class UMatrix : public Matrix {
   Bus_Parallel16 dma_bus;
 
   ESP32_GREY_DMA_STORAGE_TYPE* dma_grey_gpio_data;
+  // Scratch buffer for MBI commands and Vsync, so they never touch the frame.
+  ESP32_GREY_DMA_STORAGE_TYPE* dma_cmd_data;
+  volatile bool config_refresh_pending = false;
 
   size_t dma_grey_buffer_parallel_bit_length;  // Length in bits of the buffer
                                                // -> sequance of 13 x 16 bits (2

@@ -77,6 +77,11 @@ void UMatrix::init() {
   // Fill with zeros to start with
   memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
+  dma_cmd_data = (ESP32_GREY_DMA_STORAGE_TYPE*)heap_caps_calloc(
+      MBI_CMD_BUFFER_ENTRIES, sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
+      MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+  assert(dma_cmd_data != nullptr);
+
   // Setup LCD DMA and Output to GPIO
   auto bus_cfg = dma_bus.config();
   bus_cfg.pin_wr = MBI_DCLK;  // DCLK Pin
@@ -106,11 +111,8 @@ void UMatrix::init() {
 
   updateRegisters();
 
-  update();
-
   initialized = true;
-  // If rotation was updated earlier (e.g. ADXL in SensorTask before init), sync hardware now.
-  refreshMatrixConfig();
+  update();
 }
 
 uint8_t UMatrix::getXResolution() {
@@ -159,11 +161,9 @@ uint8_t UMatrix::getBrightness() const {
 void UMatrix::setRotation(uint8_t newRotation) {
   if (newRotation < 4 && newRotation != rotation) {
     rotation = newRotation;
-    // SensorTask can call setRotation before DisplayTask finishes init(); DMA
-    // buffers are not allocated until then — skip hardware refresh until ready.
-    if (initialized) {
-      refreshMatrixConfig();
-    }
+    // Called from SensorTask. Only the display task may drive the LCD DMA bus,
+    // so the config refresh is applied on the next update().
+    config_refresh_pending = true;
   }
 }
 
@@ -177,6 +177,11 @@ void UMatrix::clearScreen() {
 
 void UMatrix::update() {
   assert(initialized);
+
+  if (config_refresh_pending) {
+    config_refresh_pending = false;
+    refreshMatrixConfig();
+  }
 
   mbi_update_frame(true);
   if (spi_transfer_loop_stop() != ESP_OK) {
@@ -242,10 +247,6 @@ void UMatrix::updateRegisters() {
 
   // MBI Step 3) Clean out any crap in the greyscale buffer
   mbi_soft_reset_dma();  // 10 clocks
-
-  memset(dma_grey_gpio_data, 0,
-         dma_grey_buffer_size);  // accidenty display configuration registers
-                                 // id we don't clear th
 }
 
 void UMatrix::refreshMatrixConfig() {
@@ -310,31 +311,31 @@ void UMatrix::mbi_pre_active_dma() {
   // log_d("Sending MBI Pre-Active.");
   int payload_length = 0;
   for (int i = 0; i < 14; i++) {
-    dma_grey_gpio_data[payload_length++] = BIT_LAT;
+    dma_cmd_data[payload_length++] = BIT_LAT;
   }
 
   for (int i = 0; i < 2; i++) {
-    dma_grey_gpio_data[payload_length++] = 0x00;
+    dma_cmd_data[payload_length++] = 0x00;
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
 
 void UMatrix::mbi_v_sync_dma() {
   // log_d("Sending MBI Vert Sync.");
-  int payload_length = 600;
-  memset(dma_grey_gpio_data, 0,
+  int payload_length = MBI_CMD_BUFFER_ENTRIES;
+  memset(dma_cmd_data, 0,
          payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE));
 
   int start_pos = payload_length - (payload_length / 2);
   for (int i = 0; i < 3; i++) {
-    dma_grey_gpio_data[start_pos++] = BIT_LAT;
+    dma_cmd_data[start_pos++] = BIT_LAT;
   }
-  dma_grey_gpio_data[start_pos] = 0x00;
+  dma_cmd_data[start_pos] = 0x00;
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -343,11 +344,11 @@ void UMatrix::mbi_soft_reset_dma() {
   // log_d("Sending MBI Soft Reset.");
   int payload_length = 0;
   for (int i = 0; i < 10; i++) {
-    dma_grey_gpio_data[payload_length++] = BIT_LAT;
+    dma_cmd_data[payload_length++] = BIT_LAT;
   }
-  dma_grey_gpio_data[payload_length++] = 0x00;
+  dma_cmd_data[payload_length++] = 0x00;
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -365,7 +366,7 @@ void UMatrix::mbi_set_config_dma(unsigned int& dma_output_pos,
       mbi_rgb_sdi_val |= BIT_LAT;
     }
 
-    dma_grey_gpio_data[dma_output_pos++] = mbi_rgb_sdi_val;
+    dma_cmd_data[dma_output_pos++] = mbi_rgb_sdi_val;
   }
 }
 
@@ -386,7 +387,7 @@ void UMatrix::mbi_send_config_reg1_dma() {
                        i == (PANEL_MBI_CHAIN_LEN - 1), false);
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           dma_output_pos * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -400,7 +401,7 @@ void UMatrix::mbi_send_config_reg2_dma() {
                        i == (PANEL_MBI_CHAIN_LEN - 1), true);
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           dma_output_pos * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
