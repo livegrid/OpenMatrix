@@ -55,12 +55,13 @@
 #define ESP32_GREY_DMA_STORAGE_TYPE uint16_t  // DMA output of one uint16_t at a time.
 
 // For DMA GLCK and Address Line Data
-#define BIT_GCLK  (1 << 0)
-#define BIT_A     (1 << 1)
-#define BIT_B     (1 << 2)
-#define BIT_C     (1 << 3)
-#define BIT_D     (1 << 4)
-#define BIT_E     (1 << 5)
+// Octal SPI byte layout: bit n drives dataN_io_num (data0/1 are unused).
+#define BIT_A     (1 << 2)
+#define BIT_B     (1 << 3)
+#define BIT_C     (1 << 4)
+#define BIT_D     (1 << 5)
+#define BIT_E     (1 << 6)
+#define BIT_GCLK  (1 << 7)
 
 // For DMA Greyscale and other data
 #define BIT_G1   (1 << 0)
