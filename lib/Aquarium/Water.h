@@ -33,8 +33,6 @@ class Water {
   FastNoiseLite noise;
   size_t currentRow = 0;
   static const size_t rowsPerUpdate = 4;
-  size_t totalRows;
-  size_t totalCols;
 
   uint8_t scale = 5;
   float simplexSpeed = .002f;
@@ -42,13 +40,25 @@ class Water {
 
  public:
   Water(Matrix* matrix): matrix(matrix) {
-    totalRows = matrix->getYResolution();
-    totalCols = matrix->getXResolution();
     noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
     noise.SetFrequency(0.01f);
   }
 
+  // Drop the in-progress scan so the next frames rebuild from the visual surface.
+  void resetForOrientation() {
+    currentRow = 0;
+    if (matrix && matrix->background) {
+      matrix->background->clear();
+    }
+  }
+
   void update(long temperature = 25) {
+    // Row 0 is the upright surface. Godrays and depth follow that axis.
+    // On Aura, AuraLayer maps these upright pixels into the 192x64 buffer.
+    const size_t totalRows = matrix->getYResolution();
+    const size_t totalCols = matrix->getXResolution();
+    if (totalRows < 2 || totalCols < 1) return;
+
     if (currentRow >= totalRows) {
       currentRow = 0;
       return;

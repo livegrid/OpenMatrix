@@ -20,6 +20,16 @@ void BoidManager::initializeBoids() {
   }
 }
 
+void BoidManager::setLimits(uint8_t width, uint8_t height) {
+  limits.x = width;
+  limits.y = height;
+  for (auto& group : boidGroups) {
+    for (auto& boid : group) {
+      boid.setLimits(width, height);
+    }
+  }
+}
+
 void BoidManager::updateBoids(long co2) {
   float speedMultiplier = map(co2, CO2_BAD, CO2_REALBAD, 100.0f, 0.0f);
   speedMultiplier = constrain(speedMultiplier, 0.0f, 100.0f);

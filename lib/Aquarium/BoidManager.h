@@ -17,6 +17,7 @@ private:
 public:
     BoidManager(Matrix* m);
     void initializeBoids();
+    void setLimits(uint8_t width, uint8_t height);
     void updateBoids(long co2 = 600);
     void applyAttractor(float x, float y, float strength = 0.15f);
     void renderBoids();

@@ -44,7 +44,11 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
   #define NUM_BRANCHING_PLANTS 2
   #define NUM_CORAL 3
   #define NUM_ANEMONES 2
-  #define MAX_SCREEN_WIDTH 64
+  #if defined(PANEL_AURA)
+    #define MAX_SCREEN_WIDTH 192
+  #else
+    #define MAX_SCREEN_WIDTH 64
+  #endif
 #endif
 
 #define MAX_CORAL_SEGMENTS 12

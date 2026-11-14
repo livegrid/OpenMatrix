@@ -131,6 +131,13 @@ class Fish {
   }
   // ~Fish(); // Destructor
 
+  void setTankSize(uint16_t width, uint16_t height) {
+    if (motion) {
+      motion->setResolution(width * PHYSICS_SCALE, height * PHYSICS_SCALE);
+      pos = motion->getPosition() / PHYSICS_SCALE;
+    }
+  }
+
   bool update(long co2 = 600, bool stayInside = false) {
     if (!motion) {
       log_e(

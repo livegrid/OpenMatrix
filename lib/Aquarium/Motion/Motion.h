@@ -58,6 +58,15 @@ class Motion {
     return angle;
   }
 
+  void setResolution(uint16_t x, uint16_t y) {
+    xResolution = x;
+    yResolution = y;
+    if (pos.x < 0) pos.x = 0;
+    if (pos.y < 0) pos.y = 0;
+    if (pos.x > xResolution) pos.x = xResolution;
+    if (pos.y > yResolution) pos.y = yResolution;
+  }
+
   virtual void doMotion() = 0;
 
   void update(float age = AGE_ADULT, long co2 = CO2_OK,

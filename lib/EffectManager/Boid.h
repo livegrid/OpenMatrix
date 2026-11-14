@@ -20,6 +20,15 @@ public:
     Boid();
     Boid(float x, float y, PVector* limits);
 
+    void setLimits(float x, float y) {
+      limits.x = x < 1 ? 1 : x;
+      limits.y = y < 1 ? 1 : y;
+      if (location.x < 0) location.x = 0;
+      if (location.y < 0) location.y = 0;
+      if (location.x >= limits.x) location.x = limits.x - 1;
+      if (location.y >= limits.y) location.y = limits.y - 1;
+    }
+
     static float randomf();
     static float mapfloat(float x, float in_min, float in_max, float out_min, float out_max);
 
