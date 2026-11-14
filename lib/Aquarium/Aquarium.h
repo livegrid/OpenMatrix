@@ -15,6 +15,7 @@
 #include "Fish.h"
 #include "Food.h"
 #include "Plants.h"
+#include "PanelOrientation.h"
 #include "SeaFloor.h"
 #include "Water.h"
 #include "StateManager.h"
@@ -56,6 +57,10 @@ class Aquarium {
   const unsigned long TOF_FOOD_INTERVAL = 450;
 #endif
 
+  uint8_t layoutW = 0;
+  uint8_t layoutH = 0;
+  uint8_t layoutRotation = 255;
+
   enum class TextAlignment { LEFT, CENTER, RIGHT };
 
  public:
@@ -75,6 +80,7 @@ class Aquarium {
     seaFloor.generate();
     initializePlants();
     boidManager.initializeBoids();
+    rememberLayout();
   }
 
   bool isDemoFinished() const {
@@ -250,13 +256,66 @@ class Aquarium {
     }
   }
 
-  // Initialize plants and store them in a vector of unique pointers
+  // Landscape uses the full set. Portrait is one third, since the floor is the short edge.
+  uint8_t plantCountForLayout() const {
+    bool portrait = matrix->getXResolution() < matrix->getYResolution();
+    return panelScaledCount(NUM_PLANTS, portrait);
+  }
+
   void initializePlants() {
-    for (int i = 0; i < NUM_PLANTS; i++) {
+    plantArray.clear();
+    uint8_t count = plantCountForLayout();
+    if (count == 0) return;
+
+    uint8_t width = matrix->getXResolution();
+    uint8_t height = matrix->getYResolution();
+    for (uint8_t i = 0; i < count; i++) {
       plantArray.emplace_back(std::make_unique<Plants>(
-          matrix, matrix->getXResolution() * i / NUM_PLANTS,
-          matrix->getYResolution() + 7));
+          matrix, width * (i + 1) / (count + 1), height + 7));
     }
+  }
+
+  void layoutPlants() {
+    uint8_t count = plantCountForLayout();
+    if (plantArray.size() != count) {
+      initializePlants();
+      return;
+    }
+    uint8_t width = matrix->getXResolution();
+    uint8_t height = matrix->getYResolution();
+    for (uint8_t i = 0; i < count; i++) {
+      plantArray[i]->setAnchor(width * (i + 1) / (count + 1), height + 7);
+    }
+  }
+
+  void rememberLayout() {
+    layoutW = matrix->getXResolution();
+    layoutH = matrix->getYResolution();
+    layoutRotation = matrix->getRotation();
+  }
+
+  // Upright size follows the accelerometer. A 180 degree turn keeps the same
+  // tank size, so creatures stay put and only the pixel mapping changes.
+  void syncOrientation() {
+    uint8_t rot = matrix->getRotation();
+    uint8_t width = matrix->getXResolution();
+    uint8_t height = matrix->getYResolution();
+    if (rot == layoutRotation && width == layoutW && height == layoutH) return;
+
+    bool sizeChanged = width != layoutW || height != layoutH;
+    layoutRotation = rot;
+    layoutW = width;
+    layoutH = height;
+
+    water.resetForOrientation();
+    if (!sizeChanged) return;
+
+    seaFloor.refreshLayout();
+    layoutPlants();
+    for (auto& fish : fishArray) {
+      fish->setTankSize(width, height);
+    }
+    boidManager.setLimits(width, height);
   }
 
   void addFood() {
@@ -302,8 +361,22 @@ class Aquarium {
       return;
     }
 
-    const float targetX = interaction.blobX * matrix->getXResolution();
-    const float targetY = interaction.blobY * matrix->getYResolution();
+    float targetX = interaction.blobX * matrix->getXResolution();
+    float targetY = interaction.blobY * matrix->getYResolution();
+#ifdef PANEL_AURA
+    // The sensor mount offset is calibrated in physical panel space.
+    // Turn that point into the upright tank before steering fish toward it.
+    uint8_t bufferW = matrix->getBufferWidth();
+    uint8_t bufferH = matrix->getBufferHeight();
+    int16_t bufferX = (int16_t)(interaction.blobX * (bufferW - 1));
+    int16_t bufferY = (int16_t)(interaction.blobY * (bufferH - 1));
+    int16_t visualX = 0;
+    int16_t visualY = 0;
+    panelBufferToVisual(bufferX, bufferY, matrix->getRotation(), bufferW, bufferH,
+                        visualX, visualY);
+    targetX = visualX;
+    targetY = visualY;
+#endif
 
     // Gently bias aquarium boids toward detected presence.
     boidManager.applyAttractor(targetX, targetY, 0.12f);
@@ -440,6 +513,7 @@ class Aquarium {
 
   // General update function that updates all components of the aquarium
   void update(bool showSensorData = false) {
+    syncOrientation();
     handleTouchInput();
 #ifdef VL53L8CX_ENABLED
     handleTOFInput();
@@ -501,12 +575,14 @@ class Aquarium {
 
     // Calculate starting Y position
     int16_t startY;
+    const int16_t viewW = matrix->getXResolution();
+    const int16_t viewH = matrix->getYResolution();
     if (textPos == TOP) {
       startY = h;
     } else if (textPos == BOTTOM) {
-      startY = layer->getHeight() - totalHeight;
+      startY = viewH - totalHeight;
     } else {  // MIDDLE
-      startY = (layer->getHeight() - totalHeight) / 2 + h;
+      startY = (viewH - totalHeight) / 2 + h;
     }
 
     // Draw each line
@@ -519,10 +595,10 @@ class Aquarium {
           lineX = 0;
           break;
         case TextAlignment::CENTER:
-          lineX = (layer->getWidth() - w) / 2;
+          lineX = (viewW - w) / 2;
           break;
         case TextAlignment::RIGHT:
-          lineX = layer->getWidth() - w;
+          lineX = viewW - w;
           break;
       }
 

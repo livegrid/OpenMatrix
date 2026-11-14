@@ -23,6 +23,8 @@ class OMatrix : public Matrix {
   uint8_t getBrightness() const override;
   uint8_t getXResolution() override;
   uint8_t getYResolution() override;
+  uint8_t getBufferWidth() override;
+  uint8_t getBufferHeight() override;
   
   void setRotation(uint8_t newRotation) override;
   void rotate90() override;

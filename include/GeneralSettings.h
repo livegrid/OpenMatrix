@@ -4,7 +4,16 @@
 #define FIRMWARE_VERSION_MINOR 0
 #define FIRMWARE_VERSION_PATCH 0
 
-#define PANEL_UPCYCLED 1
+// Livegrid model. Uncomment at most one.
+// PANEL_AURA:     192x64 HUB75 on OMatrix, built-in VL53L8CX
+// PANEL_UPCYCLED: MBI5153 upcycled panels on UMatrix
+// Neither:        64x64 HUB75 on OMatrix
+// #define PANEL_AURA 1
+// #define PANEL_UPCYCLED 1
+
+#if defined(PANEL_AURA) && defined(PANEL_UPCYCLED)
+#error Define only one of PANEL_AURA or PANEL_UPCYCLED
+#endif
 
 #define RUN_DEMO 1
 
@@ -13,7 +22,9 @@
 #define ADXL345_ENABLED 1
 #define BH1750_ENABLED 1
 #define TOUCH_ENABLED 1
-// #define VL53L8CX_ENABLED 1  // Time-of-Flight depth sensor (optional)
+#ifdef PANEL_AURA
+#define VL53L8CX_ENABLED 1
+#endif
 
 #define WIFI_ENABLED 1
 

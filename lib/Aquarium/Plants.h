@@ -42,6 +42,10 @@ class Plants {
     // addOriginToNodes();
   }
 
+  void setAnchor(uint8_t x, uint8_t y) {
+    pos = PVector(x, y);
+  }
+
   void update(uint8_t humidity = 50) {
     unsigned long currentTime = millis();
     float sizeFactor = map(humidity, 0, 100, 0, 250);

@@ -22,9 +22,13 @@ class Matrix {
   virtual uint8_t getBrightness() const = 0;
   virtual uint8_t getXResolution() = 0;
   virtual uint8_t getYResolution() = 0;
+  // Physical framebuffer size. Upright resolution can differ when the panel is rotated.
+  virtual uint8_t getBufferWidth() { return getXResolution(); }
+  virtual uint8_t getBufferHeight() { return getYResolution(); }
   
   virtual void setRotation(uint8_t newRotation) = 0;
   virtual void rotate90() = 0;
+  uint8_t getRotation() const { return rotation; }
   virtual void clearScreen() = 0;
 
   virtual void update() = 0;

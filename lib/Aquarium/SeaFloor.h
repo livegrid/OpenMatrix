@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Matrix.h>
 #include "AquariumSettings.h"
+#include "PanelOrientation.h"
 
 // Element types — stored in draw order during generate()
 enum ElementType : uint8_t {
@@ -99,6 +100,8 @@ class SeaFloor {
   Matrix* matrix;
   uint8_t screenWidth;
   uint8_t screenHeight;
+  uint8_t layoutPlantCount;
+  uint8_t layoutSeagrassCount;
 
   // Substrate: pre-generated sand colors
   CRGB substrateColors[GROUND_SUBSTRATE_HEIGHT][MAX_SCREEN_WIDTH];
@@ -114,13 +117,29 @@ class SeaFloor {
 
  public:
   SeaFloor(Matrix* m)
-      : matrix(m), elementCount(0) {
+      : matrix(m),
+        elementCount(0),
+        layoutPlantCount(NUM_BRANCHING_PLANTS),
+        layoutSeagrassCount(NUM_SEAGRASS) {
     screenWidth = m->getXResolution();
     screenHeight = m->getYResolution();
   }
 
+  // Rebuild placement when the upright tank size changes (portrait vs landscape).
+  void refreshLayout() {
+    uint8_t w = matrix->getXResolution();
+    uint8_t h = matrix->getYResolution();
+    if (w == screenWidth && h == screenHeight) return;
+    screenWidth = w;
+    screenHeight = h;
+    generate();
+  }
+
   void generate() {
     elementCount = 0;
+    bool narrowFloor = screenWidth < screenHeight;
+    layoutPlantCount = panelScaledCount(NUM_BRANCHING_PLANTS, narrowFloor);
+    layoutSeagrassCount = panelScaledCount(NUM_SEAGRASS, narrowFloor);
     generateSubstrate();
     generateRocks();
     generateMoss();
@@ -413,10 +432,10 @@ class SeaFloor {
   void generatePlants() {
     const uint8_t accentHues[] = {0, 20, 32, 140, 200, 210};
 
-    for (uint8_t i = 0; i < NUM_BRANCHING_PLANTS; i++) {
+    for (uint8_t i = 0; i < layoutPlantCount; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_PLANT;
-      el.x = screenWidth * (i + 1) / (NUM_BRANCHING_PLANTS + 1) + random(-5, 6);
+      el.x = screenWidth * (i + 1) / (layoutPlantCount + 1) + random(-5, 6);
       el.y = screenHeight + 7;
       el.dataIndex = i;
       el.height = 10;
@@ -454,10 +473,12 @@ class SeaFloor {
   }
 
   void generateSeagrass() {
-    for (uint8_t i = 0; i < NUM_SEAGRASS; i++) {
+    for (uint8_t i = 0; i < layoutSeagrassCount; i++) {
       GroundElement& el = addElement();
       el.type = ELEM_SEAGRASS;
-      el.x = screenWidth * i / NUM_SEAGRASS + random(0, screenWidth / NUM_SEAGRASS);
+      uint8_t slot = screenWidth / layoutSeagrassCount;
+      if (slot < 1) slot = 1;
+      el.x = screenWidth * i / layoutSeagrassCount + random(0, slot);
       el.y = screenHeight - GROUND_SUBSTRATE_HEIGHT;
       el.height = random(5, 11);
       el.currentHeight = (float)el.height;
