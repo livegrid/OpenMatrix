@@ -526,23 +526,28 @@ void setup(void) {
 #ifdef WIFI_ENABLED
   s_displayReady = xSemaphoreCreateBinary();
 #endif
-  TaskManager::getInstance().createTask("DisplayTask", displayTask, 16384, 1, 1);
+  // 192x64 HUB75 DMA sits in internal RAM, so these sizes match the budget
+  // that fit the TOF sensor on the 3-display-test firmware. Steady-state
+  // display use was about 6.4 KB, so 8 KB still covers the water batch.
+  TaskManager::getInstance().createTask("DisplayTask", displayTask, 8192, 1, 1);
 
 #ifdef TOUCH_ENABLED
   touchMenu.setupInterrupts();
 #endif
 
 #ifdef WIFI_ENABLED
-  // Run ServerTask on internal RAM stack for better web/network stability.
-  // PSRAM stacks can be fragile under bursty HTTP callback load.
+  // Internal stack: NetWizard writes WiFi credentials and esp_wifi writes PHY
+  // calibration to NVS from this task. Flash writes disable the cache, and a
+  // task with a PSRAM stack cannot run then (interrupt WDT reset).
   TaskManager::getInstance().createTask("ServerTask", serverTask, 8192, 1, 0, false);
 #endif
 
 #ifdef TOUCH_ENABLED
-  TaskManager::getInstance().createTask("TouchTask", touchTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("TouchTask", touchTask, 2048, 1, 0);
 #endif
 
-  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0);
+  // PSRAM stack is safe here: StateManager::save only flags SaveTask to write.
+  TaskManager::getInstance().createTask("MQTTTask", mqttTask, 4096, 1, 0, true);
 
 #ifdef SCD40_ENABLED
   delay(50);
@@ -562,11 +567,13 @@ void setup(void) {
 #endif
 
 #if defined(BH1750_ENABLED) || defined(ADXL345_ENABLED)
-  TaskManager::getInstance().createTask("SensorTask", sensorTask, 4096, 1, 0);
+  TaskManager::getInstance().createTask("SensorTask", sensorTask, 2048, 1, 0);
 #endif
 
 #ifdef VL53L8CX_ENABLED
-  TaskManager::getInstance().createTask("TOFTask", tofTask, 7168, 1, 0);
+  // I2C does not need an internal stack. PSRAM keeps this 7 KB off the heap
+  // the DMA buffer and E1.31 task need.
+  TaskManager::getInstance().createTask("TOFTask", tofTask, 7168, 1, 0, true);
 #endif
 
   // TaskManager::getInstance().createTask("RestartTask", restartTask, 1024, 1, 0);
