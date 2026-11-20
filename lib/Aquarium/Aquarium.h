@@ -5,7 +5,7 @@
 #include <Fonts/Font4x7Fixed.h>
 #include <Fonts/Font5x7Fixed.h>
 #include <Matrix.h>
-#include <scd40.h>
+#include <SCD40.h>
 
 #include <vector>
 
@@ -71,10 +71,10 @@ class Aquarium {
         demoFinished(false) {}
 
   void begin() {
-    loadState();
+    // Ignore any saved school. This demo always opens on a single egg.
+    initializeFish();
     seaFloor.generate();
     initializePlants();
-    boidManager.initializeBoids();
   }
 
   bool isDemoFinished() const {
@@ -205,8 +205,6 @@ class Aquarium {
 
   if (demoStep < 5 || demoStep > 8) {
     updateWater();
-    boidManager.updateBoids(demoCO2);
-    boidManager.renderBoids();
     updateFish();
     updateFood();
     updatePlants();
@@ -225,23 +223,28 @@ class Aquarium {
   }
 
   void saveState() {
-    aquariumStateManager.saveState(fishArray);
-    log_i("Aquarium state saved");
+    // Leave the device's real aquarium save untouched.
   }
 
-  void periodicSave() {
-    unsigned long currentTime = millis();
-    if (currentTime - lastSaveTime >= AQUARIUM_SAVE_INTERVAL*60000) {
-      aquariumStateManager.saveState(fishArray);
-      lastSaveTime = currentTime;
-    }
+  void periodicSave() {}
+
+  // One egg, on screen. Eggs do not swim, so an off-screen spawn would be invisible.
+  void spawnAgeingEgg() {
+    const int xRes = matrix->getXResolution();
+    const int yRes = matrix->getYResolution();
+    const int xMax = xRes > 8 ? xRes - 4 : xRes;
+    const int yMax = yRes > 8 ? yRes / 2 : yRes;
+    const int x = (xMax > 4) ? random(4, xMax) : xRes / 2;
+    const int y = (yMax > 4) ? random(4, yMax) : yRes / 2;
+    fishArray.emplace_back(std::make_unique<Fish>(
+        matrix, PVector((float)x, (float)y), 0.0f, 1.0f));
+    log_i("Ageing demo: new egg at %d,%d", x, y);
   }
 
-  // Initialize fish and store them in a vector of unique pointers
   void initializeFish() {
+    fishArray.clear();
     for (int i = 0; i < NUM_FISH_START; i++) {
-      // Default Fish ctor spawns from a random outside edge.
-      fishArray.emplace_back(std::make_unique<Fish>(matrix, PVector(0, 0), 0.5f));
+      spawnAgeingEgg();
     }
   }
 
@@ -346,6 +349,7 @@ class Aquarium {
     for (auto it = fishArray.begin(); it != fishArray.end();) {
       bool destroy = (*it)->update(co2, demoMode);
       if (destroy) {
+        log_i("Ageing demo: fish died, starting another egg");
         it = fishArray.erase(it);
       } else {
         (*it)->display();
@@ -353,15 +357,12 @@ class Aquarium {
       }
     }
 
-    // Population control
-    if (fishArray.size() < NUM_FISH_IDEAL) {
-      // Attempt to create new fish
-      for (auto& fish : fishArray) {
-        if (fish->tryReproduce()) {
-          PVector newPos = fish->getPosition();
-          fishArray.emplace_back(std::make_unique<Fish>(matrix, newPos));
-          break;  // Only add one fish per update cycle
-        }
+    // The dead fish is gone. Hatch the next life as a new egg, same frame.
+    if (fishArray.empty()) {
+      spawnAgeingEgg();
+      auto& fish = fishArray.back();
+      if (!fish->update(co2, demoMode)) {
+        fish->display();
       }
     }
   }
@@ -444,8 +445,6 @@ class Aquarium {
       updateDemo();
     } else {
       updateWater();
-      boidManager.updateBoids(scd40->getCO2());
-      boidManager.renderBoids();
       updateFish();
       updateFood();
       updatePlants();

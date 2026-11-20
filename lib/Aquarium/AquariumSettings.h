@@ -13,8 +13,10 @@
 #define BORDER_BUFFER 0
 
 //AGE SETTINGS
-#define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
-#define FISH_LIFESPAN_VARIATION 1.0f  // Variation in lifespan (20% by default)
+// Ageing demo: every fish lives exactly one minute, egg to death.
+#define FISH_LIFESPAN_MS 60000.0f
+#define FISH_LIFESPAN_DAYS (FISH_LIFESPAN_MS / (24.0f * 60.0f * 60.0f * 1000.0f))
+#define FISH_LIFESPAN_VARIATION 0.0f
 
 const float HEALTH_REDUCTION_RATE_BAD = 0.1f;    // 10% per second
 const float HEALTH_REDUCTION_RATE_REALBAD = 0.2f; // 20% per second
@@ -24,8 +26,8 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 // const float HEALTH_REDUCTION_RATE_REALBAD = 0.4f / (3600 * 30); // 40% per hour at 30 fps
 // const float HEALTH_INCREASE_RATE_GOOD = 1 / (3600 * 30); // 100% per hour at 30 fps
 
-#define NUM_FISH_START 5
-#define NUM_FISH_IDEAL 20
+#define NUM_FISH_START 1
+#define NUM_FISH_IDEAL 1
 #define NUM_PLANTS 3
 
 // SeaFloor element counts (tuned for 78x78 display)

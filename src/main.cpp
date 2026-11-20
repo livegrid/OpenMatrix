@@ -510,12 +510,6 @@ void setup(void) {
   stateManager.restore();
   stateManager.startPeriodicSave();
 
-#ifdef RUN_DEMO
-  if (stateManager.getState()->firstBoot) {
-    aquarium.startDemo();
-  }
-#endif
-
 #ifdef VL53L8CX_ENABLED
   aquarium.setTOFInteractionManager(&tofInteractionManager);
 #endif

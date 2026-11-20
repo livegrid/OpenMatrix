@@ -172,9 +172,8 @@ class Fish {
         // CRGB(255,0,0));
       }
     }
-    if (age > 1.0)
-      age = 0;
-    return age > 1.0;
+    // Dead fish are removed. The aquarium replaces each one with a new egg.
+    return age >= AGE_DEAD;
   }
 
   bool tryReproduce() {
@@ -263,20 +262,16 @@ class Fish {
   }
 
   void initializeAgingRate() {
-    float baseRate = 1.0f / (FISH_LIFESPAN_DAYS * 24 * 60 * 60 *
-                             1000);  // Convert days to milliseconds
-    float variation = FISH_LIFESPAN_VARIATION *
-                      ((float)random(200) / 100.0f -
-                       1.0f);  // Random variation between -20% and +20%
-    agingRate = baseRate * (1.0f + variation);
+    // Exact one-minute life. No random spread, so the demo loop stays in time.
+    agingRate = 1.0f / FISH_LIFESPAN_MS;
   }
 
   void updateAge(long co2) {
+    (void)co2;
     unsigned long currentTime = millis();
-    float timeDiff = currentTime - lastUpdateTime;
-    if (co2 < 2000) {
-      age += timeDiff * agingRate;
-    }
+    // Age on the clock even if the room CO2 is high, so a life is always 60s.
+    float timeDiff = (float)(currentTime - lastUpdateTime);
+    age += timeDiff * agingRate;
     lastUpdateTime = currentTime;
   }
 

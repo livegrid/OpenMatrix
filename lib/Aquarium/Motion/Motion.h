@@ -3,7 +3,7 @@
 
 #include <AquariumSettings.h>
 #include <Arduino.h>
-#include <FastNoise.h>
+#include <Fastnoise.h>
 #include <PVector.h>
 #include <SCD40Settings.h>
 

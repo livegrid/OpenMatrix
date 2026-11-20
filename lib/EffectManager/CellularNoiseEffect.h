@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Effect.h"
-#include "FastNoise.h"
+#include "Fastnoise.h"
 
 class CellularNoiseEffect : public Effect {
 private:

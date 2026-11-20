@@ -52,9 +52,12 @@ public:
     this->pos = pos;
     this->angle = angle;
     this->vel = vel;
-    this->size = age;
+    // Life stage and colour follow real age. Drawn size runs ahead of age so
+    // a one-minute life is visibly growing as soon as the egg hatches.
+    const float life = constrain(age, 0.0f, 1.0f);
+    this->size = powf(life, 0.4f);
     this->health = health;
-    colorPalette->adjustColorByAgeAndHealth(this->size, this->health);
+    colorPalette->adjustColorByAgeAndHealth(life, this->health);
   }
 
   void displayEgg() {

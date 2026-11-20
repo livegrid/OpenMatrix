@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Effect.h"
-#include "FastNoise.h"
+#include "Fastnoise.h"
 
 class SimplexNoiseEffect : public Effect {
 private:

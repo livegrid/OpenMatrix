@@ -1,7 +1,7 @@
 #ifndef WATER_H
 #define WATER_H
 
-#include "FastNoise.h"
+#include "Fastnoise.h"
 #include <Matrix.h>
 #include "AquariumSettings.h"
 
