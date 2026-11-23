@@ -205,6 +205,11 @@ void displayTask(void* parameter) {
 
       if (touchMenu.isMenuOpen()) {
         touchMenu.displayMenu();
+#if defined(VL53L8CX_ENABLED) && defined(TOF_DEBUG_VIEW)
+      } else if (tofSensor.isActive()) {
+        tofVisualizer.draw();
+        matrix.background->display();
+#endif
       } else {
         switch (stateManager.getState()->mode) {
           case OpenMatrixMode::EFFECT:

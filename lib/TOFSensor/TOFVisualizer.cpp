@@ -79,7 +79,7 @@ void TOFVisualizer::draw() {
     if (blockSizeX < 1) blockSizeX = 1;
     if (blockSizeY < 1) blockSizeY = 1;
     
-    log_i("TOF Visualizer: Display=%dx%d, BlockSize=%dx%d, Rotation=%d°", 
+    log_v("TOF Visualizer: Display=%dx%d, BlockSize=%dx%d, Rotation=%d°",
           displayWidth, displayHeight, blockSizeX, blockSizeY, sensor->getRotation());
     
     // Use separate X and Y block sizes to fill entire display

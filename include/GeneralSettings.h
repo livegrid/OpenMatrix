@@ -24,6 +24,7 @@
 #define TOUCH_ENABLED 1
 #ifdef PANEL_AURA
 #define VL53L8CX_ENABLED 1
+#define TOF_DEBUG_VIEW 1  // 8x8 distance heatmap instead of the current mode
 #endif
 
 #define WIFI_ENABLED 1
