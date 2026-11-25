@@ -1,3 +1,4 @@
+#pragma GCC optimize("O2")
 #include "UMatrix.h"
 
 #ifndef _swap_int16_t
@@ -77,6 +78,21 @@ void UMatrix::init() {
   // Fill with zeros to start with
   memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
+  // PSRAM keeps internal RAM free for WiFi; only update() reads it, once per frame.
+  framebuffer_size = sizeof(Rgb8) * PANEL_MBI_RES_Y * PANEL_MBI_RES_X;
+  framebuffer = (Rgb8(*)[PANEL_MBI_RES_X])heap_caps_calloc(
+      1, framebuffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (framebuffer == nullptr) {
+    framebuffer = (Rgb8(*)[PANEL_MBI_RES_X])heap_caps_calloc(
+        1, framebuffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  }
+  assert(framebuffer != nullptr);
+
+  dma_cmd_data = (ESP32_GREY_DMA_STORAGE_TYPE*)heap_caps_calloc(
+      MBI_CMD_BUFFER_ENTRIES, sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
+      MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+  assert(dma_cmd_data != nullptr);
+
   // Setup LCD DMA and Output to GPIO
   auto bus_cfg = dma_bus.config();
   bus_cfg.pin_wr = MBI_DCLK;  // DCLK Pin
@@ -106,11 +122,8 @@ void UMatrix::init() {
 
   updateRegisters();
 
-  update();
-
   initialized = true;
-  // If rotation was updated earlier (e.g. ADXL in SensorTask before init), sync hardware now.
-  refreshMatrixConfig();
+  update();
 }
 
 uint8_t UMatrix::getXResolution() {
@@ -159,11 +172,9 @@ uint8_t UMatrix::getBrightness() const {
 void UMatrix::setRotation(uint8_t newRotation) {
   if (newRotation < 4 && newRotation != rotation) {
     rotation = newRotation;
-    // SensorTask can call setRotation before DisplayTask finishes init(); DMA
-    // buffers are not allocated until then — skip hardware refresh until ready.
-    if (initialized) {
-      refreshMatrixConfig();
-    }
+    // Called from SensorTask. Only the display task may drive the LCD DMA bus,
+    // so the config refresh is applied on the next update().
+    config_refresh_pending = true;
   }
 }
 
@@ -172,52 +183,113 @@ void UMatrix::rotate90() {
 }
 
 void UMatrix::clearScreen() {
-  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+  memset(framebuffer, 0, framebuffer_size);
 }
 
 void UMatrix::update() {
   assert(initialized);
 
-  mbi_update_frame(true);
-  spi_transfer_loop_stop();
+  if (config_refresh_pending) {
+    config_refresh_pending = false;
+    refreshMatrixConfig();
+  }
+
+  flushFramebuffer();
+  mbi_update_frame();
+  if (spi_transfer_loop_stop() != ESP_OK) {
+    log_e("GCLK loop stop failed");
+  }
   mbi_v_sync_dma();
-  spi_transfer_loop_start();
+  if (spi_transfer_loop_start() != ESP_OK) {
+    log_e("GCLK loop start failed, retrying");
+    spi_transfer_loop_stop();
+    if (spi_transfer_loop_start() != ESP_OK) {
+      log_e("GCLK loop restart failed");
+    }
+  }
 
   // log_e("tsfr count: %d", dma_bus.get_transfer_count());
 
   clearScreen();
 }
 
-void UMatrix::mbi_update_frame(bool configure_latches) {
-  int counter = 0;
+void UMatrix::mbi_update_frame() {
+  dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size,
+                          true);  // sending payload hence TRUE
+}
+
+// Transpose a 16x16 bit matrix in place. On entry each value is one GPIO
+// lane's 16-bit PWM word (lane n at index 15 - n); on exit each value is one
+// parallel DMA sample, MSB first.
+static inline void transpose16x16(uint16_t A[16]) {
+  uint16_t t;
+  for (int k = 0; k < 8; k++) {
+    t = (A[k] ^ (A[k + 8] >> 8)) & 0x00FF;
+    A[k] ^= t;
+    A[k + 8] ^= (t << 8);
+  }
+  for (int k = 0; k < 16; k += 8) {
+    for (int j = 0; j < 4; j++) {
+      t = (A[k + j] ^ (A[k + j + 4] >> 4)) & 0x0F0F;
+      A[k + j] ^= t;
+      A[k + j + 4] ^= (t << 4);
+    }
+  }
+  for (int k = 0; k < 16; k += 4) {
+    for (int j = 0; j < 2; j++) {
+      t = (A[k + j] ^ (A[k + j + 2] >> 2)) & 0x3333;
+      A[k + j] ^= t;
+      A[k + j + 2] ^= (t << 2);
+    }
+  }
+  for (int k = 0; k < 16; k += 2) {
+    t = (A[k] ^ (A[k + 1] >> 1)) & 0x5555;
+    A[k] ^= t;
+    A[k + 1] ^= (t << 1);
+  }
+}
+
+// Rewrites every word of the greyscale buffer, including the data latch on
+// the last bit of the last chained IC for every row/channel.
+void UMatrix::flushFramebuffer() {
+  // Scale in 14-bit so a dim code stays non-zero, then left-align into the
+  // 16-bit shift word. 14-bit mode ignores the bottom two bits.
+  uint16_t pwm[256];
+  const uint32_t b = brightness;
+  for (int i = 0; i < 256; i++) {
+    pwm[i] = (uint16_t)(((uint32_t)GAMMA14[i] * b) >> 8) << 2;
+  }
+
+  constexpr int kGroups = PANEL_MBI_RES_Y / PANEL_SCAN_LINES;
+  constexpr int kWordsPerIc = PANEL_MBI_CHAIN_LEN * 16;
+  constexpr int kWordsPerRow = PANEL_MBI_LED_CHANS * kWordsPerIc;
+
   for (int row = 0; row < PANEL_SCAN_LINES; row++) {
-    for (int chan = 0; chan < PANEL_MBI_LED_CHANS; chan++) {
-      for (int ic = 0; ic < PANEL_MBI_CHAIN_LEN;
-           ic++) {  // number of chained ICs
+    ESP32_GREY_DMA_STORAGE_TYPE* row_out = dma_grey_gpio_data + row * kWordsPerRow;
+    for (int x = 0; x < PANEL_MBI_RES_X; x++) {
+      uint16_t lanes[16] = {};
+      uint16_t any = 0;
+      for (int g = 0; g < kGroups; g++) {
+        const Rgb8& p = framebuffer[g * PANEL_SCAN_LINES + row][x];
+        lanes[15 - g * 3] = pwm[p.g];
+        lanes[14 - g * 3] = pwm[p.b];
+        lanes[13 - g * 3] = pwm[p.r];
+        any |= lanes[15 - g * 3] | lanes[14 - g * 3] | lanes[13 - g * 3];
+      }
+      if (any) {
+        transpose16x16(lanes);
+      }
 
-        // data latch on the last bit, when sending the last byte set latch=1
-        int latch = 0;
-        if (ic == 4) {
-          latch = 1;
-        }  // latch on last channel / ic
-
-        int bit_offset = 16;
-        while (bit_offset > 0)  // shift out MSB first per the documentation.
-        {
-          bit_offset--;  // start from 15
-
-          if (latch == 1 && bit_offset == 0) {
-            dma_grey_gpio_data[counter] |= BIT_LAT;
-          }
-          counter++;
-        }
+      ESP32_GREY_DMA_STORAGE_TYPE* out =
+          row_out + (x % PANEL_MBI_LED_CHANS) * kWordsPerIc + (x / PANEL_MBI_LED_CHANS) * 16;
+      for (int s = 0; s < 16; s++) {
+        out[s] = lanes[s];
+      }
+      if (x / PANEL_MBI_LED_CHANS == PANEL_MBI_CHAIN_LEN - 1) {
+        out[15] |= BIT_LAT;
       }
     }
   }
-
-  // log_d(TAG, "Sending greyscale data buffer out via LCD DMA.");
-  dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size,
-                          true);  // sending payload hence TRUE
 }
 
 void UMatrix::updateRegisters() {
@@ -234,10 +306,6 @@ void UMatrix::updateRegisters() {
 
   // MBI Step 3) Clean out any crap in the greyscale buffer
   mbi_soft_reset_dma();  // 10 clocks
-
-  memset(dma_grey_gpio_data, 0,
-         dma_grey_buffer_size);  // accidenty display configuration registers
-                                 // id we don't clear th
 }
 
 void UMatrix::refreshMatrixConfig() {
@@ -247,86 +315,50 @@ void UMatrix::refreshMatrixConfig() {
 
 void UMatrix::mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data,
                             uint8_t _g_data, uint8_t _b_data) {
-  if (x >= PANEL_RES_X || x < 0 || y >= PANEL_RES_Y || y < 0)
+  if (x >= PANEL_RES_X || y >= PANEL_RES_Y)
     return;
 
   int16_t _x = x, _y = y;
   int16_t _w = PANEL_RES_X, _h = PANEL_RES_Y;
   transform(_x, _y, _w, _h);
 
+  _x += 2;  // offset for missing pixels on the left
   if (_x >= PANEL_MBI_RES_X || _y >= PANEL_MBI_RES_Y) {
-    log_e("Pixel position out of bounds: x=%u, y=%u", _x, _y);
     return;
   }
 
-  // Scale in 14-bit so a dim code stays non-zero, then left-align into the
-  // 16-bit shift word. 14-bit mode ignores the bottom two bits.
-  uint16_t r_pwm = (uint16_t)(((uint32_t)GAMMA14[_r_data] * brightness) >> 8) << 2;
-  uint16_t g_pwm = (uint16_t)(((uint32_t)GAMMA14[_g_data] * brightness) >> 8) << 2;
-  uint16_t b_pwm = (uint16_t)(((uint32_t)GAMMA14[_b_data] * brightness) >> 8) << 2;
-
-  _x += 2;  // offset for missing pixels on the left
-
-  uint16_t _colourbitsoffset = (_y / PANEL_SCAN_LINES) * 3;
-  uint16_t _colourbitsclear = ~(0b111 << _colourbitsoffset);
-
-  uint16_t g_gpio_bitmask = BIT_G1 << _colourbitsoffset;
-  uint16_t b_gpio_bitmask = BIT_B1 << _colourbitsoffset;
-  uint16_t r_gpio_bitmask = BIT_R1 << _colourbitsoffset;
-
-  int y_normalised = _y % PANEL_SCAN_LINES;
-  int bit_start_pos = (1280 * y_normalised) + ((_x % 16) * 80) + ((_x / 16) * 16);
-
-  int subpixel_colour_bit = 16;
-  while (subpixel_colour_bit > 0) {
-    subpixel_colour_bit--;
-    dma_grey_gpio_data[bit_start_pos] &= _colourbitsclear;
-
-    uint16_t mask = (uint16_t)1 << subpixel_colour_bit;
-
-    if (g_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= g_gpio_bitmask;
-    }
-    if (b_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= b_gpio_bitmask;
-    }
-    if (r_pwm & mask) {
-      dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
-    }
-
-    bit_start_pos++;
-  }
+  framebuffer[_y][_x] = {_r_data, _g_data, _b_data};
 }
 
 void UMatrix::mbi_pre_active_dma() {
   // log_d("Sending MBI Pre-Active.");
   int payload_length = 0;
   for (int i = 0; i < 14; i++) {
-    dma_grey_gpio_data[payload_length++] = BIT_LAT;
+    dma_cmd_data[payload_length++] = BIT_LAT;
   }
 
   for (int i = 0; i < 2; i++) {
-    dma_grey_gpio_data[payload_length++] = 0x00;
+    dma_cmd_data[payload_length++] = 0x00;
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
 
 void UMatrix::mbi_v_sync_dma() {
   // log_d("Sending MBI Vert Sync.");
-  int payload_length = 600;
-  memset(dma_grey_gpio_data, 0,
+  int payload_length = MBI_CMD_BUFFER_ENTRIES;
+  memset(dma_cmd_data, 0,
          payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE));
 
   int start_pos = payload_length - (payload_length / 2);
   for (int i = 0; i < 3; i++) {
-    dma_grey_gpio_data[start_pos++] = BIT_LAT;
+    dma_cmd_data[start_pos++] = BIT_LAT;
   }
-  dma_grey_gpio_data[start_pos] = 0x00;
+  dma_cmd_data[start_pos] = 0x00;
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -335,11 +367,11 @@ void UMatrix::mbi_soft_reset_dma() {
   // log_d("Sending MBI Soft Reset.");
   int payload_length = 0;
   for (int i = 0; i < 10; i++) {
-    dma_grey_gpio_data[payload_length++] = BIT_LAT;
+    dma_cmd_data[payload_length++] = BIT_LAT;
   }
-  dma_grey_gpio_data[payload_length++] = 0x00;
+  dma_cmd_data[payload_length++] = 0x00;
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -357,7 +389,7 @@ void UMatrix::mbi_set_config_dma(unsigned int& dma_output_pos,
       mbi_rgb_sdi_val |= BIT_LAT;
     }
 
-    dma_grey_gpio_data[dma_output_pos++] = mbi_rgb_sdi_val;
+    dma_cmd_data[dma_output_pos++] = mbi_rgb_sdi_val;
   }
 }
 
@@ -378,7 +410,7 @@ void UMatrix::mbi_send_config_reg1_dma() {
                        i == (PANEL_MBI_CHAIN_LEN - 1), false);
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           dma_output_pos * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }
@@ -392,7 +424,7 @@ void UMatrix::mbi_send_config_reg2_dma() {
                        i == (PANEL_MBI_CHAIN_LEN - 1), true);
   }
 
-  dma_bus.send_stuff_once(dma_grey_gpio_data,
+  dma_bus.send_stuff_once(dma_cmd_data,
                           dma_output_pos * sizeof(ESP32_GREY_DMA_STORAGE_TYPE),
                           false);
 }

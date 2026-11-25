@@ -28,7 +28,7 @@ extern "C"
 
 esp_err_t spi_setup(void);
 esp_err_t spi_transfer_loop_start(void);
-esp_err_t spi_transfer_loop_stop(void); // generates interrupt
+esp_err_t spi_transfer_loop_stop(void); // blocks until the current segment ends
 
 int      spi_get_transfer_count();
 uint32_t get_gpspi2_intr_val();

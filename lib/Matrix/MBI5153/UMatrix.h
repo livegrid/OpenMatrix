@@ -27,6 +27,17 @@ class UMatrix : public Matrix {
   Bus_Parallel16 dma_bus;
 
   ESP32_GREY_DMA_STORAGE_TYPE* dma_grey_gpio_data;
+  // Scratch buffer for MBI commands and Vsync, so they never touch the frame.
+  ESP32_GREY_DMA_STORAGE_TYPE* dma_cmd_data;
+  volatile bool config_refresh_pending = false;
+
+  // Drawing writes 8-bit RGB here in MBI column order (two leading offset
+  // columns). update() packs it into dma_grey_gpio_data in one pass.
+  struct Rgb8 {
+    uint8_t r, g, b;
+  };
+  Rgb8 (*framebuffer)[PANEL_MBI_RES_X] = nullptr;
+  size_t framebuffer_size = 0;
 
   size_t dma_grey_buffer_parallel_bit_length;  // Length in bits of the buffer
                                                // -> sequance of 13 x 16 bits (2
@@ -37,7 +48,8 @@ class UMatrix : public Matrix {
                                 // value of 26 bytes
 
   void transform(int16_t &x, int16_t &y, int16_t &w, int16_t &h);
-  void mbi_update_frame(bool configure_latches);
+  void mbi_update_frame();
+  void flushFramebuffer();
   void mbi_set_pixel(uint8_t x, uint8_t y,  uint8_t _r_data, uint8_t _g_data, uint8_t _b_data);
   void mbi_pre_active_dma();
   void mbi_v_sync_dma();
