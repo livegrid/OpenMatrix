@@ -303,6 +303,26 @@ void WebServerManager::setupInterface() {
 
 void WebServerManager::startServer() {
   log_i("[*] Attaching ElegantOTA");
+  ElegantOTA.onStart([this]() {
+    log_i("[OTA] Starting update — suspending background tasks");
+    if (taskManager) {
+      taskManager->suspendTask("TOFTask");
+      taskManager->suspendTask("MQTTTask");
+      taskManager->suspendTask("SensorTask");
+      taskManager->suspendTask("TouchTask");
+      taskManager->suspendTask("DebugMonitor");
+    }
+  });
+  ElegantOTA.onEnd([this](bool success) {
+    log_i("[OTA] Update finished: %s", success ? "SUCCESS" : "FAILED");
+    if (!success && taskManager) {
+      taskManager->resumeTask("TOFTask");
+      taskManager->resumeTask("MQTTTask");
+      taskManager->resumeTask("SensorTask");
+      taskManager->resumeTask("TouchTask");
+      taskManager->resumeTask("DebugMonitor");
+    }
+  });
   ElegantOTA.begin(&server);
 
   server.begin();
