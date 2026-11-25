@@ -38,7 +38,7 @@ public:
     PVector pt3 = PVector::fromAngle(angle + PI / 2);
     pt3 *= size/2;
     pt3 += shiftedPosition;
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r,g,b));
+    fillTriangleSafe(matrix->foreground, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r,g,b));
   }
 };
 

@@ -48,12 +48,12 @@ public:
     pt1 += pos;
     pt2 += pos;
     pt3 += pos;
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
+    fillTriangleSafe(matrix->foreground, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
     pt3 = PVector::fromAngle(angle + PI/2);
     pt3.setMag(-size * 3);
     pt3 -= heading;
     pt3 += pos;
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
+    fillTriangleSafe(matrix->foreground, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
   }
 };
 
@@ -101,8 +101,15 @@ public:
     }
 
     void display(PVector pos, float angle, uint8_t size, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) override {
-        for(int8_t i = static_cast<int8_t>((segmentPositions.size()-2) * size); i > -1; i--) {
-            drawSegment(i+1, segmentPositions[i], r, g, b);
+        if (segmentPositions.size() < 2) {
+            if (!segmentPositions.empty()) drawSegment(0, pos, r, g, b);
+            return;
+        }
+        int maxIdx = static_cast<int>(segmentPositions.size()) - 2;
+        int start = maxIdx * static_cast<int>(size);
+        if (start > maxIdx) start = maxIdx;
+        for (int i = start; i >= 0; i--) {
+            drawSegment(i + 1, segmentPositions[i], r, g, b);
         }
         drawSegment(0, pos, r, g, b);
     }

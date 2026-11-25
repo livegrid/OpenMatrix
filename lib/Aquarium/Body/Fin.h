@@ -35,12 +35,12 @@ class TriangleFin : public Fin {
     pt3.setMag(size * 2);
     pt3 -= heading;
     pt3 += pos;
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
+    fillTriangleSafe(matrix->foreground, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
     pt3 = PVector::fromAngle(angle + PI/2);
     pt3.setMag(-size * 2);
     pt3 -= heading;
     pt3 += pos;
-    matrix->foreground->fillTriangle(pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
+    fillTriangleSafe(matrix->foreground, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y, CRGB(r, g, b));
   }
 };
 

@@ -37,3 +37,23 @@ class Matrix {
   GFX_Layer* foreground = nullptr;
   GFX_LayerCompositor* gfx_compositor = nullptr;
 };
+
+// GFX_Lite::fillTriangle swaps width and height when all three vertices share
+// a row (y0 == y1 == y2), drawing horizontal tails/fins as a vertical spike.
+// Draw that degenerate single-row span horizontally before delegating to GFX.
+inline void fillTriangleSafe(GFX_Layer* layer, int16_t x0, int16_t y0,
+                             int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+                             CRGB color) {
+  if (!layer) return;
+  if (y0 == y1 && y1 == y2) {
+    int16_t a = x0;
+    int16_t b = x0;
+    if (x1 < a) a = x1;
+    else if (x1 > b) b = x1;
+    if (x2 < a) a = x2;
+    else if (x2 > b) b = x2;
+    layer->fillRect(a, y0, b - a + 1, 1, color);
+    return;
+  }
+  layer->fillTriangle(x0, y0, x1, y1, x2, y2, color);
+}

@@ -81,7 +81,7 @@ class StarBody : public Body {
         float pt3x = pos.x + cos(armAngle + halfAngleStep) * radScaled;
         float pt3y = pos.y + sin(armAngle + halfAngleStep) * radScaled;
         
-        matrix->foreground->fillTriangle(pt1x, pt1y, pt2x, pt2y, pt3x, pt3y, color0);
+        fillTriangleSafe(matrix->foreground, pt1x, pt1y, pt2x, pt2y, pt3x, pt3y, color0);
       }
       
       // Draw center
