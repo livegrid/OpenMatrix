@@ -28,7 +28,9 @@ extern "C"
 
 esp_err_t spi_setup(void);
 esp_err_t spi_transfer_loop_start(void);
-esp_err_t spi_transfer_loop_stop(void); // blocks until the current segment ends
+// Blocks until the loop has run `scans` full scans since start (or, if that
+// point has passed, until the next segment ends). scans <= 0 stops ASAP.
+esp_err_t spi_transfer_loop_stop(int scans);
 
 int      spi_get_transfer_count();
 uint32_t get_gpspi2_intr_val();

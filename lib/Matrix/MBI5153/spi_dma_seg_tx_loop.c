@@ -31,6 +31,7 @@
 #include <driver/gpio.h>
 #include <esp_check.h>
 #include <esp_rom_sys.h>
+#include <esp_timer.h>
 #include <esp_private/spi_common_internal.h> // need to latest version alpha of esp32-idf for this file
 #include <freertos/queue.h>
 #include <hal/spi_hal.h>
@@ -73,10 +74,16 @@ DMA_ATTR volatile int  spi_seg_transfer_count = 0;
 esp_err_t spi_transfer_initial_payload();
 esp_err_t spi_dma_seg_setup();
 static bool spi_wait_usr_idle(uint32_t timeout_us);
+static volatile int64_t spi_loop_start_us = 0;
 
 // Must be >= 2 segment periods: a stop request can land just after the DMA
 // fetched the CONF word for the next segment.
 #define SPI_SEG_STOP_TIMEOUT_US 50000
+
+#define SPI_GCLK_CLOCK_HZ (5 * 1000 * 1000)
+// One octal byte per SPI clock. The real scan is ~0.5% longer (6221 us
+// measured) due to per-segment overhead; only used to aim mid-scan.
+#define SPI_SCAN_US ((int64_t)GCLK_TOTAL_SIZE * 1000000 / SPI_GCLK_CLOCK_HZ)
 
 // The CPU rewrites the CONF word while GDMA reads it every lap.
 DMA_ATTR static volatile uint32_t spi_seg_conf_1[4];
@@ -235,7 +242,7 @@ esp_err_t spi_setup(void)
   // Set the GCLK Frequency
   // Note: The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data.  
   //device_conf.clock_speed_hz  = SPI_MASTER_FREQ_8M/2; // 4Mhz
-  device_conf.clock_speed_hz  = 5 * 1000 * 1000; // 3Mhz
+  device_conf.clock_speed_hz  = SPI_GCLK_CLOCK_HZ;
   
   device_conf.duty_cycle_pos  = 0;
   device_conf.cs_ena_pretrans = device_conf.cs_ena_posttrans = 0;
@@ -410,6 +417,7 @@ esp_err_t spi_transfer_loop_start()
   }
 
   spi_seg_transfer_count++;
+  spi_loop_start_us = esp_timer_get_time();
 
   return ESP_OK;
 
@@ -436,7 +444,19 @@ static bool spi_wait_usr_idle(uint32_t timeout_us)
   return true;
 }
 
-esp_err_t spi_transfer_loop_stop(void) {
+esp_err_t spi_transfer_loop_stop(int scans) {
+
+  // The CONF word is read at the start of each segment, so a stop requested
+  // during scan k ends after scan k + 1. Aim for the middle of scan N - 2.
+  if (scans >= 2) {
+    const int64_t target = spi_loop_start_us + (int64_t)(scans - 2) * SPI_SCAN_US + SPI_SCAN_US / 2;
+    int64_t remaining = target - esp_timer_get_time();
+    if (remaining > 2000) {
+      vTaskDelay(pdMS_TO_TICKS((remaining - 1000) / 1000));
+    }
+    while (esp_timer_get_time() < target) {
+    }
+  }
 
   GPSPI2.dma_int_clr.dma_seg_trans_done = 1;
 

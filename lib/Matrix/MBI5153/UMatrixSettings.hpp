@@ -92,6 +92,10 @@
 
 #define MBI_CMD_BUFFER_ENTRIES 600 // largest command payload is the Vsync
 
+// S-PWM spreads low grey codes over several scans, so every frame must show
+// the same number of scans between Vsyncs or dark pixels flicker.
+#define MBI_SCANS_PER_FRAME 6
+
 #define PANEL_RES_X 78
 #define PANEL_RES_Y 78
 

@@ -196,13 +196,13 @@ void UMatrix::update() {
 
   flushFramebuffer();
   mbi_update_frame();
-  if (spi_transfer_loop_stop() != ESP_OK) {
+  if (spi_transfer_loop_stop(MBI_SCANS_PER_FRAME) != ESP_OK) {
     log_e("GCLK loop stop failed");
   }
   mbi_v_sync_dma();
   if (spi_transfer_loop_start() != ESP_OK) {
     log_e("GCLK loop start failed, retrying");
-    spi_transfer_loop_stop();
+    spi_transfer_loop_stop(0);
     if (spi_transfer_loop_start() != ESP_OK) {
       log_e("GCLK loop restart failed");
     }
