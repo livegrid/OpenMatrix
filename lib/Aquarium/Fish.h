@@ -18,7 +18,10 @@
 class Fish {
   Matrix* matrix = nullptr;
   PVector pos;
-  float age;
+  // Double so per-frame steps (~1e-8 of a 7-day life at 30 fps) are not
+  // rounded away. In float those steps stall, then a slow frame jumps
+  // past AGE_DEAD and the old wrap below turned the fish back into an egg.
+  double age;
   float health;
   BodyFactory* bodyFactory = nullptr;
   uint8_t offspringCount = 0;
@@ -120,7 +123,7 @@ class Fish {
           matrix->getYResolution() * PHYSICS_SCALE);
     }
 
-    fishDefinition = {age,
+    fishDefinition = {static_cast<float>(age),
                       health,
                       selectedType.bodyType,
                       this->body->getHeadType(),
@@ -179,9 +182,10 @@ class Fish {
         // CRGB(255,0,0));
       }
     }
-    if (age > 1.0)
-      age = 0;
-    return age > 1.0;
+    // True means Aquarium::updateFish should erase this fish.
+    // Do not wrap age back to 0 first: that made this check unreachable,
+    // so fish respawned as eggs instead of dying.
+    return age >= AGE_DEAD;
   }
 
   bool tryReproduce() {
@@ -214,7 +218,7 @@ class Fish {
       body->display();
   }
 
-  float getAge() {
+  double getAge() const {
     return age;
   }
 
@@ -251,7 +255,7 @@ class Fish {
 
  private:
   unsigned long lastUpdateTime = millis();
-  float agingRate;
+  double agingRate = 0;
 
   static PVector randomOutsideEdgePosition(Matrix* matrix) {
     const float w = (float)matrix->getXResolution();
@@ -270,19 +274,25 @@ class Fish {
   }
 
   void initializeAgingRate() {
-    float baseRate = 1.0f / (FISH_LIFESPAN_DAYS * 24 * 60 * 60 *
-                             1000);  // Convert days to milliseconds
-    float variation = FISH_LIFESPAN_VARIATION *
-                      ((float)random(200) / 100.0f -
-                       1.0f);  // Random variation between -20% and +20%
-    agingRate = baseRate * (1.0f + variation);
+    const double lifespanMs =
+        (double)FISH_LIFESPAN_DAYS * 24.0 * 60.0 * 60.0 * 1000.0;
+    const double baseRate = 1.0 / lifespanMs;
+    // random(200)/100 - 1 is in [-1, 0.99), then scaled by the variation.
+    const double variation = (double)FISH_LIFESPAN_VARIATION *
+                             ((double)random(200) / 100.0 - 1.0);
+    double multiplier = 1.0 + variation;
+    // Below this, age barely moves. A zero multiplier never reaches death.
+    if (multiplier < 0.05) {
+      multiplier = 0.05;
+    }
+    agingRate = baseRate * multiplier;
   }
 
   void updateAge(long co2) {
     unsigned long currentTime = millis();
-    float timeDiff = currentTime - lastUpdateTime;
+    unsigned long timeDiff = currentTime - lastUpdateTime;
     if (co2 < 2000) {
-      age += timeDiff * agingRate;
+      age += (double)timeDiff * agingRate;
     }
     lastUpdateTime = currentTime;
   }
