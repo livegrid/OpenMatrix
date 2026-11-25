@@ -30,11 +30,13 @@ void TaskManager::createTask(const std::string& taskName, TaskFunction_t taskFun
   StaticTask_t* taskBuffer = nullptr;
 
   if (usePSRAM) {
-    // Manually allocate stack in PSRAM and use static task creation
+    // Keep the stack in PSRAM, but the FreeRTOS TCB (StaticTask_t) must stay
+    // in internal RAM: flash erases/writes (e.g. OTA) disable PSRAM cache while
+    // the tick ISR still walks task control blocks.
     stackBuffer = (StackType_t*)heap_caps_malloc(stackSize * sizeof(StackType_t),
                                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     taskBuffer = (StaticTask_t*)heap_caps_malloc(sizeof(StaticTask_t),
-                                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                                                   MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 
     if (stackBuffer == nullptr || taskBuffer == nullptr) {
       log_e("Failed to allocate PSRAM for task '%s' stack. Heap=%u psram=%u",
