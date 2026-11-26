@@ -23,7 +23,7 @@ protected:
   Head* head;
   Tail* tail;
   Fin* fin;
-  ColorPalette* colorPalette;
+  ColorPalette* colorPalette = nullptr;
 
   float transitionFactor;
 
@@ -32,6 +32,13 @@ protected:
 
 public:
   Body(Matrix* m, Head* head, Tail* tail, Fin* fin) : matrix(m), head(head), tail(tail), fin(fin) {
+  }
+
+  virtual ~Body() {
+    delete head;
+    delete tail;
+    delete fin;
+    delete colorPalette;
   }
 
   String getHeadType() {
@@ -48,13 +55,19 @@ public:
 
   String type;
 
-  virtual void update(PVector pos, PVector vel, float angle, float age = 0.8, float health = 1.0) {
+  virtual void update(PVector pos, PVector vel, float angle, float age = 0.8f,
+                      float health = 1.0f, float strokePhase = 0.0f,
+                      float turnRate = 0.0f) {
+    (void)strokePhase;
+    (void)turnRate;
     this->pos = pos;
     this->angle = angle;
     this->vel = vel;
     this->size = age;
     this->health = health;
-    colorPalette->adjustColorByAgeAndHealth(this->size, this->health);
+    if (colorPalette) {
+      colorPalette->adjustColorByAgeAndHealth(this->size, this->health);
+    }
   }
 
   void displayEgg() {
@@ -80,7 +93,7 @@ public:
     matrix->foreground->drawPixel(x, y, blend(bgColor, eggColor, alpha));
   }
   
-  void setColorPaletteHSV(const std::vector<CHSV>& palette) {
+  virtual void setColorPaletteHSV(const std::vector<CHSV>& palette) {
     colorPalette->setColors(palette);
   }
 

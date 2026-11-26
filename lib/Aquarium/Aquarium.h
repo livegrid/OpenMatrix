@@ -245,9 +245,15 @@ class Aquarium {
 
   // Initialize fish and store them in a vector of unique pointers
   void initializeFish() {
+    const int minFish = NUM_FISH_START / 2 + 1;
+    int fishCount = 0;
     for (int i = 0; i < NUM_FISH_START; i++) {
-      // Default Fish ctor spawns from a random outside edge.
-      fishArray.emplace_back(std::make_unique<Fish>(matrix, PVector(0, 0), 0.5f));
+      const int remaining = NUM_FISH_START - i;
+      const String forced = (fishCount + remaining <= minFish) ? "Fish" : "";
+      // Default Fish ctor spawns from a random outside edge (including squids & turtles).
+      auto creature = std::make_unique<Fish>(matrix, PVector(0, 0), 0.5f, 1.0f, forced);
+      if (creature->getBodyType() == "Fish") fishCount++;
+      fishArray.emplace_back(std::move(creature));
     }
   }
 
@@ -431,8 +437,15 @@ class Aquarium {
       // Attempt to create new fish
       for (auto& fish : fishArray) {
         if (fish->tryReproduce()) {
+          size_t fishCount = 0;
+          for (const auto& f : fishArray) {
+            if (f->getBodyType() == "Fish") fishCount++;
+          }
+          const size_t nextMajority = (fishArray.size() + 1) / 2 + 1;
+          const String forced = (fishCount < nextMajority) ? "Fish" : "";
           PVector newPos = fish->getPosition();
-          fishArray.emplace_back(std::make_unique<Fish>(matrix, newPos));
+          fishArray.emplace_back(
+              std::make_unique<Fish>(matrix, newPos, 0.0f, 1.0f, forced));
           break;  // Only add one fish per update cycle
         }
       }

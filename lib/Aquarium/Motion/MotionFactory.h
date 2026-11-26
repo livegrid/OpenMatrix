@@ -7,6 +7,7 @@
 #include "StarMotion.h"
 #include "SnakeMotion.h"
 #include "OctopusMotion.h"
+#include "SquidMotion.h"
 
 class MotionFactory {
 public:
@@ -25,6 +26,9 @@ public:
         }
         else if (type == "Octopus") {
             return std::make_unique<OctopusMotion>(pos, xResolution, yResolution);
+        }
+        else if (type == "Squid") {
+            return std::make_unique<SquidMotion>(pos, xResolution, yResolution);
         }
         else {
           return nullptr;

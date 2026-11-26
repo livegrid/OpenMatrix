@@ -58,6 +58,14 @@ class Motion {
     return angle;
   }
 
+  virtual float getStrokePhase() const {
+    return 0.0f;
+  }
+
+  virtual float getTurnRate() const {
+    return 0.0f;
+  }
+
   void setResolution(uint16_t x, uint16_t y) {
     xResolution = x;
     yResolution = y;
@@ -69,8 +77,8 @@ class Motion {
 
   virtual void doMotion() = 0;
 
-  void update(float age = AGE_ADULT, long co2 = CO2_OK,
-              bool stayInside = false) {
+  virtual void update(float age = AGE_ADULT, long co2 = CO2_OK,
+                      bool stayInside = false) {
     this->co2 = co2;
 
     if (age < AGE_EGG) {
