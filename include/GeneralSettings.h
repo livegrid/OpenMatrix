@@ -1,7 +1,7 @@
 #pragma once
 
 #define FIRMWARE_VERSION_MAJOR 2
-#define FIRMWARE_VERSION_MINOR 3
+#define FIRMWARE_VERSION_MINOR 4
 #define FIRMWARE_VERSION_PATCH 0
 
 // Livegrid model. Uncomment at most one.
