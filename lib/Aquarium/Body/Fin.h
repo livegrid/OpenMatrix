@@ -57,7 +57,9 @@ public:
 
 class LegFin : public Fin {
 public:
-  LegFin(Matrix* m) : Fin(m) {}
+  LegFin(Matrix* m) : Fin(m) {
+    type = "LegFin";
+  }
 
   void display(PVector pos, float angle, uint8_t size, uint8_t r, uint8_t g, uint8_t b) override {
     // PVector heading = PVector::fromAngle(angle);

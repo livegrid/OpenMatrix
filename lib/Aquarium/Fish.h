@@ -57,7 +57,8 @@ class Fish {
 
   Fish(Matrix* matrix, const FishDefinition& fishDef)
       : matrix(matrix),
-        pos(randomOutsideEdgePosition(matrix)),
+        pos(fishDef.age < AGE_EGG ? randomInsidePosition(matrix)
+                                  : randomOutsideEdgePosition(matrix)),
         age(fishDef.age),
         health(fishDef.health) {  // Member initializer list
     BodyFactory bodyFactory(matrix);
@@ -261,6 +262,15 @@ class Fish {
  private:
   unsigned long lastUpdateTime = millis();
   double agingRate = 0;
+
+  static PVector randomInsidePosition(Matrix* matrix) {
+    const long w = max(1L, (long)matrix->getXResolution());
+    const long h = max(1L, (long)matrix->getYResolution());
+    const long marginX = w > 6 ? 3 : 0;
+    const long marginY = h > 6 ? 3 : 0;
+    return PVector((float)random(marginX, w - marginX),
+                   (float)random(marginY, h - marginY));
+  }
 
   static PVector randomOutsideEdgePosition(Matrix* matrix) {
     const float w = (float)matrix->getXResolution();

@@ -14,7 +14,7 @@
 
 //AGE SETTINGS
 #define FISH_LIFESPAN_DAYS 7.0f  // Average lifespan in days
-#define FISH_LIFESPAN_VARIATION 1.0f  // Variation in lifespan (20% by default)
+#define FISH_LIFESPAN_VARIATION 0.2f  // Variation in lifespan (20% by default)
 
 const float HEALTH_REDUCTION_RATE_BAD = 0.1f;    // 10% per second
 const float HEALTH_REDUCTION_RATE_REALBAD = 0.2f; // 20% per second
@@ -28,24 +28,24 @@ const float HEALTH_INCREASE_RATE_GOOD = 0.05f;    // 5% per second
 #define NUM_FISH_IDEAL 20
 #define NUM_PLANTS 3
 
-// SeaFloor element counts (tuned for 78x78 display)
-#if defined(PANEL_UPCYCLED)
-  #define NUM_ROCKS 0
-  #define NUM_MOSS_CLUSTERS 0
-  #define NUM_SEAGRASS 0
-  #define NUM_BRANCHING_PLANTS 0
-  #define NUM_CORAL 0
-  #define NUM_ANEMONES 0
-  #define MAX_SCREEN_WIDTH 78
-#else
+// SeaFloor element counts (procedural seafloor is Aura-only)
+#if defined(PANEL_AURA)
   #define NUM_ROCKS 3
   #define NUM_MOSS_CLUSTERS 5
   #define NUM_SEAGRASS 10
   #define NUM_BRANCHING_PLANTS 2
   #define NUM_CORAL 3
   #define NUM_ANEMONES 2
-  #if defined(PANEL_AURA)
-    #define MAX_SCREEN_WIDTH 192
+  #define MAX_SCREEN_WIDTH 192
+#else
+  #define NUM_ROCKS 0
+  #define NUM_MOSS_CLUSTERS 0
+  #define NUM_SEAGRASS 0
+  #define NUM_BRANCHING_PLANTS 0
+  #define NUM_CORAL 0
+  #define NUM_ANEMONES 0
+  #if defined(PANEL_UPCYCLED)
+    #define MAX_SCREEN_WIDTH 78
   #else
     #define MAX_SCREEN_WIDTH 64
   #endif

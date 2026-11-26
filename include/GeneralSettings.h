@@ -2,7 +2,7 @@
 
 #define FIRMWARE_VERSION_MAJOR 2
 #define FIRMWARE_VERSION_MINOR 4
-#define FIRMWARE_VERSION_PATCH 0
+#define FIRMWARE_VERSION_PATCH 1
 
 // Livegrid model. Uncomment at most one.
 // PANEL_AURA:     192x64 HUB75 on OMatrix, built-in VL53L8CX

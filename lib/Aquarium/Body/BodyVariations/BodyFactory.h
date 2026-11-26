@@ -137,7 +137,9 @@ class BodyFactory {
       return new TriangleFin(matrix);
     } else if (type == "EllipseFin") {
       return new EllipseFin(matrix);
-    } else if (type == "LegFin") {
+    } else if (type == "LegFin" || type.length() == 0) {
+      // Earlier firmware forgot to set type = "LegFin" in LegFin's constructor,
+      // so existing saves store "" for LegFin creatures.
       return new LegFin(matrix);
     } else if (type == "RoundFin") {
       return new RoundFin(matrix);

@@ -227,6 +227,8 @@ class Aquarium {
     if (!aquariumStateManager.loadState(fishArray, matrix)) {
       log_w("Failed to load aquarium state, initializing with default values");
       initializeFish();
+    } else {
+      ensureMinimumFish();
     }
   }
 
@@ -243,18 +245,29 @@ class Aquarium {
     }
   }
 
-  // Initialize fish and store them in a vector of unique pointers
-  void initializeFish() {
-    const int minFish = NUM_FISH_START / 2 + 1;
-    int fishCount = 0;
-    for (int i = 0; i < NUM_FISH_START; i++) {
-      const int remaining = NUM_FISH_START - i;
+  // Ensure the aquarium never holds fewer than NUM_FISH_START creatures.
+  void ensureMinimumFish() {
+    if (fishArray.size() >= NUM_FISH_START) {
+      return;
+    }
+    size_t fishCount = 0;
+    for (const auto& f : fishArray) {
+      if (f->getBodyType() == "Fish") fishCount++;
+    }
+    const size_t minFish = NUM_FISH_START / 2 + 1;
+    while (fishArray.size() < NUM_FISH_START) {
+      const size_t remaining = NUM_FISH_START - fishArray.size();
       const String forced = (fishCount + remaining <= minFish) ? "Fish" : "";
       // Default Fish ctor spawns from a random outside edge (including squids & turtles).
       auto creature = std::make_unique<Fish>(matrix, PVector(0, 0), 0.5f, 1.0f, forced);
       if (creature->getBodyType() == "Fish") fishCount++;
       fishArray.emplace_back(std::move(creature));
     }
+  }
+
+  // Initialize fish and store them in a vector of unique pointers
+  void initializeFish() {
+    ensureMinimumFish();
   }
 
   // Landscape uses the full set. Portrait is one third, since the floor is the short edge.
@@ -432,6 +445,9 @@ class Aquarium {
       }
     }
 
+    // Keep at least NUM_FISH_START creatures in the tank even if older ones die off.
+    ensureMinimumFish();
+
     // Population control
     if (fishArray.size() < NUM_FISH_IDEAL) {
       // Attempt to create new fish
@@ -444,6 +460,10 @@ class Aquarium {
           const size_t nextMajority = (fishArray.size() + 1) / 2 + 1;
           const String forced = (fishCount < nextMajority) ? "Fish" : "";
           PVector newPos = fish->getPosition();
+          newPos.x = constrain(newPos.x, 1.0f,
+                               (float)max(1, (int)matrix->getXResolution() - 2));
+          newPos.y = constrain(newPos.y, 1.0f,
+                               (float)max(1, (int)matrix->getYResolution() - 2));
           fishArray.emplace_back(
               std::make_unique<Fish>(matrix, newPos, 0.0f, 1.0f, forced));
           break;  // Only add one fish per update cycle
