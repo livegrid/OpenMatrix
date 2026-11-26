@@ -19,6 +19,7 @@
 #include "StarBody.h"
 #include "TurtleBody.h"
 #include "OctopusBody.h"
+#include "SquidBody.h"
 
 class BodyFactory {
  private:
@@ -71,6 +72,9 @@ class BodyFactory {
     });
     registerBodyType([](Matrix* m, Head* h, Tail* t, Fin* f) -> Body* {
       return new OctopusBody(m, h, t, f);
+    });
+    registerBodyType([](Matrix* m, Head* h, Tail* t, Fin* f) -> Body* {
+      return new SquidBody(m, h, t, f);
     });
   }
 
@@ -180,6 +184,8 @@ class BodyFactory {
       return new SnakeBody(matrix, head, tail, fin);
     } else if (type == "Octopus") {
       return new OctopusBody(matrix, head, tail, fin);
+    } else if (type == "Squid") {
+      return new SquidBody(matrix, head, tail, fin);
     } else {
       // If the type is not recognized, return nullptr or a default body type
       delete head;
@@ -205,6 +211,9 @@ class BodyFactory {
     } else if (type == "Octopus") {
       return new OctopusBody(matrix, createRandomHead(), createRandomTail(),
                              createRandomFin());
+    } else if (type == "Squid") {
+      return new SquidBody(matrix, createRandomHead(), createRandomTail(),
+                           createRandomFin());
     }
     else {
       return nullptr;

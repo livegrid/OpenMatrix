@@ -84,7 +84,7 @@ class Fish {
   }
 
   Fish(Matrix* matrix, PVector pos = PVector(0, 0), float age = 0,
-       float health = 1)
+       float health = 1, const String& forcedType = "")
       : matrix(matrix), pos(pos), age(age), health(health) {
     BodyFactory bodyFactory(matrix);
     initializeAgingRate();
@@ -95,13 +95,17 @@ class Fish {
       this->pos = randomOutsideEdgePosition(matrix);
     }
 
+    // 50% Fish, 10% each of the other 5 creatures.
     std::vector<BodyMotionType> types = {{"Fish", "Fish", 0.5},
+                                         {"Turtle", "Turtle", 0.1},
+                                         {"Squid", "Squid", 0.1},
+                                         {"Octopus", "Octopus", 0.1},
                                          {"Star", "Star", 0.1},
-                                         {"Turtle", "Turtle", 0.2},
-                                         {"Snake", "Snake", 0.1},
-                                         {"Octopus", "Octopus", 0.1}};
+                                         {"Snake", "Snake", 0.1}};
 
-    auto selectedType = selectType(types);
+    BodyMotionType selectedType =
+        forcedType.length() > 0 ? BodyMotionType{forcedType, forcedType, 1.0}
+                                : selectType(types);
 
     this->body =
         std::unique_ptr<Body>(bodyFactory.createBody(selectedType.bodyType));
@@ -168,7 +172,8 @@ class Fish {
     pos = motion->getPosition() / PHYSICS_SCALE;
     updateAge(co2);
     updateHealth(co2);
-    body->update(pos, motion->getVelocity(), motion->getAngle(), age, health);
+    body->update(pos, motion->getVelocity(), motion->getAngle(), age, health,
+                 motion->getStrokePhase(), motion->getTurnRate());
     if (food != nullptr) {
       PVector foodDistance = food->getPosition() - pos;
       if (food->isOffScreen()) {
